@@ -100,13 +100,13 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 @media(min-width:600px){.prod-grid{grid-template-columns:repeat(3,1fr);}}
 .prod-card{background:#fff;border-radius:12px;padding:10px;box-shadow:var(--sh);cursor:pointer;position:relative;-webkit-tap-highlight-color:transparent;}
 .prod-card:active{transform:scale(.97);}
-.prod-card-img{width:100%;height:80px;object-fit:cover;border-radius:8px;margin-bottom:6px;}
-.prod-card-emoji{width:100%;height:80px;display:flex;align-items:center;justify-content:center;font-size:2.5rem;border-radius:8px;background:var(--vbg);margin-bottom:6px;}
-.prod-card-name{font-weight:800;font-size:.78rem;margin-bottom:2px;line-height:1.2;}
-.prod-card-price{font-weight:900;color:var(--v);font-size:.88rem;}
-.prod-card-stock{font-size:.65rem;color:var(--gr);}
-.prod-card-add{position:absolute;top:6px;right:6px;background:var(--v);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:1rem;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;}
-.prod-card.out{opacity:.5;pointer-events:none;}
+.prod-card-img{width:100%;height:160px;object-fit:cover;border-radius:8px;margin-bottom:8px;}
+.prod-card-emoji{width:100%;height:160px;display:flex;align-items:center;justify-content:center;font-size:3.5rem;border-radius:8px;background:var(--vbg);margin-bottom:8px;}
+.prod-card-name{font-weight:800;font-size:.85rem;margin-bottom:3px;line-height:1.3;}
+.prod-card-price{font-weight:900;color:var(--v);font-size:1rem;}
+.prod-card-stock{font-size:.7rem;color:var(--gr);margin-top:2px;}
+.prod-card-add{position:absolute;top:8px;right:8px;background:var(--v);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.2);}
+.prod-card.out{opacity:.7;}
 .temp-card-add{background:var(--or);}
 
 /* CART ITEMS */
@@ -430,7 +430,7 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
   </div>
 </div>
 
-<!-- MIC FAB -->
+<!-- MIC FAB — graba directo sin burbuja -->
 <button class="mic-fab" id="micFab" onclick="toggleVoiceSearch()">
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
     <rect x="9" y="2" width="6" height="11" rx="3"/>
@@ -439,18 +439,6 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
     <line x1="8" y1="21" x2="16" y2="21"/>
   </svg>
 </button>
-
-<!-- VOICE PANEL -->
-<div class="voice-panel" id="voicePanelEl">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-    <span style="font-size:.8rem;font-weight:800;color:var(--v)">🎤 Búsqueda por voz</span>
-    <button onclick="closeVoicePanel()" style="background:none;border:none;color:var(--gr);cursor:pointer">✕</button>
-  </div>
-  <div id="voiceStatus" style="background:var(--vbg);border-radius:8px;padding:8px 10px;font-size:.78rem;font-weight:700;color:var(--v);margin-bottom:8px;min-height:32px;display:flex;align-items:center;gap:6px">
-    <span id="vsIcon">🎤</span><span id="vsText">Toca el micrófono y di el producto</span>
-  </div>
-  <div id="voiceTranscript" style="display:none;background:#f9fef9;border:1px solid var(--vbg);border-radius:8px;padding:7px 10px;font-size:.75rem;font-style:italic;color:var(--gr);margin-bottom:6px"></div>
-</div>
 
 <div class="toast" id="toast"></div>
 
@@ -672,15 +660,27 @@ function makeProdCard(p, tipo) {
   const imgEl = p.img
     ? `<img src="${p.img}" class="prod-card-img">`
     : `<div class="prod-card-emoji">${catEmoji(p.cat)}</div>`;
-  const stock = tipo==="catalogo" ? `<div class="prod-card-stock">Stock: ${p.stock}</div>` : (p.stock!=null?`<div class="prod-card-stock">Quedan: ${p.stock}</div>`:"");
-  const addBtn = agotado ? "" : `<button class="prod-card-add${isTmp?" temp-card-add":""}" onclick="addToCart('${p.id}','${tipo}');event.stopPropagation()">+</button>`;
-  return `<div class="prod-card${agotado?" out":""}" onclick="addToCart('${p.id}','${tipo}')">
-    ${imgEl}
+  const stockEl = tipo==="catalogo"
+    ? `<div class="prod-card-stock">Stock: ${p.stock}</div>`
+    : (p.stock!=null?`<div class="prod-card-stock">Quedan: ${p.stock}</div>`:"");
+  const descEl = p.desc ? `<div style="font-size:.7rem;color:var(--gr);margin-top:3px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${p.desc}</div>` : "";
+
+  // Bottom button: Agotado (red) or Agregar (green)
+  const bottomBtn = agotado
+    ? `<button disabled style="width:100%;background:var(--ro);color:#fff;border:none;border-radius:10px;padding:8px;font-size:.82rem;font-weight:800;margin-top:8px;cursor:default">Agotado</button>`
+    : `<button class="prod-card-add${isTmp?" temp-card-add":""}" onclick="addToCart('${p.id}','${tipo}');event.stopPropagation()" style="position:static;width:100%;border-radius:10px;height:auto;padding:8px;font-size:.82rem;font-weight:800;margin-top:8px">+ Agregar</button>`;
+
+  return `<div class="prod-card${agotado?" out":""}" ${agotado?"":"onclick=\"addToCart('"+p.id+"','"+tipo+"')\""}>
+    <div style="position:relative">
+      ${imgEl}
+      ${isTmp?`<div style="position:absolute;top:6px;left:6px;background:var(--or);color:#fff;font-size:.6rem;font-weight:800;padding:2px 7px;border-radius:50px">Propio</div>`:""}
+    </div>
     <div class="prod-card-name">${p.nombre}</div>
+    ${descEl}
     <div class="prod-card-price">Bs.${(p.precio||0).toFixed(2)}</div>
-    ${stock}
-    ${addBtn}
-    ${isTmp?`<div style="position:absolute;top:6px;left:6px;background:var(--or);color:#fff;font-size:.6rem;font-weight:800;padding:2px 6px;border-radius:50px">Propio</div>`:"" }
+    <div style="font-size:.72rem;color:var(--gr)">${p.unidad||"unidad"}</div>
+    ${stockEl}
+    ${bottomBtn}
   </div>`;
 }
 
@@ -1081,35 +1081,42 @@ async function saveCompra(){
 let voiceRecog=null, voiceActive=false;
 
 function toggleVoiceSearch(){
-  if(voiceActive){stopVoiceSearch();return;}
+  if(voiceActive){ stopVoiceSearch(); return; }
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){showToast("Reconocimiento de voz no disponible",true);return;}
-  if(window.speechSynthesis)window.speechSynthesis.cancel();
+  if(!SR){ showToast("Reconocimiento de voz no disponible. Usa Chrome.",true); return; }
+  if(window.speechSynthesis) window.speechSynthesis.cancel();
+  const mic=document.getElementById("micFab");
   voiceRecog=new SR();
   voiceRecog.lang="es-BO"; voiceRecog.interimResults=true; voiceRecog.continuous=false;
   voiceRecog.onstart=()=>{
     voiceActive=true;
-    document.getElementById("micFab").classList.add("active");
-    document.getElementById("voicePanelEl").style.display="block";
-    document.getElementById("vsIcon").textContent="🔴";
-    document.getElementById("vsText").textContent="Escuchando...";
-    document.getElementById("voiceTranscript").style.display="none";
+    if(mic){ mic.classList.add("active"); mic.style.transform="scale(1.2)"; }
+    showToast("🔴 Escuchando... di el producto", false);
   };
   voiceRecog.onresult=(e)=>{
     let text="";
     for(let i=e.resultIndex;i<e.results.length;i++) text+=e.results[i][0].transcript;
-    document.getElementById("voiceTranscript").textContent=text;
-    document.getElementById("voiceTranscript").style.display="block";
     document.getElementById("vendSearch").value=text;
     onVendSearch();
   };
-  voiceRecog.onerror=()=>stopVoiceSearch();
-  voiceRecog.onend=()=>{voiceActive=false;document.getElementById("micFab").classList.remove("active");document.getElementById("vsIcon").textContent="🎤";document.getElementById("vsText").textContent="Toca el micrófono y di el producto";};
+  voiceRecog.onerror=(e)=>{
+    stopVoiceSearch();
+    if(e.error==="not-allowed") showToast("Permiso de micrófono denegado",true);
+  };
+  voiceRecog.onend=()=>{
+    voiceActive=false;
+    if(mic){ mic.classList.remove("active"); mic.style.transform="scale(1.0)"; }
+  };
   voiceRecog.start();
 }
 
-function stopVoiceSearch(){if(voiceRecog){try{voiceRecog.stop();}catch(e){}voiceRecog=null;}voiceActive=false;document.getElementById("micFab").classList.remove("active");}
-function closeVoicePanel(){stopVoiceSearch();document.getElementById("voicePanelEl").style.display="none";}
+function stopVoiceSearch(){
+  if(voiceRecog){try{voiceRecog.stop();}catch(e){}voiceRecog=null;}
+  voiceActive=false;
+  const mic=document.getElementById("micFab");
+  if(mic){ mic.classList.remove("active"); mic.style.transform="scale(1.0)"; }
+}
+function closeVoicePanel(){ stopVoiceSearch(); }
 
 // ════════════════════════════════════
 // UTILS
