@@ -492,8 +492,21 @@ header{background:var(--v);color:#fff;padding:0 14px;position:sticky;top:0;z-ind
 
     <!-- PASO 2: Ubicación en mapa -->
     <div id="cliS2" style="display:none">
-      <div class="mlbl">Buscá tu dirección o mové el pin en el mapa 📍</div>
-      <input class="places-input" id="placesInput" type="text" placeholder="Escribe tu dirección para buscar...">
+      <div class="mlbl">¿Dónde entregamos tu pedido? 📍</div>
+
+      <!-- GPS Button — prominent, shown first -->
+      <button id="gpsBtn" onclick="useGPSLocation()" style="width:100%;background:var(--v);color:#fff;border:none;border-radius:12px;padding:13px;font-size:.92rem;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;-webkit-tap-highlight-color:transparent">
+        <span id="gpsBtnIcon">📍</span>
+        <span id="gpsBtnText">Usar mi ubicación actual</span>
+      </button>
+
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <div style="flex:1;height:1px;background:#e0e0e0"></div>
+        <span style="font-size:.75rem;color:var(--gr);white-space:nowrap">o buscá tu dirección</span>
+        <div style="flex:1;height:1px;background:#e0e0e0"></div>
+      </div>
+
+      <input class="places-input" id="placesInput" type="text" placeholder="Escribí tu calle o barrio...">
       <div id="clientMap" class="map-container"></div>
       <div class="map-addr-display" id="mapAddrDisplay" style="display:none">
         <span>📍</span><span id="mapAddrText"></span>
@@ -2210,17 +2223,56 @@ function initClientMap() {
     });
   }
 
-  // Try geolocation
-  if(navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(pos => {
+  // Don't auto-geolocate — user taps the GPS button explicitly
+}
+
+// ── GPS BUTTON — explicit user action ─────────────────
+function useGPSLocation() {
+  const btn = document.getElementById("gpsBtn");
+  const icon = document.getElementById("gpsBtnIcon");
+  const text = document.getElementById("gpsBtnText");
+
+  if(!navigator.geolocation) {
+    showToast("Tu navegador no soporta GPS. Buscá tu dirección.", true);
+    return;
+  }
+
+  // Show loading state
+  if(icon) icon.textContent = "⏳";
+  if(text) text.textContent = "Buscando tu ubicación...";
+  if(btn) btn.disabled = true;
+
+  navigator.geolocation.getCurrentPosition(
+    pos => {
       const {latitude:lat, longitude:lng} = pos.coords;
-      clientMap.flyTo({center:[lng, lat], zoom:16});
-      clientMarker.setLngLat([lng, lat]);
+
+      // Center map and move marker
+      if(clientMap) {
+        clientMap.flyTo({center:[lng, lat], zoom:17});
+      }
+      if(clientMarker) {
+        clientMarker.setLngLat([lng, lat]);
+      }
       clientLatLng = {lat, lng};
       reverseGeocode(lat, lng);
       checkDeliveryRange(lat, lng);
-    }, () => {});
-  }
+
+      // Success state
+      if(icon) icon.textContent = "✅";
+      if(text) text.textContent = "Ubicación encontrada";
+      if(btn) { btn.style.background = "var(--vl)"; btn.disabled = false; }
+    },
+    err => {
+      // Error — guide user to search manually
+      if(icon) icon.textContent = "⚠️";
+      if(text) text.textContent = "No se pudo obtener ubicación — buscá tu dirección arriba";
+      if(btn) { btn.style.background = "var(--or)"; btn.disabled = false; }
+      if(err.code === 1) {
+        showToast("Permiso de ubicación denegado. Buscá tu dirección manualmente.", true);
+      }
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  );
 }
 
 async function reverseGeocode(lat, lng) {
