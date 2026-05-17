@@ -1207,6 +1207,8 @@ async function acceptAndNotify(id, btn) {
   try {
     await fs.updateDoc(fs.doc(db,"orders",id), { status:"confirmed", confirmedAt: fs.serverTimestamp() });
     showToast("✅ Pedido confirmado");
+    // Auto-assign if only one repartidor
+    await autoAssignIfSingle(id);
   } catch(e) { showToast("Error",true); if(btn) btn.disabled=false; return; }
   // Build "en camino" WhatsApp message ready to send to client
   // Admin opens WhatsApp to client's number
@@ -3082,45 +3084,82 @@ async function confirmAssignRep() {
 async function printOrderWithRep(orderId) {
   const o = DB.orders.find(x=>x.id===orderId);
   if(!o) return;
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(location.origin+'/repartidor.html?order='+orderId)}`;
-  const itemsHtml = (o.items||[]).map(i=>`<tr><td>${i.nombre}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right">Bs.${(i.subtotal||0).toFixed(2)}</td></tr>`).join('');
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=${encodeURIComponent(location.origin+'/repartidor.html?order='+orderId)}`;
+  const itemsHtml = (o.items||[]).map(i=>`<tr><td>${i.nombre}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right">Bs.${(i.subtotal||0).toFixed(2)}</td><td style="text-align:center">☐</td></tr>`).join('');
+  const distInfo = o.dist ? `${o.dist.toFixed(1)} km · ~${o.estimatedMins||'?'} min` : 'Sin datos';
+  const now = new Date().toLocaleString('es-BO');
+
+  // Shared ticket content builder
+  const ticketContent = (tipo) => `
+    <div style="text-align:center;font-size:10px;font-weight:bold;background:${tipo==='retiro'?'#eaf6ee':'#e3f2fd'};padding:4px;margin-bottom:4px;border-radius:3px">
+      ${tipo==='retiro'?'📦 CONTROL DE RETIRO — Para el repartidor':'🏠 CONTROL DE ENTREGA — Para el cliente'}
+    </div>
+    <div style="text-align:center"><b>🏪 La Bodega Online Pacata</b></div>
+    <div style="text-align:center;font-size:10px">${now}</div>
+    <div class="sep"></div>
+    <div><b>Pedido:</b> ${o.code||'—'}</div>
+    <div><b>Cliente:</b> ${o.clientName||'—'}</div>
+    <div><b>Tel:</b> ${o.clientPhone||'—'}</div>
+    <div><b>Dirección:</b> ${o.clientAddr||'—'}</div>
+    <div><b>📏 Distancia:</b> ${distInfo}</div>
+    ${o.scheduledSlot?`<div><b>⏰ Entrega programada:</b> ${o.scheduledSlot}</div>`:''}
+    ${o.adminNote?`<div style="background:#fff8e1;padding:3px;margin:3px 0;border-radius:3px"><b>📝 Nota:</b> ${o.adminNote}</div>`:''}
+    <div class="sep"></div>
+    <table>
+      <thead><tr><th style="text-align:left">Producto</th><th>Cant.</th><th style="text-align:right">Total</th><th>☑</th></tr></thead>
+      <tbody>${itemsHtml}</tbody>
+    </table>
+    <div class="sep"></div>
+    <div>Subtotal: Bs. ${(o.subtotal||0).toFixed(2)}</div>
+    <div>Delivery: ${o.delivery===0?'GRATIS ✓':'Bs. '+(o.delivery||0).toFixed(2)}</div>
+    <div class="total">TOTAL: Bs. ${(o.total||0).toFixed(2)}</div>
+    <div class="sep"></div>
+    <div class="rep-box">🚲 Repartidor: <b>${o.repartidorNombre||'Por asignar'}</b></div>
+    ${tipo==='retiro'?`
+      <div style="margin-top:6px;font-size:11px">
+        <b>Control de retiro:</b>
+        <div style="margin-top:4px">☐ Productos verificados y completos</div>
+        <div>☐ Monto cobrado en puerta: Bs._______</div>
+        <div>☐ Pedido entregado al repartidor</div>
+        <div style="margin-top:6px">Firma: _______________________</div>
+      </div>`:`
+      <div style="margin-top:6px;font-size:11px">
+        <b>Confirmación de entrega:</b>
+        <div style="margin-top:4px">☐ Pedido recibido conforme</div>
+        <div>☐ Pago realizado: ☐ Efectivo  ☐ QR</div>
+        <div>☐ Monto pagado: Bs._______</div>
+        <div style="margin-top:6px">Firma cliente: _______________</div>
+      </div>`}
+    <div class="sep"></div>
+    <div class="qr"><img src="${qrUrl}" width="80" height="80"><br><small>Escanear para ver detalles</small></div>`;
+
   const w = window.open('','_blank');
   w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Pedido ${o.code}</title>
   <style>
-    body{font-family:Arial,sans-serif;font-size:12px;margin:0;padding:10px;max-width:300px;}
-    h2{font-size:14px;text-align:center;margin:4px 0;}
-    .sep{border-top:1px dashed #000;margin:6px 0;}
+    body{font-family:Arial,sans-serif;font-size:12px;margin:0;padding:0;}
+    .ticket{max-width:300px;margin:0 auto;padding:10px;page-break-after:always;}
+    .ticket:last-child{page-break-after:auto;}
+    h2{font-size:13px;text-align:center;margin:3px 0;}
+    .sep{border-top:1px dashed #000;margin:5px 0;}
     table{width:100%;border-collapse:collapse;}
-    td{padding:3px 2px;}
-    .total{font-size:14px;font-weight:bold;}
-    .rep-box{background:#eaf6ee;border:1px solid #2d7a45;border-radius:6px;padding:6px;margin:6px 0;text-align:center;}
-    .qr{text-align:center;margin:8px 0;}
-    @media print{button{display:none}}
+    th,td{padding:3px 2px;font-size:11px;}
+    .total{font-size:13px;font-weight:bold;margin:3px 0;}
+    .rep-box{background:#eaf6ee;border:1px solid #2d7a45;border-radius:4px;padding:5px;margin:4px 0;text-align:center;font-size:11px;}
+    .qr{text-align:center;margin:5px 0;}
+    @media print{
+      .no-print{display:none}
+      .ticket{border:none;}
+    }
+    @media screen{
+      body{background:#f0f0f0;}
+      .ticket{background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.15);margin:10px auto;}
+    }
   </style></head><body>
-  <h2>🏪 La Bodega Online Pacata</h2>
-  <div style="text-align:center;font-size:11px">${new Date().toLocaleString('es-BO')}</div>
-  <div class="sep"></div>
-  <div><b>Pedido:</b> ${o.code||'—'}</div>
-  <div><b>Cliente:</b> ${o.clientName||'—'}</div>
-  <div><b>Tel:</b> ${o.clientPhone||'—'}</div>
-  <div><b>Dirección:</b> ${o.clientAddr||'—'}</div>
-  ${o.scheduledSlot?`<div><b>⏰ Entrega programada:</b> ${o.scheduledSlot}</div>`:''}
-  ${o.adminNote?`<div style="background:#fff8e1;padding:4px;border-radius:4px;margin:4px 0"><b>📝 Nota:</b> ${o.adminNote}</div>`:''}
-  <div class="sep"></div>
-  <table>
-    <thead><tr><th style="text-align:left">Producto</th><th>Cant.</th><th style="text-align:right">Total</th></tr></thead>
-    <tbody>${itemsHtml}</tbody>
-  </table>
-  <div class="sep"></div>
-  <div>Subtotal: Bs. ${(o.subtotal||0).toFixed(2)}</div>
-  <div>Delivery: ${o.delivery===0?'GRATIS':'Bs. '+(o.delivery||0).toFixed(2)}</div>
-  <div class="total">TOTAL: Bs. ${(o.total||0).toFixed(2)}</div>
-  <div class="sep"></div>
-  <div class="rep-box">🚲 Repartidor: <b>${o.repartidorNombre||'Por asignar'}</b></div>
-  <div class="qr"><img src="${qrUrl}" width="80" height="80"><br><small>Escanear para ver detalles</small></div>
-  <div class="sep"></div>
-  <div style="text-align:center;font-size:10px">¡Gracias por su preferencia!</div>
-  <button onclick="window.print()" style="width:100%;margin-top:10px;padding:8px;background:#2d7a45;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">🖨️ Imprimir</button>
+  <div class="ticket">${ticketContent('retiro')}</div>
+  <div class="ticket">${ticketContent('entrega')}</div>
+  <div class="no-print" style="text-align:center;padding:10px">
+    <button onclick="window.print()" style="padding:10px 24px;background:#2d7a45;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:bold">🖨️ Imprimir ambos tickets</button>
+  </div>
   </body></html>`);
 }
 
@@ -3159,33 +3198,83 @@ function renderOrders() {
   }
   const tbody = document.getElementById("ordersBody");
   if(!orders.length) { tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--gr);padding:20px">Sin pedidos</td></tr>'; return; }
+
+  const activeReps = DB_repartidores.filter(r=>r.activo!==false);
+
   tbody.innerHTML = orders.map(o => {
     const dt = o.createdAt ? new Date(o.createdAt.seconds*1000).toLocaleString("es-BO",{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : "-";
     const isScheduled = o.status === "scheduled";
     let quickBtn = "";
     if(o.status==="pending"||o.status==="scheduled") {
       quickBtn = `<button class="btn btn-v btn-sm" onclick="acceptAndNotify('${o.id}',this)">✅ Aceptar</button>`;
-    } else if(o.status==="confirmed" && !o.repartidorId) {
-      quickBtn = `<button class="btn btn-or btn-sm" onclick="openAssignRep('${o.id}')">🚲 Asignar</button>`;
-    } else if(o.status==="confirmed" && o.repartidorId) {
-      quickBtn = `<button class="btn btn-or btn-sm" onclick="sendOnWay('${o.id}',this)">🚲 En camino</button>`;
+    } else if(o.status==="confirmed") {
+      quickBtn = `<button class="btn btn-or btn-sm" onclick="sendOnWay('${o.id}',this)">🚲 En camino</button>
+        <button class="btn btn-sec btn-sm" onclick="printOrderWithRep('${o.id}')">🖨️</button>`;
     } else if(o.status==="on_way") {
       quickBtn = `<button class="btn btn-v btn-sm" onclick="markDelivered('${o.id}',this)">📦 Entregado</button>`;
     } else if(o.status==="delivered") {
       quickBtn = `<button class="btn btn-sec btn-sm" onclick="openCalModal('${o.id}')">⭐ Calificar</button>`;
     }
+
     const schedBadge = isScheduled ? `<br><span style="font-size:.62rem;background:#e8f4fd;color:#1565c0;padding:1px 5px;border-radius:50px;font-weight:800">⏰ ${o.scheduledSlot||""}</span>` : "";
-    const repName = o.repartidorNombre ? `<span style="font-size:.72rem;color:var(--v);font-weight:700">🚲 ${o.repartidorNombre}</span>` : `<span style="font-size:.7rem;color:var(--gr)">Sin asignar</span>`;
+
+    // ── Repartidor column: inline dropdown ──
+    let repCell = "";
+    if(o.status==="confirmed" || o.status==="on_way" || o.status==="scheduled" && o.repartidorId) {
+      // Show current assignment + dropdown to change
+      const repOptions = activeReps.map(r => {
+        const isOnline = r.online && r.lastSeen?.seconds && (Date.now()/1000 - r.lastSeen.seconds < 120);
+        return `<option value="${r.id}" ${o.repartidorId===r.id?'selected':''}>${r.nombre} ${isOnline?'🟢':'⚫'}</option>`;
+      }).join('');
+      repCell = `<select onchange="quickAssignRep('${o.id}',this.value)" style="font-size:.72rem;padding:4px 6px;border:1.5px solid var(--vbg);border-radius:8px;outline:none;max-width:120px">
+        <option value="" ${!o.repartidorId?'selected':''}>Sin asignar</option>
+        ${repOptions}
+      </select>`;
+    } else if(o.status==="pending") {
+      repCell = `<span style="font-size:.7rem;color:var(--gr)">—</span>`;
+    } else {
+      repCell = o.repartidorNombre
+        ? `<span style="font-size:.72rem;color:var(--v);font-weight:700">🚲 ${o.repartidorNombre}</span>`
+        : `<span style="font-size:.7rem;color:var(--gr)">Sin asignar</span>`;
+    }
+
     return `<tr>
       <td><b>${o.code||"-"}</b>${schedBadge}</td>
       <td>${o.clientName||"-"}<br><small style="color:var(--gr)">${o.clientPhone||""}</small></td>
       <td>Bs. ${(o.total||0).toFixed(2)}</td>
       <td>${statusChip(o.status)}</td>
-      <td>${repName}</td>
+      <td>${repCell}</td>
       <td style="font-size:.72rem">${dt}</td>
       <td style="display:flex;gap:4px;flex-wrap:wrap">${quickBtn}<button class="btn btn-sec btn-sm" onclick="openOrder('${o.id}')">👁️</button></td>
     </tr>`;
   }).join("");
+}
+
+// Quick assign repartidor from dropdown in table
+async function quickAssignRep(orderId, repId) {
+  const rep = DB_repartidores.find(r=>r.id===repId);
+  try {
+    await fs.updateDoc(fs.doc(db,"orders",orderId), {
+      repartidorId: repId||null,
+      repartidorNombre: rep?.nombre||null,
+      assignedAt: fs.serverTimestamp()
+    });
+    showToast(rep ? `✅ Asignado a ${rep.nombre}` : "Asignación removida");
+  } catch(e) { showToast("Error",true); }
+}
+
+// Auto-assign if single repartidor when order is confirmed
+async function autoAssignIfSingle(orderId) {
+  const activeReps = DB_repartidores.filter(r=>r.activo!==false);
+  if(activeReps.length === 1) {
+    const rep = activeReps[0];
+    await fs.updateDoc(fs.doc(db,"orders",orderId), {
+      repartidorId: rep.id,
+      repartidorNombre: rep.nombre,
+      assignedAt: fs.serverTimestamp()
+    });
+    showToast(`🚲 Auto-asignado a ${rep.nombre}`);
+  }
 }
 
 async function markDelivered(id, btn) {
