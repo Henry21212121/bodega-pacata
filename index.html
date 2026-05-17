@@ -2134,21 +2134,37 @@ function initClientMap() {
   if(!window.mapboxgl) { setTimeout(initClientMap, 100); return; }
   mapboxgl.accessToken = MAPBOX_TOKEN;
 
-  const defaultCenter = [-66.1568, -17.3895]; // Cochabamba [lng, lat]
+  // Priority: 1) saved client location, 2) browser geolocation, 3) Cochabamba default
+  const savedLat = currentClient?.lat;
+  const savedLng = currentClient?.lng;
+  const hasSaved = savedLat && savedLng;
+
+  const defaultCenter = hasSaved
+    ? [savedLng, savedLat]
+    : [-66.1568, -17.3895]; // Cochabamba
+
+  const defaultZoom = hasSaved ? 17 : 14;
 
   clientMap = new mapboxgl.Map({
     container: 'clientMap',
     style: 'mapbox://styles/mapbox/streets-v12',
     center: defaultCenter,
-    zoom: 14
+    zoom: defaultZoom
   });
 
-  // Draggable marker
+  // Draggable marker — start at saved location if available
   const el = document.createElement('div');
   el.style.cssText = 'width:32px;height:32px;background:url("https://cdn.jsdelivr.net/npm/@mapbox/maki@6/icons/marker-15.svg") center/cover;cursor:grab;filter:hue-rotate(0deg) saturate(5) brightness(0.8)';
   clientMarker = new mapboxgl.Marker({element:el, draggable:true})
     .setLngLat(defaultCenter)
     .addTo(clientMap);
+
+  // If we have a saved location, set it as the current location
+  if(hasSaved) {
+    clientLatLng = {lat: savedLat, lng: savedLng};
+    reverseGeocode(savedLat, savedLng);
+    checkDeliveryRange(savedLat, savedLng);
+  }
 
   clientMarker.on('dragend', () => {
     const lngLat = clientMarker.getLngLat();
