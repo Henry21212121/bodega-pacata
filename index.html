@@ -1454,36 +1454,44 @@ async function sendWhatsApp(cli) {
   const dist = DB._lastDeliveryDist || 0;
   const speedKmh = parseFloat(DB.config.deliverySpeed) || 15;
   const estimatedMinR = Math.max(8, Math.round((dist > 0 ? (dist/speedKmh)*60 : 0) + 3 + 2));
+  const estimatedMinMax = estimatedMinR + 5; // range: min to min+5
   const isScheduled = !!DB._scheduledSlot;
 
-  // Build admin WhatsApp message (vos lo enviás desde admin)
-  let msg = `🛒 *PEDIDO ${orderCode}*${isScheduled?" ⏰ PROGRAMADO":""}\n`;
-  msg += `🏪 La Bodega Online Pacata\n`;
+  // Build admin WhatsApp message — exact format requested
+  const wa = (DB.config.wa||"").replace(/\D/g,"");
+  let msg = `━━━━━━━━━━━━━━━━\n`;
+  msg += `🛒 Hola ${cli.name.split(" ")[0]}, tu pedido *${orderCode}* fue recibido y está siendo preparado.\n`;
   msg += `━━━━━━━━━━━━━━━━\n`;
-  msg += `👤 ${cli.name}  📱 Cel. ${cli.phone}\n`;
-  msg += `📍 ${cli.addr||""}\n`;
-  if(cli.lat && cli.lng) {
-    msg += `🗺️ https://maps.google.com/?q=${cli.lat},${cli.lng}\n`;
-    if(dist > 0) msg += `📏 ${dist.toFixed(1)} km  ⏱️ ~${estimatedMinR} mins\n`;
-  }
-  if(isScheduled) msg += `⏰ *ENTREGA PROGRAMADA: ${DB._scheduledSlot}*\n`;
-  msg += `━━━━━━━━━━━━━━━━\nDETALLE\n`;
-
+  msg += `*Detalle*\n`;
   Object.values(cart).forEach(entry => {
     if(entry.isCombo) {
-      msg += `• [COMBO] ${entry.name}\n  ${entry.qty} × Bs.${entry.unitPrice.toFixed(2)} = *Bs.${(entry.unitPrice*entry.qty).toFixed(2)}*\n`;
+      const t = (entry.unitPrice * entry.qty).toFixed(2);
+      msg += `• [COMBO] ${entry.name}\n  ${entry.qty} × Bs.${entry.unitPrice.toFixed(2)} = Bs.${t}\n`;
     } else {
       const {prod, qty} = entry;
       const pt = calcPrecio(prod, qty);
-      msg += `• [${prod.id}] ${prod.nombre}\n  ${qty} × Bs.${prod.precio.toFixed(2)} = *Bs.${pt.toFixed(2)}*\n`;
+      msg += `• [${prod.id}] ${prod.nombre}\n  ${qty} × Bs.${prod.precio.toFixed(2)} = Bs.${pt.toFixed(2)}\n`;
     }
   });
-
   msg += `━━━━━━━━━━━━━━━━\n`;
   msg += `💰 Subtotal: Bs. ${total.toFixed(2)}\n`;
   msg += `🚚 Delivery: ${deliveryAmt===0?"GRATIS 🎉":"Bs. "+deliveryAmt.toFixed(2)}\n`;
   msg += `💰 *TOTAL: Bs. ${grandTotal.toFixed(2)}*\n`;
-  msg += `💳 Pago en puerta: Efectivo o QR`;
+  msg += `💳 Puedes pagar con: Efectivo o QR\n`;
+  if(isScheduled) {
+    msg += `⏰ Tu pedido está programado para las *${DB._scheduledSlot}*.\n`;
+  } else if(dist > 0) {
+    msg += `🚲 Estaremos en aproximadamente *${estimatedMinR} a ${estimatedMinMax} minutos* en tu puerta.\n`;
+  } else {
+    msg += `🚲 Estaremos pronto en tu puerta.\n`;
+  }
+  if(cli.lat && cli.lng) {
+    msg += `📍 ${cli.addr||""}\n`;
+    msg += `🗺️ https://maps.google.com/?q=${cli.lat},${cli.lng}\n`;
+  }
+  msg += `Si tienes alguna consulta, escríbeme aquí. 🙏\n`;
+  msg += `— La Bodega Online Pacata\n`;
+  msg += `━━━━━━━━━━━━━━━━`;
 
   // Save to Firestore
   let orderId = null;
@@ -1558,12 +1566,19 @@ async function sendWhatsApp(cli) {
   toggleCart();
   renderProducts();
 
-  // Show confirmation screen — NO WhatsApp from client
-  showOrderConfirmScreen(orderCode, cli, grandTotal, isScheduled, estimatedMinR, dist);
+  // Auto-open WhatsApp to admin immediately
+  if(wa) {
+    const waUrl = `https://wa.me/${wa}?text=${encodeURIComponent(msg)}`;
+    // Small delay to ensure Firebase save completes first
+    setTimeout(() => window.open(waUrl, "_blank"), 800);
+  }
+
+  // Show confirmation screen
+  showOrderConfirmScreen(orderCode, cli, grandTotal, isScheduled, estimatedMinR, estimatedMinMax, dist);
 }
 
 // ── ORDER CONFIRMATION SCREEN ─────────────────────────
-function showOrderConfirmScreen(code, cli, total, isScheduled, mins, dist) {
+function showOrderConfirmScreen(code, cli, total, isScheduled, mins, minsMax, dist) {
   const screen = document.getElementById("orderConfirmScreen");
   const c = DB.config;
   const nombre = cli.name.split(" ")[0];
@@ -1572,31 +1587,42 @@ function showOrderConfirmScreen(code, cli, total, isScheduled, mins, dist) {
   if(isScheduled) {
     timeMsg = `⏰ Tu pedido está programado para las <b>${DB._scheduledSlot || "mañana"}</b>.`;
   } else if(dist > 0) {
-    timeMsg = `🚲 Estaremos en aproximadamente <b>${mins} minutos</b> en tu puerta.`;
+    timeMsg = `🚲 Estaremos en aproximadamente <b>${mins} a ${minsMax} minutos</b> en tu puerta.`;
   } else {
-    timeMsg = `🚲 Estaremos en aproximadamente <b>${c.deliveryTime||"10 a 15"} minutos</b> en tu puerta.`;
+    timeMsg = `🚲 Estaremos pronto en tu puerta.`;
   }
 
+  // Build items detail
+  const itemsDetail = Object.values(cart).map(entry => {
+    if(entry.isCombo) return `<div style="font-size:.8rem;display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.15)"><span>[COMBO] ${entry.name}</span><span>Bs.${(entry.unitPrice*entry.qty).toFixed(2)}</span></div>`;
+    const {prod,qty} = entry;
+    const pt = calcPrecio(prod,qty);
+    return `<div style="font-size:.8rem;display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.15)"><span>${qty}× ${prod.nombre}</span><span>Bs.${pt.toFixed(2)}</span></div>`;
+  }).join("");
+
   screen.innerHTML = `
-    <div style="background:linear-gradient(135deg,var(--v),var(--vl));min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;text-align:center">
-      <div style="font-size:4rem;margin-bottom:16px">✅</div>
-      <div style="font-family:'Fraunces',serif;font-size:1.6rem;font-weight:900;color:#fff;margin-bottom:8px">
-        ¡Pedido recibido!
+    <div style="background:linear-gradient(135deg,var(--v),var(--vl));min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center">
+      <div style="font-size:3.5rem;margin-bottom:12px">✅</div>
+      <div style="font-family:'Fraunces',serif;font-size:1.5rem;font-weight:900;color:#fff;margin-bottom:6px">¡Pedido recibido!</div>
+      <div style="color:rgba(255,255,255,.9);font-size:.92rem;margin-bottom:18px">Hola <b>${nombre}</b>, ya tenemos tu pedido.</div>
+
+      <div style="background:rgba(255,255,255,.15);border-radius:14px;padding:14px 18px;margin-bottom:14px;width:100%;max-width:360px;text-align:left">
+        <div style="color:rgba(255,255,255,.75);font-size:.72rem;margin-bottom:6px;text-align:center">Código de pedido</div>
+        <div style="font-size:1.2rem;font-weight:900;color:#fff;letter-spacing:1px;text-align:center;margin-bottom:10px">${code}</div>
+        ${itemsDetail}
+        <div style="display:flex;justify-content:space-between;padding-top:8px;font-size:.88rem">
+          <span style="color:rgba(255,255,255,.8)">Total</span>
+          <span style="font-weight:900;color:#fff">Bs. ${total.toFixed(2)}</span>
+        </div>
       </div>
-      <div style="color:rgba(255,255,255,.9);font-size:.95rem;margin-bottom:20px">
-        Hola <b>${nombre}</b>, ya tenemos tu pedido.
-      </div>
-      <div style="background:rgba(255,255,255,.15);border-radius:14px;padding:16px 20px;margin-bottom:20px;width:100%;max-width:340px">
-        <div style="color:rgba(255,255,255,.75);font-size:.75rem;margin-bottom:4px">Código de pedido</div>
-        <div style="font-size:1.3rem;font-weight:900;color:#fff;letter-spacing:1px">${code}</div>
-        <div style="color:rgba(255,255,255,.85);font-size:.88rem;margin-top:8px">Total: <b>Bs. ${total.toFixed(2)}</b></div>
-      </div>
-      <div style="background:rgba(255,255,255,.95);border-radius:14px;padding:14px 18px;margin-bottom:24px;width:100%;max-width:340px;color:var(--tx);font-size:.85rem;line-height:1.7">
+
+      <div style="background:rgba(255,255,255,.95);border-radius:14px;padding:12px 16px;margin-bottom:22px;width:100%;max-width:360px;color:var(--tx);font-size:.84rem;line-height:1.7;text-align:left">
         ${timeMsg}<br>
-        <span style="font-size:.8rem;color:var(--gr)">Recibirás un mensaje de WhatsApp cuando tu pedido esté en camino.</span>
+        <span style="font-size:.78rem;color:var(--gr)">Recibirás un mensaje de WhatsApp con la confirmación.</span>
       </div>
-      <button onclick="document.getElementById('orderConfirmScreen').style.display='none'" 
-        style="background:#fff;color:var(--v);border:none;border-radius:50px;padding:14px 32px;font-size:1rem;font-weight:900;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.2)">
+
+      <button onclick="document.getElementById('orderConfirmScreen').style.display='none'"
+        style="background:#fff;color:var(--v);border:none;border-radius:50px;padding:13px 30px;font-size:.95rem;font-weight:900;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.2)">
         Seguir viendo productos
       </button>
     </div>`;
