@@ -252,6 +252,7 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
   <button class="tab-btn" onclick="showTab('mi-dia',this)"><span class="tab-icon">📊</span><span>Mi Día</span></button>
   <button class="tab-btn" onclick="showTab('fiados',this)"><span class="tab-icon">📋</span><span>Fiados</span></button>
   <button class="tab-btn" onclick="showTab('compras',this)"><span class="tab-icon">🛒</span><span>Compras</span></button>
+  <button class="tab-btn" onclick="showTab('configuracion',this)"><span class="tab-icon">⚙️</span><span>Config</span></button>
 </div>
 
 <!-- ══ TAB VENDER ══ -->
@@ -286,10 +287,15 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
           <span style="color:var(--gr);font-weight:700">Total</span>
           <span style="font-weight:900;color:var(--v);font-size:1rem" id="cartTotal">Bs. 0.00</span>
         </div>
-        <button class="sell-btn" id="sellBtn" onclick="openCheckout()" disabled>
-          <span>💰 VENDER</span>
-          <span id="sellBtnItems">0 items</span>
-        </button>
+        <div style="display:flex;gap:8px">
+          <button class="sell-btn" id="sellBtn" onclick="openCheckout()" disabled style="flex:2">
+            <span>💰 VENDER</span>
+            <span id="sellBtnItems">0 items</span>
+          </button>
+          <button class="sell-btn" id="fiarBtn" onclick="openFiarCheckout()" disabled style="flex:1;background:var(--ro);font-size:.82rem">
+            📋 FIAR
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -328,6 +334,22 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
       <button class="btn btn-or" onclick="openAddFiado()" style="padding:7px 13px;font-size:.78rem">+ Nuevo</button>
     </div>
     <div id="fiadoTotal" style="background:var(--vbg);border-radius:10px;padding:9px 13px;margin-bottom:10px;font-size:.8rem;font-weight:700;color:var(--v)">Total pendiente: Bs. 0.00</div>
+    <!-- Tabla de fiados -->
+    <div style="overflow-x:auto;margin-bottom:10px">
+      <table style="width:100%;border-collapse:collapse;font-size:.78rem">
+        <thead>
+          <tr style="background:var(--vbg)">
+            <th style="padding:7px 8px;text-align:left;font-weight:800">Nombre</th>
+            <th style="padding:7px 4px;text-align:right;font-weight:800">Total</th>
+            <th style="padding:7px 4px;text-align:right;font-weight:800">Pagado</th>
+            <th style="padding:7px 4px;text-align:right;font-weight:800;color:var(--ro)">Saldo</th>
+            <th style="padding:7px 4px;text-align:center;font-weight:800">Ult.pago</th>
+            <th style="padding:7px 4px"></th>
+          </tr>
+        </thead>
+        <tbody id="fiadoTableBody"></tbody>
+      </table>
+    </div>
     <div id="fiadoList"></div>
   </div>
 </div>
@@ -340,6 +362,146 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
       <button class="btn btn-v" onclick="openAddCompra()" style="padding:7px 13px;font-size:.78rem">+ Registrar</button>
     </div>
     <div id="compraList"><div style="text-align:center;padding:20px;color:var(--gr);font-size:.82rem">Sin compras</div></div>
+  </div>
+</div>
+
+<!-- ══ TAB CONFIGURACIÓN ══ -->
+<div class="tab-content" id="tab-configuracion">
+  <div class="inner">
+
+    <!-- Cambiar PIN -->
+    <div style="background:#fff;border-radius:var(--rd);padding:14px;box-shadow:var(--sh);margin-top:10px;margin-bottom:12px">
+      <div class="section-title" style="margin-bottom:10px">🔐 Cambiar PIN de acceso</div>
+      <div class="fld"><label>PIN actual</label><input type="password" id="cfgPinActual" maxlength="4" placeholder="••••" style="letter-spacing:4px"></div>
+      <div class="fld"><label>Nuevo PIN (4 dígitos)</label><input type="password" id="cfgPinNuevo" maxlength="4" placeholder="••••" style="letter-spacing:4px"></div>
+      <div class="fld"><label>Confirmar nuevo PIN</label><input type="password" id="cfgPinConfirm" maxlength="4" placeholder="••••" style="letter-spacing:4px"></div>
+      <button class="btn btn-v" onclick="cambiarPin()" style="width:100%">🔐 Cambiar PIN</button>
+    </div>
+
+    <!-- Unidad de peso -->
+    <div style="background:#fff;border-radius:var(--rd);padding:14px;box-shadow:var(--sh);margin-bottom:12px">
+      <div class="section-title" style="margin-bottom:10px">⚖️ Unidad de peso para frutas/verduras</div>
+      <div style="display:flex;gap:10px">
+        <button id="pesoLibrasBtn" onclick="setPesoUnit('libras')" class="btn btn-v" style="flex:1">Libras (lb)</button>
+        <button id="pesoGramosBtn" onclick="setPesoUnit('gramos')" class="btn btn-sec" style="flex:1">Gramos (g)</button>
+      </div>
+      <div style="font-size:.72rem;color:var(--gr);margin-top:8px;text-align:center" id="pesoUnitLabel">Unidad actual: <b>Libras</b></div>
+    </div>
+
+    <!-- Categorías propias -->
+    <div style="background:#fff;border-radius:var(--rd);padding:14px;box-shadow:var(--sh);margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div class="section-title" style="margin:0">📂 Categorías propias</div>
+        <button class="btn btn-or" onclick="openAddCatFisica()" style="padding:6px 12px;font-size:.78rem">+ Nueva</button>
+      </div>
+      <div style="font-size:.72rem;color:var(--gr);margin-bottom:8px">Solo podés editar las categorías creadas aquí. Las de la tienda virtual son de solo lectura.</div>
+      <div id="catFisicaList"></div>
+    </div>
+
+    <!-- Productos propios -->
+    <div style="background:#fff;border-radius:var(--rd);padding:14px;box-shadow:var(--sh);margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div class="section-title" style="margin:0">📦 Mis productos</div>
+        <button class="btn btn-or" onclick="openAddProdFisica()" style="padding:6px 12px;font-size:.78rem">+ Agregar</button>
+      </div>
+      <div style="font-size:.72rem;color:var(--gr);margin-bottom:8px">Estos productos son visibles en el admin pero inactivos en la tienda virtual hasta que el admin los active.</div>
+      <div id="prodFisicaList"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL: DETALLE FIADO -->
+<div class="modal-ov" id="fiadoDetalleModal">
+  <div class="modal-box">
+    <div class="modal-title" id="fiadoDetalleTitle">📋 Detalle de fiado</div>
+    <div id="fiadoDetalleContent"></div>
+    <div class="btn-row" style="margin-top:10px">
+      <button class="btn btn-sec" onclick="closeModal('fiadoDetalleModal')">Cerrar</button>
+      <button class="btn btn-v" onclick="openPagoParc(window._fiadoDetalleId)" id="btnPagoParc">💰 Registrar pago</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: PAGO PARCIAL -->
+<div class="modal-ov" id="pagoParcModal">
+  <div class="modal-box">
+    <div class="modal-title">💰 Registrar pago parcial</div>
+    <div class="fld"><label>Monto pagado (Bs.) *</label><input type="number" id="pagoParcMonto" step="0.5" min="0" onwheel="this.blur()" placeholder="0.00"></div>
+    <div class="fld"><label>Nota (opcional)</label><input type="text" id="pagoParcNota" placeholder="Ej: Pagó con arroz..."></div>
+    <div class="btn-row">
+      <button class="btn btn-sec" onclick="closeModal('pagoParcModal')">Cancelar</button>
+      <button class="btn btn-v" onclick="savePagoParc()">💾 Guardar pago</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: CATEGORÍA FÍSICA -->
+<div class="modal-ov" id="catFisicaModal">
+  <div class="modal-box">
+    <div class="modal-title" id="catFisicaTitle">📂 Nueva categoría</div>
+    <div class="fld"><label>Nombre de la categoría *</label><input type="text" id="catFisicaNombre" placeholder="Ej: Verduras, Frutas, Repostería..."></div>
+    <div class="fld"><label>Emoji</label><input type="text" id="catFisicaEmoji" placeholder="🥬" maxlength="2"></div>
+    <div class="fld"><label>¿Productos por peso? (frutas/verduras)</label>
+      <select id="catFisicaPeso" style="width:100%;padding:9px;border:1.5px solid #d0e8d8;border-radius:10px;outline:none;font-size:.9rem">
+        <option value="false">No — venta por unidad normal</option>
+        <option value="true">Sí — venta por peso/cantidad variable</option>
+      </select>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-sec" onclick="closeModal('catFisicaModal')">Cancelar</button>
+      <button class="btn btn-or" onclick="saveCatFisica()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: PRODUCTO FÍSICA SIMPLE -->
+<div class="modal-ov" id="prodFisicaModal">
+  <div class="modal-box">
+    <div class="modal-title" id="prodFisicaTitle">📦 Agregar producto</div>
+    <div class="fld"><label>Nombre del producto *</label><input type="text" id="pfNombre" placeholder="Ej: Tomate, Plátano..."></div>
+    <div class="fld"><label>Categoría *</label>
+      <select id="pfCat" style="width:100%;padding:9px;border:1.5px solid #d0e8d8;border-radius:10px;outline:none;font-size:.9rem" onchange="checkPesoCategory()">
+        <option value="">-- Elegir categoría --</option>
+      </select>
+    </div>
+    <div class="fld"><label>Unidad de venta</label><input type="text" id="pfUnidad" placeholder="Ej: cuartilla, docena, kg, unidad..."></div>
+
+    <!-- Campos básicos -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="fld"><label>Cantidad adquirida</label><input type="number" id="pfCantAdq" step="0.5" min="0" onwheel="this.blur()" oninput="calcPFPrecioUnit()" placeholder="12"></div>
+      <div class="fld"><label>Costo del lote (Bs.)</label><input type="number" id="pfCostoLote" step="0.5" min="0" onwheel="this.blur()" oninput="calcPFPrecioUnit()" placeholder="75.00"></div>
+    </div>
+    <div class="fld" style="background:var(--vbg);border-radius:10px;padding:10px">
+      <label>Precio unitario (calculado)</label>
+      <input type="number" id="pfPrecioUnit" step="0.01" min="0" onwheel="this.blur()" placeholder="0.00" style="background:#fff">
+      <div style="font-size:.68rem;color:var(--gr);margin-top:3px">Se calcula automáticamente o podés editarlo</div>
+    </div>
+    <div class="fld"><label>Precio de venta (Bs.) *</label><input type="number" id="pfPrecioVenta" step="0.5" min="0" onwheel="this.blur()" placeholder="0.00"></div>
+    <div class="fld"><label>Stock disponible (opcional)</label><input type="number" id="pfStock" step="0.5" min="0" onwheel="this.blur()" placeholder="Dejar vacío = sin límite"></div>
+
+    <!-- Campos para productos por peso -->
+    <div id="pfPesoFields" style="display:none;background:#fff3e0;border-radius:10px;padding:10px;margin-bottom:10px">
+      <div style="font-size:.78rem;font-weight:800;color:var(--or);margin-bottom:8px">⚖️ Configuración de precio por peso</div>
+      <div style="font-size:.72rem;color:var(--gr);margin-bottom:8px">El cliente puede pedir "2 Bs de tomate" — la app calculará el peso equivalente.</div>
+      <div class="fld"><label>Precio de referencia (Bs.)</label><input type="number" id="pfPesoRef" step="0.5" min="0" onwheel="this.blur()" oninput="calcPesoEquiv()" placeholder="Ej: 15.00 (precio por cuartilla)"></div>
+      <div class="fld"><label>Equivalencia en <span id="pfPesoUnitLabel">libras</span></label><input type="number" id="pfPesoEquiv" step="0.1" min="0" onwheel="this.blur()" placeholder="Ej: 1.0 lb por cuartilla"></div>
+      <div style="font-size:.72rem;color:var(--or);font-weight:700" id="pfPesoCalcPreview"></div>
+    </div>
+
+    <!-- Botón desplegar detalle completo -->
+    <button onclick="togglePFDetalle()" style="background:none;border:none;color:var(--v);font-size:.78rem;font-weight:700;cursor:pointer;padding:4px 0;display:flex;align-items:center;gap:4px" id="pfDetalleToggle">
+      ▶ Ver/ocultar detalle completo
+    </button>
+    <div id="pfDetalleExtra" style="display:none">
+      <div class="fld"><label>Descripción</label><textarea id="pfDesc" rows="2" placeholder="Descripción breve..."></textarea></div>
+      <div class="fld"><label>Proveedor/Lugar de compra</label><input type="text" id="pfProveedor" placeholder="Ej: Mercado La Pampa"></div>
+    </div>
+
+    <div class="btn-row" style="margin-top:12px">
+      <button class="btn btn-sec" onclick="closeModal('prodFisicaModal')">Cancelar</button>
+      <button class="btn btn-or" onclick="saveProdFisica()">💾 Guardar producto</button>
+    </div>
   </div>
 </div>
 
@@ -440,9 +602,541 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
   </svg>
 </button>
 
+<!-- MODAL: FIAR DESDE CARRITO -->
+<div class="modal-ov" id="fiarModal">
+  <div class="modal-box">
+    <div class="modal-title">📋 Registrar como fiado</div>
+    <div id="fiarCartSummary" style="background:var(--vbg);border-radius:10px;padding:10px;margin-bottom:12px;font-size:.82rem"></div>
+
+    <!-- Buscar deudor existente o crear nuevo -->
+    <div class="fld">
+      <label>¿A quién le fiaste?</label>
+      <input type="text" id="fiarBuscar" placeholder="Buscar por nombre..." oninput="buscarDeudor()" autocomplete="off">
+      <div id="fiarSugerencias" style="display:none;background:#fff;border:1.5px solid var(--vbg);border-radius:10px;margin-top:4px;max-height:150px;overflow-y:auto"></div>
+    </div>
+
+    <div id="fiarDeudorSelec" style="display:none;background:var(--vbg);border-radius:10px;padding:10px;margin-bottom:10px">
+      <div style="font-size:.78rem;font-weight:800;color:var(--v)" id="fiarDeudorNombre"></div>
+      <div style="font-size:.72rem;color:var(--gr)" id="fiarDeudorSaldo"></div>
+      <button onclick="clearFiarDeudor()" style="background:none;border:none;color:var(--gr);font-size:.72rem;cursor:pointer">Cambiar</button>
+    </div>
+
+    <!-- Crear nuevo -->
+    <div id="fiarNuevoForm">
+      <div style="font-size:.78rem;font-weight:800;color:var(--gr);margin-bottom:6px">— o crear nuevo deudor —</div>
+      <div class="fld"><label>Nombre *</label><input type="text" id="fiarNuevoNombre" placeholder="Nombre completo"></div>
+      <div class="fld"><label>Celular (opcional)</label><input type="tel" id="fiarNuevoCel" placeholder="70012345"></div>
+    </div>
+
+    <div class="fld">
+      <label>Pago a cuenta (opcional, Bs.)</label>
+      <input type="number" id="fiarACuenta" step="0.5" min="0" onwheel="this.blur()" placeholder="0.00" oninput="calcFiarSaldo()">
+      <div style="font-size:.75rem;font-weight:800;color:var(--ro);margin-top:4px" id="fiarSaldoDisplay"></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-sec" onclick="closeModal('fiarModal')">Cancelar</button>
+      <button class="btn btn-ro" onclick="confirmarFiar()">📋 Registrar fiado</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
+// ════════════ CONFIGURACIÓN ════════════
+
+let pesoUnit = 'libras'; // 'libras' | 'gramos'
+let catsFisicas = []; // categorías propias de tienda física
+let prodsFisicas = []; // productos propios
+let editCatFisicaId = null;
+let editProdFisicaId = null;
+let fiarDeudorSeleccionado = null; // deudor elegido para fiar
+
+// Load config data
+async function loadConfigData() {
+  // Load peso unit from localStorage
+  pesoUnit = localStorage.getItem('tienda_peso_unit') || 'libras';
+  updatePesoUnitUI();
+
+  // Load categorías físicas
+  fs.onSnapshot(fs.query(fs.collection(db,'categorias_fisica'), fs.orderBy('nombre')), snap => {
+    catsFisicas = snap.docs.map(d=>({...d.data(),id:d.id}));
+    renderCatFisicaList();
+    populateCatSelect();
+  });
+
+  // Load productos físicos
+  fs.onSnapshot(fs.query(fs.collection(db,'tempProducts'), fs.orderBy('nombre')), snap => {
+    prodsFisicas = snap.docs.map(d=>({...d.data(),id:d.id}));
+    renderProdFisicaList();
+  });
+}
+
+function setPesoUnit(unit) {
+  pesoUnit = unit;
+  localStorage.setItem('tienda_peso_unit', unit);
+  updatePesoUnitUI();
+  showToast(`⚖️ Unidad de peso: ${unit === 'libras' ? 'Libras (lb)' : 'Gramos (g)'}`);
+}
+
+function updatePesoUnitUI() {
+  const lblBtn = document.getElementById('pesoLibrasBtn');
+  const grBtn = document.getElementById('pesoGramosBtn');
+  const lbl = document.getElementById('pesoUnitLabel');
+  if(lblBtn) { lblBtn.className = pesoUnit==='libras' ? 'btn btn-v' : 'btn btn-sec'; }
+  if(grBtn) { grBtn.className = pesoUnit==='gramos' ? 'btn btn-v' : 'btn btn-sec'; }
+  if(lbl) lbl.innerHTML = `Unidad actual: <b>${pesoUnit==='libras'?'Libras (lb)':'Gramos (g)'}</b>`;
+  // Update peso label in product form
+  const pfLbl = document.getElementById('pfPesoUnitLabel');
+  if(pfLbl) pfLbl.textContent = pesoUnit;
+}
+
+// ── CAMBIAR PIN ─────────────────────────────────────────
+async function cambiarPin() {
+  const actual = document.getElementById('cfgPinActual').value.trim();
+  const nuevo = document.getElementById('cfgPinNuevo').value.trim();
+  const confirm = document.getElementById('cfgPinConfirm').value.trim();
+  const correctPin = String(DB.config.tiendaPin || '1234');
+  if(actual !== correctPin) { showToast('PIN actual incorrecto', true); return; }
+  if(nuevo.length !== 4 || isNaN(nuevo)) { showToast('El nuevo PIN debe ser 4 dígitos', true); return; }
+  if(nuevo !== confirm) { showToast('Los PINs no coinciden', true); return; }
+  try {
+    await fs.updateDoc(fs.doc(db,'config','main'), {tiendaPin: nuevo});
+    DB.config.tiendaPin = nuevo;
+    showToast('✅ PIN actualizado');
+    ['cfgPinActual','cfgPinNuevo','cfgPinConfirm'].forEach(id=>document.getElementById(id).value='');
+  } catch(e) { showToast('Error: '+e.message, true); }
+}
+
+// ── CATEGORÍAS FÍSICAS ──────────────────────────────────
+function openAddCatFisica(id) {
+  editCatFisicaId = id||null;
+  const cat = id ? catsFisicas.find(c=>c.id===id) : null;
+  document.getElementById('catFisicaTitle').textContent = id ? '✏️ Editar categoría' : '📂 Nueva categoría';
+  document.getElementById('catFisicaNombre').value = cat?.nombre||'';
+  document.getElementById('catFisicaEmoji').value = cat?.emoji||'';
+  document.getElementById('catFisicaPeso').value = cat?.esPeso?'true':'false';
+  openModal('catFisicaModal');
+}
+
+async function saveCatFisica() {
+  const nombre = document.getElementById('catFisicaNombre').value.trim();
+  if(!nombre) { showToast('El nombre es obligatorio', true); return; }
+  const data = {
+    nombre, emoji: document.getElementById('catFisicaEmoji').value.trim()||'📦',
+    esPeso: document.getElementById('catFisicaPeso').value === 'true',
+    origen: 'fisica', updatedAt: fs.serverTimestamp()
+  };
+  try {
+    if(editCatFisicaId) {
+      await fs.updateDoc(fs.doc(db,'categorias_fisica',editCatFisicaId), data);
+    } else {
+      data.createdAt = fs.serverTimestamp();
+      await fs.addDoc(fs.collection(db,'categorias_fisica'), data);
+    }
+    closeModal('catFisicaModal'); showToast('✅ Categoría guardada');
+  } catch(e) { showToast('Error: '+e.message, true); }
+}
+
+async function deleteCatFisica(id) {
+  if(!confirm('¿Eliminar esta categoría?')) return;
+  await fs.deleteDoc(fs.doc(db,'categorias_fisica',id));
+  showToast('Categoría eliminada');
+}
+
+function renderCatFisicaList() {
+  const el = document.getElementById('catFisicaList');
+  if(!el) return;
+  if(!catsFisicas.length) { el.innerHTML='<div style="text-align:center;padding:12px;color:var(--gr);font-size:.8rem">Sin categorías creadas</div>'; return; }
+  el.innerHTML = catsFisicas.map(c=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--gcl);border-radius:10px;margin-bottom:6px">
+      <span style="font-size:1.3rem">${c.emoji||'📦'}</span>
+      <div style="flex:1">
+        <div style="font-weight:800;font-size:.85rem">${c.nombre}</div>
+        <div style="font-size:.7rem;color:var(--gr)">${c.esPeso?'⚖️ Por peso/cantidad':'📦 Por unidad'}</div>
+      </div>
+      <button onclick="openAddCatFisica('${c.id}')" style="background:var(--vbg);color:var(--v);border:none;border-radius:8px;padding:5px 8px;cursor:pointer;font-size:.72rem">✏️</button>
+      <button onclick="deleteCatFisica('${c.id}')" style="background:#ffebee;color:var(--ro);border:none;border-radius:8px;padding:5px 8px;cursor:pointer;font-size:.72rem">🗑️</button>
+    </div>`).join('');
+}
+
+function populateCatSelect() {
+  const sel = document.getElementById('pfCat');
+  if(!sel) return;
+  const allCats = [
+    ...catsFisicas.map(c=>({id:c.id, nombre:c.nombre, emoji:c.emoji||'📦', esPeso:c.esPeso, origen:'fisica'})),
+  ];
+  sel.innerHTML = '<option value="">-- Elegir categoría --</option>' +
+    allCats.map(c=>`<option value="${c.id}" data-peso="${c.esPeso}">${c.emoji} ${c.nombre}</option>`).join('');
+}
+
+function checkPesoCategory() {
+  const sel = document.getElementById('pfCat');
+  const opt = sel.options[sel.selectedIndex];
+  const esPeso = opt?.getAttribute('data-peso') === 'true';
+  document.getElementById('pfPesoFields').style.display = esPeso ? 'block' : 'none';
+  document.getElementById('pfPesoUnitLabel').textContent = pesoUnit;
+}
+
+// ── PRODUCTOS FÍSICOS ───────────────────────────────────
+function openAddProdFisica(id) {
+  editProdFisicaId = id||null;
+  const p = id ? prodsFisicas.find(x=>x.id===id) : null;
+  document.getElementById('prodFisicaTitle').textContent = id ? '✏️ Editar producto' : '📦 Agregar producto';
+  document.getElementById('pfNombre').value = p?.nombre||'';
+  document.getElementById('pfCat').value = p?.catId||'';
+  document.getElementById('pfUnidad').value = p?.unidad||'';
+  document.getElementById('pfCantAdq').value = p?.cantAdq||'';
+  document.getElementById('pfCostoLote').value = p?.costoLote||'';
+  document.getElementById('pfPrecioUnit').value = p?.costoUnit||'';
+  document.getElementById('pfPrecioVenta').value = p?.precio||'';
+  document.getElementById('pfStock').value = p?.stock!=null?p.stock:'';
+  document.getElementById('pfDesc').value = p?.desc||'';
+  document.getElementById('pfProveedor').value = p?.proveedor||'';
+  document.getElementById('pfPesoRef').value = p?.pesoRef||'';
+  document.getElementById('pfPesoEquiv').value = p?.pesoEquiv||'';
+  document.getElementById('pfDetalleExtra').style.display = 'none';
+  document.getElementById('pfDetalleToggle').textContent = '▶ Ver/ocultar detalle completo';
+  checkPesoCategory();
+  populateCatSelect();
+  if(p?.catId) { document.getElementById('pfCat').value = p.catId; checkPesoCategory(); }
+  openModal('prodFisicaModal');
+}
+
+function calcPFPrecioUnit() {
+  const cant = parseFloat(document.getElementById('pfCantAdq').value)||0;
+  const lote = parseFloat(document.getElementById('pfCostoLote').value)||0;
+  if(cant>0 && lote>0) {
+    document.getElementById('pfPrecioUnit').value = (lote/cant).toFixed(2);
+  }
+}
+
+function calcPesoEquiv() {
+  const ref = parseFloat(document.getElementById('pfPesoRef').value)||0;
+  const equiv = parseFloat(document.getElementById('pfPesoEquiv').value)||0;
+  const prev = document.getElementById('pfPesoCalcPreview');
+  if(ref>0 && equiv>0) {
+    const porBs = (equiv/ref).toFixed(1);
+    const unit = pesoUnit === 'libras' ? 'lb' : 'g';
+    prev.textContent = `→ Por cada Bs. 1.00 = ${porBs} ${unit} · Ej: Bs.2.00 → ${(porBs*2).toFixed(1)} ${unit}`;
+  } else {
+    prev.textContent = '';
+  }
+}
+
+function togglePFDetalle() {
+  const el = document.getElementById('pfDetalleExtra');
+  const btn = document.getElementById('pfDetalleToggle');
+  const open = el.style.display === 'block';
+  el.style.display = open ? 'none' : 'block';
+  btn.textContent = (open ? '▶' : '▼') + ' Ver/ocultar detalle completo';
+}
+
+async function saveProdFisica() {
+  const nombre = document.getElementById('pfNombre').value.trim();
+  const precio = parseFloat(document.getElementById('pfPrecioVenta').value)||0;
+  const catId = document.getElementById('pfCat').value;
+  if(!nombre) { showToast('El nombre es obligatorio', true); return; }
+  if(!precio) { showToast('El precio de venta es obligatorio', true); return; }
+  const cat = catsFisicas.find(c=>c.id===catId);
+  const stockVal = document.getElementById('pfStock').value.trim();
+  const data = {
+    nombre, catId, cat: cat?.nombre||'Mis productos',
+    precio, unidad: document.getElementById('pfUnidad').value.trim()||'unidad',
+    costoUnit: parseFloat(document.getElementById('pfPrecioUnit').value)||0,
+    costoLote: parseFloat(document.getElementById('pfCostoLote').value)||0,
+    cantAdq: parseFloat(document.getElementById('pfCantAdq').value)||0,
+    stock: stockVal !== '' ? parseFloat(stockVal) : null,
+    desc: document.getElementById('pfDesc').value.trim(),
+    proveedor: document.getElementById('pfProveedor').value.trim(),
+    esPeso: cat?.esPeso||false,
+    pesoRef: parseFloat(document.getElementById('pfPesoRef').value)||0,
+    pesoEquiv: parseFloat(document.getElementById('pfPesoEquiv').value)||0,
+    pesoUnit,
+    origen: 'fisica',
+    activoVirtual: false, // inactivo en tienda virtual hasta que admin lo active
+    updatedAt: fs.serverTimestamp()
+  };
+  try {
+    if(editProdFisicaId) {
+      await fs.updateDoc(fs.doc(db,'tempProducts',editProdFisicaId), data);
+    } else {
+      data.createdAt = fs.serverTimestamp();
+      await fs.addDoc(fs.collection(db,'tempProducts'), data);
+    }
+    closeModal('prodFisicaModal'); showToast('✅ Producto guardado');
+  } catch(e) { showToast('Error: '+e.message, true); }
+}
+
+function renderProdFisicaList() {
+  const el = document.getElementById('prodFisicaList');
+  if(!el) return;
+  if(!prodsFisicas.length) { el.innerHTML='<div style="text-align:center;padding:12px;color:var(--gr);font-size:.8rem">Sin productos creados</div>'; return; }
+  el.innerHTML = prodsFisicas.map(p=>`
+    <div style="background:var(--gcl);border-radius:10px;padding:10px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-weight:800;font-size:.85rem">${p.nombre}</div>
+          <div style="font-size:.72rem;color:var(--gr)">${p.cat||'—'} · Bs.${(p.precio||0).toFixed(2)} / ${p.unidad||'unidad'}</div>
+          ${p.esPeso?`<div style="font-size:.68rem;color:var(--or)">⚖️ Venta por peso</div>`:''}
+          <div style="font-size:.68rem;color:${p.activoVirtual?'var(--v)':'var(--gr)'}">${p.activoVirtual?'✅ Activo en tienda virtual':'⏸️ Inactivo en tienda virtual'}</div>
+        </div>
+        <div style="display:flex;gap:4px">
+          <button onclick="openAddProdFisica('${p.id}')" style="background:var(--vbg);color:var(--v);border:none;border-radius:8px;padding:5px 8px;cursor:pointer;font-size:.72rem">✏️</button>
+          <button onclick="deleteProdFisica('${p.id}')" style="background:#ffebee;color:var(--ro);border:none;border-radius:8px;padding:5px 8px;cursor:pointer;font-size:.72rem">🗑️</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+async function deleteProdFisica(id) {
+  if(!confirm('¿Eliminar este producto?')) return;
+  await fs.deleteDoc(fs.doc(db,'tempProducts',id));
+  showToast('Producto eliminado');
+}
+
+// ── FIADOS MEJORADOS ─────────────────────────────────────
+function renderFiados() {
+  const el = document.getElementById('fiadoList');
+  const tbody = document.getElementById('fiadoTableBody');
+  const total = fiados.reduce((s,f)=>s+(f.monto||0),0);
+  const totalPagado = fiados.reduce((s,f)=>s+(f.pagado||0),0);
+  const saldo = total - totalPagado;
+  document.getElementById('fiadoTotal').textContent = `Total pendiente: Bs. ${saldo.toFixed(2)} | Fiado total: Bs. ${total.toFixed(2)}`;
+  if(!fiados.length) {
+    if(tbody) tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:16px;color:var(--gr)">Sin fiados pendientes 🎉</td></tr>';
+    if(el) el.innerHTML='';
+    return;
+  }
+  if(tbody) {
+    tbody.innerHTML = fiados.map(f=>{
+      const t = f.createdAt?.seconds ? new Date(f.createdAt.seconds*1000) : new Date();
+      const lastPago = f.lastPagoAt?.seconds ? new Date(f.lastPagoAt.seconds*1000) : null;
+      const saldoF = (f.monto||0) - (f.pagado||0);
+      return `<tr style="border-bottom:1px solid var(--vbg)">
+        <td style="padding:8px 4px;font-weight:700">${f.nombre}</td>
+        <td style="padding:8px 4px;text-align:right">Bs.${(f.monto||0).toFixed(2)}</td>
+        <td style="padding:8px 4px;text-align:right;color:var(--v)">Bs.${(f.pagado||0).toFixed(2)}</td>
+        <td style="padding:8px 4px;text-align:right;color:var(--ro);font-weight:800">Bs.${saldoF.toFixed(2)}</td>
+        <td style="padding:8px 4px;text-align:center;font-size:.7rem;color:var(--gr)">${lastPago?lastPago.toLocaleDateString('es',{day:'numeric',month:'short'}):t.toLocaleDateString('es',{day:'numeric',month:'short'})}</td>
+        <td style="padding:4px">
+          <button onclick="verDetalleFiado('${f.id}')" style="background:var(--v);color:#fff;border:none;border-radius:8px;padding:4px 8px;font-size:.7rem;cursor:pointer">👁️</button>
+          ${saldoF>0?`<button onclick="openPagoParc('${f.id}')" style="background:var(--vbg);color:var(--v);border:none;border-radius:8px;padding:4px 8px;font-size:.7rem;cursor:pointer;margin-left:3px">💰</button>`:'<span style="font-size:.7rem;color:var(--v);padding:0 4px">✓</span>'}
+        </td>
+      </tr>`;
+    }).join('');
+  }
+}
+
+async function verDetalleFiado(id) {
+  window._fiadoDetalleId = id;
+  const f = fiados.find(x=>x.id===id);
+  if(!f) return;
+  const saldo = (f.monto||0) - (f.pagado||0);
+  document.getElementById('fiadoDetalleTitle').textContent = `📋 ${f.nombre}`;
+
+  // Load pagos parciales
+  let pagosHtml = '<div style="font-size:.78rem;color:var(--gr);margin-top:8px">Sin pagos parciales registrados</div>';
+  try {
+    const pagosSnap = await fs.getDocs(fs.query(
+      fs.collection(db,'pagos_fiado'),
+      fs.where('fiadoId','==',id),
+      fs.orderBy('createdAt','desc')
+    ));
+    const pagos = pagosSnap.docs.map(d=>({...d.data(),id:d.id}));
+    if(pagos.length) {
+      pagosHtml = `<div style="font-size:.8rem;font-weight:800;margin:10px 0 6px;color:var(--v)">💰 Pagos parciales:</div>` +
+        pagos.map(p=>{
+          const t = p.createdAt?.seconds ? new Date(p.createdAt.seconds*1000) : new Date();
+          return `<div style="display:flex;justify-content:space-between;padding:5px 8px;background:var(--vbg);border-radius:8px;margin-bottom:4px;font-size:.78rem">
+            <span>${t.toLocaleDateString('es',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${p.nota?' · '+p.nota:''}</span>
+            <span style="font-weight:800;color:var(--v)">+Bs.${(p.monto||0).toFixed(2)}</span>
+          </div>`;
+        }).join('');
+    }
+  } catch(e) {}
+
+  // Load deudas (fiado items)
+  const t = f.createdAt?.seconds ? new Date(f.createdAt.seconds*1000) : new Date();
+  document.getElementById('fiadoDetalleContent').innerHTML = `
+    <div style="background:var(--vbg);border-radius:10px;padding:10px;margin-bottom:8px">
+      <div style="font-size:.78rem;color:var(--gr)">${t.toLocaleDateString('es',{day:'numeric',month:'long',year:'numeric'})}</div>
+      ${f.detalle?`<div style="font-size:.82rem;margin-top:4px">${f.detalle}</div>`:''}
+      ${f.aCuenta?`<div style="font-size:.8rem;color:var(--v);margin-top:4px">A cuenta: Bs.${(f.aCuenta||0).toFixed(2)}</div>`:''}
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--vbg);font-size:.82rem">
+      <span>Deuda total</span><span style="font-weight:800">Bs.${(f.monto||0).toFixed(2)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--vbg);font-size:.82rem">
+      <span style="color:var(--v)">Total pagado</span><span style="font-weight:800;color:var(--v)">Bs.${(f.pagado||0).toFixed(2)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:.95rem">
+      <span style="font-weight:900;color:${saldo>0?'var(--ro)':'var(--v)'}">Saldo ${saldo>0?'pendiente':'saldado'}</span>
+      <span style="font-weight:900;color:${saldo>0?'var(--ro)':'var(--v)'}">Bs.${saldo.toFixed(2)}</span>
+    </div>
+    ${pagosHtml}`;
+
+  document.getElementById('btnPagoParc').style.display = saldo > 0 ? 'block' : 'none';
+  openModal('fiadoDetalleModal');
+}
+
+function openPagoParc(id) {
+  window._fiadoDetalleId = id;
+  document.getElementById('pagoParcMonto').value = '';
+  document.getElementById('pagoParcNota').value = '';
+  openModal('pagoParcModal');
+}
+
+async function savePagoParc() {
+  const id = window._fiadoDetalleId;
+  const monto = parseFloat(document.getElementById('pagoParcMonto').value)||0;
+  if(!monto) { showToast('Ingresá el monto', true); return; }
+  const f = fiados.find(x=>x.id===id);
+  if(!f) return;
+  try {
+    // Save pago
+    await fs.addDoc(fs.collection(db,'pagos_fiado'), {
+      fiadoId: id, monto,
+      nota: document.getElementById('pagoParcNota').value.trim(),
+      createdAt: fs.serverTimestamp()
+    });
+    // Update fiado total pagado
+    const newPagado = (f.pagado||0) + monto;
+    const saldo = (f.monto||0) - newPagado;
+    await fs.updateDoc(fs.doc(db,'fiados',id), {
+      pagado: newPagado,
+      cobrado: saldo <= 0,
+      lastPagoAt: fs.serverTimestamp()
+    });
+    closeModal('pagoParcModal');
+    closeModal('fiadoDetalleModal');
+    showToast(`✅ Pago de Bs.${monto.toFixed(2)} registrado`);
+  } catch(e) { showToast('Error: '+e.message, true); }
+}
+
+// ── FIAR DESDE CARRITO ──────────────────────────────────
+function openFiarCheckout() {
+  if(!Object.keys(cart).length) return;
+  fiarDeudorSeleccionado = null;
+  document.getElementById('fiarBuscar').value = '';
+  document.getElementById('fiarSugerencias').style.display = 'none';
+  document.getElementById('fiarDeudorSelec').style.display = 'none';
+  document.getElementById('fiarNuevoForm').style.display = 'block';
+  document.getElementById('fiarNuevoNombre').value = '';
+  document.getElementById('fiarNuevoCel').value = '';
+  document.getElementById('fiarACuenta').value = '';
+
+  // Build cart summary
+  const items = Object.values(cart);
+  const total = cartTotal();
+  document.getElementById('fiarCartSummary').innerHTML =
+    items.map(e=>`<div style="display:flex;justify-content:space-between"><span>${e.qty}× ${e.prod.nombre}</span><span>Bs.${((e.prod.precio||0)*e.qty).toFixed(2)}</span></div>`).join('') +
+    `<div style="border-top:1px solid var(--vbg);margin-top:6px;padding-top:6px;font-weight:900;display:flex;justify-content:space-between"><span>Total fiado:</span><span style="color:var(--ro)">Bs.${total.toFixed(2)}</span></div>`;
+  calcFiarSaldo();
+  openModal('fiarModal');
+}
+
+function buscarDeudor() {
+  const q = document.getElementById('fiarBuscar').value.toLowerCase().trim();
+  const sug = document.getElementById('fiarSugerencias');
+  if(!q) { sug.style.display='none'; return; }
+  // Search in all fiados (including cobrados for reference)
+  const matches = fiados.filter(f=>f.nombre.toLowerCase().includes(q));
+  if(!matches.length) { sug.style.display='none'; return; }
+  sug.innerHTML = matches.map(f=>{
+    const saldo = (f.monto||0)-(f.pagado||0);
+    return `<div onclick="seleccionarDeudor('${f.id}')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--vbg);font-size:.82rem">
+      <div style="font-weight:700">${f.nombre}</div>
+      <div style="font-size:.72rem;color:var(--ro)">Debe: Bs.${saldo.toFixed(2)}</div>
+    </div>`;
+  }).join('');
+  sug.style.display = 'block';
+}
+
+function seleccionarDeudor(id) {
+  const f = fiados.find(x=>x.id===id);
+  if(!f) return;
+  fiarDeudorSeleccionado = f;
+  document.getElementById('fiarSugerencias').style.display = 'none';
+  document.getElementById('fiarBuscar').value = '';
+  document.getElementById('fiarDeudorNombre').textContent = f.nombre;
+  const saldo = (f.monto||0)-(f.pagado||0);
+  document.getElementById('fiarDeudorSaldo').textContent = `Saldo actual: Bs.${saldo.toFixed(2)}`;
+  document.getElementById('fiarDeudorSelec').style.display = 'block';
+  document.getElementById('fiarNuevoForm').style.display = 'none';
+  calcFiarSaldo();
+}
+
+function clearFiarDeudor() {
+  fiarDeudorSeleccionado = null;
+  document.getElementById('fiarDeudorSelec').style.display = 'none';
+  document.getElementById('fiarNuevoForm').style.display = 'block';
+}
+
+function calcFiarSaldo() {
+  const total = cartTotal();
+  const aCuenta = parseFloat(document.getElementById('fiarACuenta').value)||0;
+  const saldo = total - aCuenta;
+  const el = document.getElementById('fiarSaldoDisplay');
+  if(el && total > 0) {
+    el.textContent = aCuenta > 0
+      ? `A cuenta: Bs.${aCuenta.toFixed(2)} → Saldo fiado: Bs.${saldo.toFixed(2)}`
+      : `Total a fiar: Bs.${total.toFixed(2)}`;
+  }
+}
+
+async function confirmarFiar() {
+  const total = cartTotal();
+  const aCuenta = parseFloat(document.getElementById('fiarACuenta').value)||0;
+  const saldo = total - aCuenta;
+  const items = Object.values(cart);
+  const detalle = items.map(e=>`${e.qty}× ${e.prod.nombre} (Bs.${((e.prod.precio||0)*e.qty).toFixed(2)})`).join(', ');
+
+  let nombre, celular, fiadoId;
+
+  if(fiarDeudorSeleccionado) {
+    // Agregar deuda a deudor existente
+    nombre = fiarDeudorSeleccionado.nombre;
+    fiadoId = fiarDeudorSeleccionado.id;
+    const nuevoMonto = (fiarDeudorSeleccionado.monto||0) + saldo;
+    await fs.updateDoc(fs.doc(db,'fiados',fiadoId), {
+      monto: nuevoMonto,
+      detalle: (fiarDeudorSeleccionado.detalle||'') + ' | ' + detalle,
+      updatedAt: fs.serverTimestamp()
+    });
+  } else {
+    nombre = document.getElementById('fiarNuevoNombre').value.trim();
+    celular = document.getElementById('fiarNuevoCel').value.trim();
+    if(!nombre) { showToast('El nombre es obligatorio', true); return; }
+    // Create new fiado
+    const docRef = await fs.addDoc(fs.collection(db,'fiados'), {
+      nombre, celular: celular||null, monto: saldo,
+      pagado: aCuenta, aCuenta,
+      detalle, cobrado: saldo <= 0,
+      createdAt: fs.serverTimestamp()
+    });
+    fiadoId = docRef.id;
+    // If paid something at door, register as pago
+    if(aCuenta > 0) {
+      await fs.addDoc(fs.collection(db,'pagos_fiado'), {
+        fiadoId, monto: aCuenta, nota: 'Pago a cuenta al momento del fiado',
+        createdAt: fs.serverTimestamp()
+      });
+    }
+  }
+
+  // Register sale as fiado
+  const sale = { items: items.map(e=>({prodNombre:e.prod.nombre,qty:e.qty,precio:e.prod.precio||0,subtotal:(e.prod.precio||0)*e.qty,tipo:e.tipo})),
+    total, payMethod:'fiado', fiadoId, fiadoNombre:nombre,
+    createdAt: fs.serverTimestamp() };
+  await fs.addDoc(fs.collection(db,'sales_physical'), sale);
+
+  closeModal('fiarModal');
+  cart = {}; renderCart();
+  showToast(`📋 Fiado registrado para ${nombre}`);
+}
+</script>
 // ════════════════════════════════════
 // STATE
 // ════════════════════════════════════
@@ -514,6 +1208,8 @@ async function loadAll() {
     compras = snap.docs.map(d=>({...d.data(),id:d.id}));
     renderCompras();
   });
+
+  loadConfigData();
 }
 
 // ════════════════════════════════════
@@ -586,26 +1282,25 @@ function onVendSearch() {
   const allProds = [
     ...Object.values(DB.products).filter(p=>p.estado!=="oculto").map(p=>({...p,_tipo:"catalogo"})),
     ...DB.tempProds.map(p=>({...p,_tipo:"temporal"}))
-  ].filter(p=>p.nombre?.toLowerCase().includes(q)).slice(0,8);
+  ].filter(p=>p.nombre?.toLowerCase().includes(q));
 
-  if(!allProds.length) { sug.style.display="none"; return; }
+  // Hide regular product grid, show search results in grid format
+  const wrap = document.getElementById("vendProdsWrap");
+  sug.style.display = "none"; // not using suggestion list anymore
 
-  sug.innerHTML = allProds.map(p => {
-    const imgEl = p.img
-      ? `<img src="${p.img}" class="sug-img">`
-      : `<div class="sug-emoji">${catEmoji(p.cat)}</div>`;
-    const isTmp = p._tipo==="temporal";
-    const addCls = isTmp ? ' temp-card-add' : '';
-    return '<div class="suggestion-item">' +
-      imgEl +
-      '<div class="sug-info">' +
-        '<div class="sug-name">' + p.nombre + '</div>' +
-        '<div class="sug-price">Bs.' + (p.precio||0).toFixed(2) + ' · ' + (p.unidad||'unidad') + '</div>' +
-      '</div>' +
-      '<button class="sug-add' + addCls + '" onclick="addToCart(\'' + p.id + '\',\'' + p._tipo + '\');event.stopPropagation()">+ Agregar</button>' +
-    '</div>';
-  }).join("");
-  sug.style.display = "block";
+  if(!allProds.length) {
+    wrap.innerHTML = `<div style="text-align:center;padding:30px;color:var(--gr);font-size:.85rem">Sin resultados para "<b>${q}</b>"</div>`;
+    return;
+  }
+
+  // Show results as full product grid (same format as regular view)
+  wrap.innerHTML = `
+    <div style="font-size:.78rem;color:var(--gr);margin-bottom:8px">
+      ${allProds.length} resultado${allProds.length!==1?'s':''} para "<b>${q}</b>"
+    </div>
+    <div class="prod-grid">
+      ${allProds.map(p => makeProdCard(p, p._tipo)).join('')}
+    </div>`;
 }
 
 function clearVendSearch() {
@@ -732,6 +1427,8 @@ function renderCart() {
     sellBtn.disabled=true;
     sellBtnItems.textContent="0 items";
     cartTotalEl.textContent="Bs. 0.00";
+    const fiarBtnEmpty = document.getElementById("fiarBtn");
+    if(fiarBtnEmpty) fiarBtnEmpty.disabled=true;
     return;
   }
 
@@ -752,6 +1449,8 @@ function renderCart() {
   cartTotalEl.textContent = "Bs. "+total.toFixed(2);
   sellBtn.disabled = false;
   sellBtnItems.textContent = totalQty+" item"+(totalQty!==1?"s":"");
+  const fiarBtn = document.getElementById("fiarBtn");
+  if(fiarBtn) fiarBtn.disabled = false;
 }
 
 // ════════════════════════════════════
