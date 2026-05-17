@@ -222,6 +222,7 @@ header{background:var(--v);color:#fff;padding:0 14px;position:sticky;top:0;z-ind
 .loading-fill{height:100%;background:#fff;border-radius:2px;animation:fill 2s ease-in-out infinite;}
 @keyframes fill{0%{width:0}50%{width:100%}100%{width:0}}
 @keyframes tipPop{0%{opacity:0;transform:scale(.7) translateY(10px)}100%{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes schedBlink{0%,100%{opacity:1}50%{opacity:.55}}
 
 /* ── TOAST ── */
 .toast{position:fixed;bottom:82px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--v);color:#fff;padding:9px 20px;border-radius:50px;font-weight:700;font-size:.85rem;z-index:600;box-shadow:0 4px 16px rgba(0,0,0,.2);transition:transform .3s,opacity .3s;opacity:0;pointer-events:none;white-space:nowrap;max-width:90vw;text-align:center;}
@@ -1127,6 +1128,22 @@ function checkStatus() {
   bar.className = "status-bar show" + (isOpen ? "" : " closed");
   dot.className = "status-dot" + (isOpen ? "" : " off");
   txt.textContent = isOpen ? `Abierto · Cerramos a las ${c.closeTime}` : `Cerrado · Abrimos a las ${c.openTime}`;
+
+  // Show/hide scheduled order prompt
+  let schedPrompt = document.getElementById("schedPrompt");
+  if(!isOpen) {
+    if(!schedPrompt) {
+      schedPrompt = document.createElement("div");
+      schedPrompt.id = "schedPrompt";
+      schedPrompt.style.cssText = "background:#e53935;color:#fff;text-align:center;padding:8px 14px;font-size:.82rem;font-weight:800;animation:schedBlink 1.2s ease-in-out infinite;cursor:pointer";
+      schedPrompt.onclick = () => confirmOrder();
+      schedPrompt.innerHTML = "🕐 ¡Pero puedes programar tu pedido para mañana!";
+      bar.parentElement.insertBefore(schedPrompt, bar.nextSibling);
+    }
+    schedPrompt.style.display = "block";
+  } else if(schedPrompt) {
+    schedPrompt.style.display = "none";
+  }
   // Update cats-bar sticky offset to match actual header height
   requestAnimationFrame(() => {
     const header = document.querySelector("header");
@@ -2941,27 +2958,37 @@ function voicePanelMicClick() {
 
   if(window.speechSynthesis) window.speechSynthesis.cancel();
 
+  const btn = document.getElementById("voiceBtn");
+  const recBtn = document.getElementById("micRecordBtn");
+
+  // Helper: set mic to grey (speaking, inactive)
+  function setMicSpeaking() {
+    if(btn) { btn.style.background = "#9e9e9e"; btn.style.transform = "scale(1.15)"; }
+    if(recBtn) { recBtn.disabled = true; recBtn.style.background = "#bbb"; }
+  }
+  // Helper: set mic to ready (can record)
+  function setMicReady() {
+    if(btn) { btn.style.background = ""; btn.style.transform = "scale(1.0)"; btn.classList.remove("active"); }
+    if(recBtn) { recBtn.disabled = false; recBtn.style.background = "var(--v)"; }
+  }
+
   if(!_greetingSpoken) {
-    // PRIMERA VEZ: saludo → graba automático al terminar
+    // PRIMERA VEZ: saludo → mic gris → auto-graba
     _greetingSpoken = true;
     _voiceSession = { active:true, turnCount:0, addCount:0, removeCount:0, lastAction:null, abuseWarned:false };
-    setVoiceStatus("💬", "Preparando saludo...");
-    const recBtn = document.getElementById("micRecordBtn");
-    if(recBtn) { recBtn.disabled = true; recBtn.style.background = "#aaa"; }
+    setVoiceStatus("💬", "...");
+    setMicSpeaking();
     const utter = _buildGreetingUtterance();
-    utter.onend = () => {
-      if(recBtn) { recBtn.disabled = false; recBtn.style.background = "var(--v)"; }
-      setVoiceStatus("🔴", "Escuchando...");
-      setTimeout(_startRecording, 300);
-    };
-    utter.onerror = () => {
-      if(recBtn) { recBtn.disabled = false; recBtn.style.background = "var(--v)"; }
-      setVoiceStatus("🎤", "Toca \"Grabar pedido\" y habla");
-    };
+    utter.onend = () => { setMicReady(); setVoiceStatus("🔴", "Escuchando..."); setTimeout(_startRecording, 300); };
+    utter.onerror = () => { setMicReady(); setVoiceStatus("🎤", "Toca \"Grabar pedido\" y habla"); };
     window.speechSynthesis.speak(utter);
   } else {
-    // TURNO MANUAL: "¿Algo más?" → graba
-    _speakThenRecord(_buildAlgoMasUtterance());
+    // TAPS SIGUIENTES: mic gris mientras habla "¿Algo más?" → auto-graba
+    setMicSpeaking();
+    const algoMas = _buildAlgoMasUtterance();
+    algoMas.onend = () => { setMicReady(); setTimeout(_startRecording, 300); };
+    algoMas.onerror = () => { setMicReady(); _startRecording(); };
+    window.speechSynthesis.speak(algoMas);
   }
 }
 
@@ -2987,7 +3014,12 @@ function _startRecording() {
 
   voiceRecognition.onstart = () => {
     voiceListening = true;
-    document.getElementById("voiceBtn")?.classList.add("active");
+    const btn = document.getElementById("voiceBtn");
+    if(btn) {
+      btn.classList.add("active");
+      btn.style.background = "var(--ro)"; // red = recording
+      btn.style.transform = "scale(1.0)";
+    }
     const recBtn = document.getElementById("micRecordBtn");
     if(recBtn) { recBtn.style.background = "var(--ro)"; recBtn.disabled = false; }
     const recIcon = document.getElementById("micRecordIcon");
@@ -3060,16 +3092,23 @@ function toggleVoicePanel() {
   const panel = document.getElementById("voicePanel");
   const btn   = document.getElementById("voiceBtn");
   const isOpen = panel.style.display !== "none";
-  if(isOpen) {
+  if(isOpen && !voiceListening) {
+    // Close panel
     closeMicPanel();
-  } else {
-    if(window.speechSynthesis) window.speechSynthesis.cancel();
+    return;
+  }
+  if(!isOpen) {
+    // Open panel — expand mic with grey/loading state immediately
     panel.style.display = "block";
     btn.classList.add("active");
+    btn.style.background = "#9e9e9e"; // grey while speaking
+    btn.style.transform = "scale(1.2)";
     voiceAccumulated = "";
     document.getElementById("voiceResult").style.display = "none";
     document.getElementById("voiceTranscript").style.display = "none";
-    setVoiceStatus("💬", "Toca \"Grabar pedido\" y habla");
+    setVoiceStatus("💬", "...");
+    // Immediately start the greeting flow
+    voicePanelMicClick();
   }
 }
 // No longer needed — voiceBtn uses onclick=toggleVoicePanel() directly
