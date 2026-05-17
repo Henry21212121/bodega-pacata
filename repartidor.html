@@ -379,7 +379,7 @@ function checkPin() {
     document.getElementById('hRepName').textContent = '🚲 ' + rep.nombre;
     document.getElementById('pinError').textContent = '';
     loadAll();
-    // Location tracking starts only when pressing "En camino"
+    startLocationTracking();
   } else {
     document.getElementById('pinError').textContent = 'PIN incorrecto';
     pinInput = ''; updatePinDots();
@@ -495,18 +495,11 @@ async function renderOrders() {
       ? `https://www.google.com/maps/dir/?api=1&destination=${o.clientLat},${o.clientLng}&travelmode=bicycling`
       : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(o.clientAddr||'')}`;
 
-    // WhatsApp call to client
-    const clientWAPhone = `591${(o.clientPhone||'').replace(/\D/g,'')}`;
-    const waCallUrl = `https://wa.me/${clientWAPhone}`;
-
-    const isOnWay = o.status === 'on_way';
-
     card.innerHTML = `
       <div class="order-card-header">
         <div>
           <div class="order-code">${o.code||'—'}</div>
           ${o.scheduledSlot?`<div style="font-size:.68rem;background:var(--blbg);color:var(--bl);padding:2px 8px;border-radius:50px;display:inline-block;margin-top:3px">⏰ ${o.scheduledSlot}</div>`:''}
-          ${isOnWay?`<div style="font-size:.68rem;background:#e8f5e9;color:var(--v);padding:2px 8px;border-radius:50px;display:inline-block;margin-top:3px;font-weight:800">🚲 En camino</div>`:''}
         </div>
         <div style="text-align:right">
           <div class="order-client">${o.clientName||'—'}</div>
@@ -521,19 +514,9 @@ async function renderOrders() {
         ${o.adminNote?`<div style="background:#fff8e1;border-radius:6px;padding:6px 8px;font-size:.75rem;margin-bottom:6px;color:#e65100">📝 ${o.adminNote}</div>`:''}
         <div class="order-items">${itemsHtml}</div>
         <div class="order-total">💰 Total: Bs. ${(o.total||0).toFixed(2)}</div>
-
-        ${!isOnWay ? `
-        <button class="action-btn" style="width:100%;background:var(--or);color:#fff;margin-bottom:8px;font-size:.88rem;font-weight:900"
-          onclick="marcarEnCamino('${o.id}')">
-          🚲 SALIR — Marcar en camino
-        </button>` : ''}
-
         <div class="action-row">
           <button class="action-btn btn-nav" onclick="window.open('${mapsUrl}','_blank')">🗺️ Navegar</button>
-          <button class="action-btn btn-call" onclick="window.open('${waCallUrl}','_blank')" style="background:#25d366">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="flex-shrink:0"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.075.534 4.065 1.475 5.8L0 24l6.335-1.44A11.937 11.937 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.011-1.37l-.36-.214-3.732.848.88-3.629-.235-.372A9.818 9.818 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182c5.43 0 9.818 4.388 9.818 9.818 0 5.43-4.388 9.818-9.818 9.818z"/></svg>
-            WhatsApp
-          </button>
+          <button class="action-btn btn-call" onclick="window.open('tel:${o.clientPhone}')">📱 Llamar</button>
         </div>
         <div class="action-row" style="margin-top:6px">
           <button class="action-btn btn-adjust" onclick="openAdjustModal('${o.id}','${o.clientLat}','${o.clientLng}','${o.clientId}')">📍 Ajustar pin</button>
@@ -543,27 +526,7 @@ async function renderOrders() {
       </div>`;
     el.appendChild(card);
   }
-
-  // Show route optimizer if more than 1 order
-  if(myOrders.length > 1) {
-    const routeEl = document.createElement('div');
-    routeEl.style.cssText = 'background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:var(--sh);order:-1';
-    routeEl.innerHTML = `
-      <div style="font-weight:800;font-size:.88rem;margin-bottom:10px;color:var(--v)">🗺️ Planificar ruta óptima</div>
-      <div style="font-size:.78rem;color:var(--gr);margin-bottom:8px">Seleccioná los pedidos a entregar en este viaje:</div>
-      ${myOrders.map(o=>`
-        <label style="display:flex;align-items:center;gap:8px;padding:6px;background:var(--vbg);border-radius:8px;margin-bottom:5px;cursor:pointer">
-          <input type="checkbox" class="route-check" value="${o.id}" checked style="width:16px;height:16px;accent-color:var(--v)">
-          <span style="font-size:.8rem;font-weight:700">${o.code} — ${o.clientName}</span>
-          <span style="font-size:.72rem;color:var(--gr);margin-left:auto">${o.dist?o.dist.toFixed(1)+'km':''}</span>
-        </label>`).join('')}
-      <div style="display:flex;gap:8px;margin-top:10px">
-        <button onclick="calcRoute()" style="flex:1;background:var(--v);color:#fff;border:none;border-radius:10px;padding:10px;font-size:.82rem;font-weight:800;cursor:pointer">🗺️ Calcular ruta óptima</button>
-        <button onclick="calcRoute(true)" style="background:var(--vbg);color:var(--v);border:none;border-radius:10px;padding:10px;font-size:.78rem;font-weight:700;cursor:pointer">Todos →</button>
-      </div>
-      <div id="routeResult" style="margin-top:8px;display:none"></div>`;
-    el.insertBefore(routeEl, el.firstChild);
-  }
+}
 
 function renderHistory() {
   const el = document.getElementById('historialList');
@@ -680,21 +643,6 @@ async function savePhoto() {
 }
 
 // ─── DELIVERY ────────────────────────────────────────
-// ─── MARCAR EN CAMINO ────────────────────────────────────
-async function marcarEnCamino(orderId) {
-  try {
-    await fs.updateDoc(fs.doc(db,'orders',orderId), {
-      status: 'on_way',
-      onWayAt: fs.serverTimestamp(),
-      repartidorNombre: currentRep.nombre
-    });
-    showToast('🚲 ¡En camino! Enviando ubicación cada 30s');
-    // Start sending location only when on the way
-    if(!locationInterval) startLocationTracking();
-    loadOrders();
-  } catch(e) { showToast('Error: '+e.message, true); }
-}
-
 function openDeliverModal(orderId) {
   currentOrderId = orderId;
   const o = myOrders.find(x=>x.id===orderId);
@@ -717,24 +665,13 @@ async function confirmDelivery() {
     });
     closeModal('deliverModal');
     showToast('✅ Pedido entregado');
-
-    // Stop location tracking if no more on_way orders
-    const remaining = myOrders.filter(x => x.id !== currentOrderId && x.status === 'on_way');
-    if(!remaining.length) {
-      stopLocationTracking();
-      // Mark as available again
-      await fs.updateDoc(fs.doc(db,'repartidores',currentRep.id), {
-        disponible: true, online: true
-      }).catch(()=>{});
-    }
-
     loadOrders(); loadHistory();
-  } catch(e) { showToast('Error: '+e.message, true); }
+  } catch(e) { showToast('Error: '+e.message,true); }
 }
 
-// ─── LOCATION TRACKING — only while on_way ───────────────
+// ─── LOCATION TRACKING (Firestore, cada 30s) ─────────
 function startLocationTracking() {
-  if(!navigator.geolocation || locationInterval) return;
+  if(!navigator.geolocation) return;
   sendLocation();
   locationInterval = setInterval(sendLocation, 30000);
 }
@@ -742,127 +679,21 @@ function startLocationTracking() {
 function stopLocationTracking() {
   if(locationInterval) { clearInterval(locationInterval); locationInterval=null; }
   if(currentRep) {
-    fs.updateDoc(fs.doc(db,'repartidores',currentRep.id), {
-      online: false, disponible: false
-    }).catch(()=>{});
+    fs.updateDoc(fs.doc(db,'repartidores',currentRep.id), {online:false, disponible:false}).catch(()=>{});
   }
 }
 
 function sendLocation() {
-  if(!currentRep) return;
+  if(!currentRep || !disponible) return;
   navigator.geolocation.getCurrentPosition(pos => {
     fs.updateDoc(fs.doc(db,'repartidores',currentRep.id), {
       lat: pos.coords.latitude,
       lng: pos.coords.longitude,
       online: true,
+      disponible: true,
       lastSeen: fs.serverTimestamp()
     }).catch(()=>{});
   }, ()=>{}, {enableHighAccuracy:true,timeout:8000,maximumAge:0});
-}
-
-// ─── ROUTE OPTIMIZER ─────────────────────────────────────
-// Nearest neighbor algorithm for TSP (Travelling Salesman Problem)
-function calcRoute(selectAll) {
-  if(selectAll) {
-    document.querySelectorAll('.route-check').forEach(cb => cb.checked = true);
-  }
-
-  const selected = [...document.querySelectorAll('.route-check:checked')].map(cb => cb.value);
-  if(selected.length < 2) {
-    showToast('Seleccioná al menos 2 pedidos para optimizar la ruta', true);
-    return;
-  }
-
-  const orders = selected.map(id => myOrders.find(o=>o.id===id)).filter(Boolean);
-  const withCoords = orders.filter(o => o.clientLat && o.clientLng);
-
-  if(withCoords.length < 2) {
-    // Can't optimize without coordinates — just open Google Maps with waypoints
-    openMultiRoute(orders);
-    return;
-  }
-
-  // Get current position and optimize
-  if(navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(pos => {
-      const origin = {lat: pos.coords.latitude, lng: pos.coords.longitude};
-      const optimized = nearestNeighbor(origin, withCoords);
-      showRouteResult(optimized, origin);
-    }, () => {
-      // No GPS — use store location as origin
-      const origin = {lat: -17.3895, lng: -66.1568};
-      const optimized = nearestNeighbor(origin, withCoords);
-      showRouteResult(optimized, origin);
-    }, {enableHighAccuracy:true, timeout:6000});
-  }
-}
-
-// Nearest neighbor heuristic
-function nearestNeighbor(origin, orders) {
-  const remaining = [...orders];
-  const route = [];
-  let current = origin;
-
-  while(remaining.length) {
-    let minDist = Infinity, nearest = null, nearestIdx = -1;
-    remaining.forEach((o, i) => {
-      const d = haversine(current.lat, current.lng, o.clientLat, o.clientLng);
-      if(d < minDist) { minDist = d; nearest = o; nearestIdx = i; }
-    });
-    if(nearest) {
-      route.push({...nearest, _distFromPrev: minDist});
-      current = {lat: nearest.clientLat, lng: nearest.clientLng};
-      remaining.splice(nearestIdx, 1);
-    }
-  }
-  return route;
-}
-
-// Haversine distance in km
-function haversine(lat1, lng1, lat2, lng2) {
-  const R = 6371;
-  const dLat = (lat2-lat1) * Math.PI/180;
-  const dLng = (lng2-lng1) * Math.PI/180;
-  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-}
-
-function showRouteResult(route, origin) {
-  const el = document.getElementById('routeResult');
-  const totalDist = route.reduce((s,o)=>s+(o._distFromPrev||0), 0);
-
-  el.style.display = 'block';
-  el.innerHTML = `
-    <div style="font-weight:800;font-size:.82rem;color:var(--v);margin-bottom:8px">
-      ✅ Ruta óptima (${totalDist.toFixed(1)} km total)
-    </div>
-    ${route.map((o,i)=>`
-      <div style="display:flex;align-items:center;gap:8px;padding:6px;background:${i%2===0?'var(--vbg)':'#fff'};border-radius:8px;margin-bottom:4px">
-        <div style="background:var(--v);color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.75rem;flex-shrink:0">${i+1}</div>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:.78rem;font-weight:700">${o.clientName}</div>
-          <div style="font-size:.7rem;color:var(--gr);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.clientAddr||'Sin dirección'}</div>
-        </div>
-        <div style="font-size:.7rem;color:var(--gr);white-space:nowrap">${o._distFromPrev?.toFixed(1)||'?'} km</div>
-      </div>`).join('')}
-    <button onclick="openMultiRoute(${JSON.stringify(route.map(o=>o.id))})" style="width:100%;margin-top:8px;background:var(--bl);color:#fff;border:none;border-radius:10px;padding:10px;font-size:.82rem;font-weight:800;cursor:pointer">
-      🗺️ Abrir ruta completa en Maps
-    </button>`;
-}
-
-function openMultiRoute(orderIdsOrOrders) {
-  const orders = Array.isArray(orderIdsOrOrders) && typeof orderIdsOrOrders[0] === 'string'
-    ? orderIdsOrOrders.map(id => myOrders.find(o=>o.id===id)).filter(Boolean)
-    : orderIdsOrOrders;
-
-  const withCoords = orders.filter(o=>o.clientLat&&o.clientLng);
-  if(!withCoords.length) { showToast('Sin coordenadas disponibles', true); return; }
-
-  // Build Google Maps URL with waypoints
-  const waypoints = withCoords.slice(0,-1).map(o=>`${o.clientLat},${o.clientLng}`).join('|');
-  const dest = withCoords[withCoords.length-1];
-  const url = `https://www.google.com/maps/dir/?api=1&destination=${dest.clientLat},${dest.clientLng}&waypoints=${waypoints}&travelmode=bicycling`;
-  window.open(url, '_blank');
 }
 
 async function toggleDisponible() {
