@@ -1152,17 +1152,35 @@ let allSales = [], allGastos = [], fiados = [], compras = [];
 // ════════════════════════════════════
 // INIT
 // ════════════════════════════════════
-function waitForDB() {
-  if(window._dbReady && window._db && window._fs) {
-    db = window._db; fs = window._fs;
-    loadAll();
-  } else setTimeout(waitForDB, 50);
+async function waitForDB() {
+  while(!window._dbReady || !window._db || !window._fs) {
+    await new Promise(r => setTimeout(r, 50));
+  }
+  db = window._db;
+  fs = window._fs;
+
+  // Load config FIRST — PIN depends on this
+  try {
+    const snap = await fs.getDoc(fs.doc(db, "config", "main"));
+    if(snap.exists()) DB.config = snap.data();
+  } catch(e) {}
+
+  // Mark as ready and update UI
+  window._pinReady = true;
+  const sub = document.getElementById("loginSub");
+  if(sub) sub.textContent = "Ingresá tu PIN de acceso";
+  const err = document.getElementById("pinError");
+  if(err) err.textContent = "";
 }
+
 document.addEventListener("DOMContentLoaded", () => {
+  // Show loading while Firebase connects
+  const sub = document.getElementById("loginSub");
+  if(sub) sub.textContent = "Conectando...";
+
   waitForDB();
   updateHeader();
   setInterval(updateHeader, 30000);
-  // Prevent scroll changing number inputs
   document.addEventListener("wheel", () => {
     if(document.activeElement.type === "number") document.activeElement.blur();
   }, {passive:true});
@@ -1216,6 +1234,12 @@ async function loadAll() {
 // LOGIN
 // ════════════════════════════════════
 function pinPress(k) {
+  // Show message if Firebase not ready yet
+  if(!window._pinReady) {
+    const err = document.getElementById("pinError");
+    if(err) err.textContent = "⏳ Conectando, espera un momento...";
+    return;
+  }
   if(k==="C") { pinInput=pinInput.slice(0,-1); }
   else if(k==="OK") { checkPin(); return; }
   else { if(pinInput.length>=4) return; pinInput+=String(k); if(pinInput.length===4) checkPin(); }
@@ -1229,6 +1253,7 @@ function checkPin() {
   if(pinInput === correct) {
     document.getElementById("loginScreen").classList.add("hidden");
     document.getElementById("pinError").textContent = "";
+    loadAll(); // load all data after successful login
   } else {
     document.getElementById("pinError").textContent = "PIN incorrecto";
     pinInput = ""; updatePinDots();
