@@ -1170,7 +1170,9 @@ async function waitForDB() {
   const sub = document.getElementById("loginSub");
   if(sub) sub.textContent = "Ingresá tu PIN de acceso";
   const err = document.getElementById("pinError");
-  if(err) err.textContent = "";
+  // Temporarily show what PIN is expected (remove after debugging)
+  const pin = DB.config.tiendaPin || "1234";
+  if(err) err.textContent = `PIN configurado: ${pin} (${pin.length} dígitos)`;
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -1250,12 +1252,15 @@ function updatePinDots() {
 }
 function checkPin() {
   const correct = String(DB.config.tiendaPin || "1234");
+  // Show diagnostic info
+  const err = document.getElementById("pinError");
+  console.log("checkPin called. pinInput:", pinInput, "correct:", correct, "DB.config:", JSON.stringify(DB.config));
   if(pinInput === correct) {
     document.getElementById("loginScreen").classList.add("hidden");
-    document.getElementById("pinError").textContent = "";
-    loadAll(); // load all data after successful login
+    err.textContent = "";
+    loadAll();
   } else {
-    document.getElementById("pinError").textContent = "PIN incorrecto";
+    err.textContent = `PIN incorrecto (esperado: ${correct.length} dígitos)`;
     pinInput = ""; updatePinDots();
     const dots = document.getElementById("pinDots");
     dots.style.animation = "none";
