@@ -98,16 +98,34 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 
 .prod-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;}
 @media(min-width:600px){.prod-grid{grid-template-columns:repeat(3,1fr);}}
-.prod-card{background:#fff;border-radius:12px;padding:10px;box-shadow:var(--sh);cursor:pointer;position:relative;-webkit-tap-highlight-color:transparent;}
-.prod-card:active{transform:scale(.97);}
-.prod-card-img{width:100%;height:160px;object-fit:cover;border-radius:8px;margin-bottom:8px;}
-.prod-card-emoji{width:100%;height:160px;display:flex;align-items:center;justify-content:center;font-size:3.5rem;border-radius:8px;background:var(--vbg);margin-bottom:8px;}
-.prod-card-name{font-weight:800;font-size:.85rem;margin-bottom:3px;line-height:1.3;}
-.prod-card-price{font-weight:900;color:var(--v);font-size:1rem;}
-.prod-card-stock{font-size:.7rem;color:var(--gr);margin-top:2px;}
-.prod-card-add{position:absolute;top:8px;right:8px;background:var(--v);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.2);}
-.prod-card.out{opacity:.7;}
-.temp-card-add{background:var(--or);}
+/* PRODUCT CARDS — identical to virtual store */
+.pcard{background:#fff;border-radius:var(--rd);overflow:hidden;box-shadow:var(--sh);display:flex;flex-direction:column;position:relative;transition:transform .15s,box-shadow .15s;}
+.pcard:hover{transform:translateY(-2px);box-shadow:0 6px 22px rgba(45,122,69,.16);}
+.pcard-img-wrap{width:100%;aspect-ratio:1/1;overflow:hidden;background:var(--vbg);position:relative;flex-shrink:0;}
+.pcard-img{width:100%;height:100%;object-fit:cover;display:block;}
+.pcard-icon{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:2.8rem;}
+.agotado-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45);}
+.agotado-band{background:var(--ro);color:#fff;font-size:.78rem;font-weight:900;padding:6px 40px;transform:rotate(-35deg);letter-spacing:1px;text-transform:uppercase;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.3);}
+.badge-pr{position:absolute;top:7px;left:7px;background:var(--or);color:#fff;font-size:.58rem;font-weight:900;padding:2px 6px;border-radius:50px;z-index:2;}
+.badge-own{position:absolute;top:7px;left:7px;background:#7b1fa2;color:#fff;font-size:.58rem;font-weight:900;padding:2px 6px;border-radius:50px;z-index:2;}
+.badge-low{position:absolute;top:7px;right:7px;background:#ff9800;color:#fff;font-size:.58rem;font-weight:900;padding:2px 6px;border-radius:50px;z-index:2;}
+.prod-code-badge{position:absolute;bottom:5px;right:5px;background:rgba(0,0,0,.55);color:#fff;font-size:.55rem;font-weight:700;padding:1px 5px;border-radius:4px;letter-spacing:.3px;z-index:3;}
+.pcard-body{padding:9px 10px 10px;display:flex;flex-direction:column;flex:1;}
+.pcard-name{font-size:.78rem;font-weight:700;line-height:1.28;margin-bottom:3px;flex:1;}
+.pcard-unit{font-size:.66rem;color:var(--gr);margin-bottom:3px;}
+.pcard-price{font-size:.98rem;font-weight:900;color:var(--v);margin-bottom:4px;}
+.promo-box{background:#fff8ec;border:1px solid #fde19a;border-radius:7px;padding:4px 7px;margin-bottom:6px;}
+.promo-row{display:flex;justify-content:space-between;}
+.promo-row .pq{font-size:.75rem;font-weight:700;color:var(--gr);}
+.promo-row .pp{font-size:.75rem;font-weight:900;color:var(--or);}
+.abtn{background:var(--v);color:#fff;border:none;border-radius:8px;padding:7px;font-weight:800;font-size:.78rem;width:100%;cursor:pointer;transition:background .15s;}
+.abtn:hover{background:var(--vl);}
+.abtn:disabled{background:#ccc;cursor:not-allowed;}
+.qctrl{display:flex;align-items:center;justify-content:space-between;background:var(--vbg);border-radius:8px;overflow:hidden;}
+.qbtn{background:none;border:none;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:900;color:var(--v);cursor:pointer;}
+.qbtn:hover{background:#c8e6d0;}
+.qbtn:disabled{color:#ccc;cursor:not-allowed;}
+.qnum{font-weight:800;font-size:.9rem;}
 
 /* CART ITEMS */
 .cart-item{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:10px;background:var(--vbg);margin-bottom:6px;}
@@ -1387,32 +1405,66 @@ function renderVendProds() {
 }
 
 function makeProdCard(p, tipo) {
-  const agotado = tipo==="catalogo" && p.stock===0;
-  const isTmp = tipo==="temporal";
-  const imgEl = p.img
-    ? `<img src="${p.img}" class="prod-card-img">`
-    : `<div class="prod-card-emoji">${catEmoji(p.cat)}</div>`;
-  const stockEl = tipo==="catalogo"
-    ? `<div class="prod-card-stock">Stock: ${p.stock}</div>`
-    : (p.stock!=null?`<div class="prod-card-stock">Quedan: ${p.stock}</div>`:"");
-  const descEl = p.desc ? `<div style="font-size:.7rem;color:var(--gr);margin-top:3px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${p.desc}</div>` : "";
+  const agotado = p.stock === 0;
+  const isTmp = tipo === "temporal";
+  const low = p.stockMin > 0 && p.stock <= p.stockMin && p.stock > 0;
+  const conPromo = p.promoActive && p.promos && p.promos.length > 1;
+  const inCart = cart[tipo + "_" + p.id];
 
-  // Bottom button: Agotado (red) or Agregar (green)
-  const bottomBtn = agotado
-    ? `<button disabled style="width:100%;background:var(--ro);color:#fff;border:none;border-radius:10px;padding:8px;font-size:.82rem;font-weight:800;margin-top:8px;cursor:default">Agotado</button>`
-    : `<button class="prod-card-add${isTmp?" temp-card-add":""}" onclick="addToCart('${p.id}','${tipo}');event.stopPropagation()" style="position:static;width:100%;border-radius:10px;height:auto;padding:8px;font-size:.82rem;font-weight:800;margin-top:8px">+ Agregar</button>`;
+  // Image wrap — exact same as virtual store
+  const imgContent = p.img
+    ? `<img class="pcard-img" src="${p.img}" alt="${p.nombre}" loading="lazy">`
+    : `<div class="pcard-icon">${catEmoji(p.cat)}</div>`;
 
-  return `<div class="prod-card${agotado?" out":""}" ${agotado?"":"onclick=\"addToCart('"+p.id+"','"+tipo+"')\""}>
-    <div style="position:relative">
-      ${imgEl}
-      ${isTmp?`<div style="position:absolute;top:6px;left:6px;background:var(--or);color:#fff;font-size:.6rem;font-weight:800;padding:2px 7px;border-radius:50px">Propio</div>`:""}
+  const agotadoOverlay = agotado
+    ? `<div class="agotado-overlay"><div class="agotado-band">Agotado</div></div>` : "";
+
+  const badgePr = (conPromo && !agotado)
+    ? `<div class="badge-pr">🏷️ Promo</div>` : "";
+  const badgeLow = (low && !agotado)
+    ? `<div class="badge-low">⚠️ Últimas</div>` : "";
+  const badgeOwn = isTmp
+    ? `<div class="badge-own">🌸 Propio</div>` : "";
+  const codeBadge = p.id
+    ? `<div class="prod-code-badge">${p.id}</div>` : "";
+
+  // Promo rows
+  let promoHtml = "";
+  if(conPromo && !agotado) {
+    const rows = p.promos.slice(1).map(t =>
+      `<div class="promo-row"><span class="pq">${t[0]} ${p.unidad||"u"}s</span><span class="pp">Bs.${t[1].toFixed(2)}</span></div>`
+    ).join("");
+    promoHtml = `<div class="promo-box">${rows}</div>`;
+  }
+
+  // Cart control — same as virtual store
+  const atMax = inCart && inCart.qty >= p.stock && p.stock > 0;
+  let ctrlHtml = "";
+  if(agotado) {
+    ctrlHtml = `<button class="abtn" disabled>Sin stock</button>`;
+  } else if(inCart) {
+    ctrlHtml = `<div class="qctrl">
+      <button class="qbtn" onclick="changeCartQty('${tipo}_${p.id}',-1)">−</button>
+      <span class="qnum">${inCart.qty}</span>
+      <button class="qbtn" onclick="changeCartQty('${tipo}_${p.id}',1)" ${atMax?"disabled":""}>+</button>
+    </div>`;
+  } else {
+    ctrlHtml = `<button class="abtn" onclick="addToCart('${p.id}','${tipo}')">+ Agregar</button>`;
+  }
+
+  return `<div class="pcard">
+    <div class="pcard-img-wrap">
+      ${imgContent}
+      ${agotadoOverlay}
+      ${badgePr}${badgeLow}${badgeOwn}${codeBadge}
     </div>
-    <div class="prod-card-name">${p.nombre}</div>
-    ${descEl}
-    <div class="prod-card-price">Bs.${(p.precio||0).toFixed(2)}</div>
-    <div style="font-size:.72rem;color:var(--gr)">${p.unidad||"unidad"}</div>
-    ${stockEl}
-    ${bottomBtn}
+    <div class="pcard-body">
+      <div class="pcard-name">${p.nombre}</div>
+      <div class="pcard-unit">por ${p.unidad||"unidad"}</div>
+      <div class="pcard-price">Bs. ${(p.precio||0).toFixed(2)}</div>
+      ${promoHtml}
+      ${ctrlHtml}
+    </div>
   </div>`;
 }
 
