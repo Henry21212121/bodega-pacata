@@ -682,18 +682,23 @@ async function loadConfigData() {
   pesoUnit = localStorage.getItem('tienda_peso_unit') || 'libras';
   updatePesoUnitUI();
 
-  // Load categorías físicas
-  fs.onSnapshot(fs.query(fs.collection(db,'categorias_fisica'), fs.orderBy('nombre')), snap => {
-    catsFisicas = snap.docs.map(d=>({...d.data(),id:d.id}));
+  // Load categorías físicas — no orderBy to avoid index requirement
+  fs.onSnapshot(fs.collection(db,'categorias_fisica'), snap => {
+    catsFisicas = snap.docs.map(d=>({...d.data(),id:d.id}))
+      .sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||''));
     renderCatFisicaList();
     populateCatSelect();
   });
 
-  // Load productos físicos
-  fs.onSnapshot(fs.query(fs.collection(db,'tempProducts'), fs.orderBy('nombre')), snap => {
-    prodsFisicas = snap.docs.map(d=>({...d.data(),id:d.id}));
-    renderProdFisicaList();
-  });
+  // Load productos físicos propios — no orderBy
+  fs.onSnapshot(
+    fs.query(fs.collection(db,'tempProducts'), fs.where('origen','==','fisica')),
+    snap => {
+      prodsFisicas = snap.docs.map(d=>({...d.data(),id:d.id}))
+        .sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||''));
+      renderProdFisicaList();
+    }
+  );
 }
 
 function setPesoUnit(unit) {
@@ -747,9 +752,11 @@ async function saveCatFisica() {
   const nombre = document.getElementById('catFisicaNombre').value.trim();
   if(!nombre) { showToast('El nombre es obligatorio', true); return; }
   const data = {
-    nombre, emoji: document.getElementById('catFisicaEmoji').value.trim()||'📦',
+    nombre,
+    emoji: document.getElementById('catFisicaEmoji').value.trim()||'📦',
     esPeso: document.getElementById('catFisicaPeso').value === 'true',
-    origen: 'fisica', updatedAt: fs.serverTimestamp()
+    origen: 'fisica',
+    updatedAt: fs.serverTimestamp()
   };
   try {
     if(editCatFisicaId) {
@@ -758,8 +765,13 @@ async function saveCatFisica() {
       data.createdAt = fs.serverTimestamp();
       await fs.addDoc(fs.collection(db,'categorias_fisica'), data);
     }
-    closeModal('catFisicaModal'); showToast('✅ Categoría guardada');
-  } catch(e) { showToast('Error: '+e.message, true); }
+    editCatFisicaId = null;
+    closeModal('catFisicaModal');
+    showToast('✅ Categoría guardada');
+  } catch(e) {
+    console.error('saveCatFisica error:', e);
+    showToast('Error: ' + (e.message||e.code||'desconocido'), true);
+  }
 }
 
 async function deleteCatFisica(id) {
@@ -865,8 +877,11 @@ async function saveProdFisica() {
   const cat = catsFisicas.find(c=>c.id===catId);
   const stockVal = document.getElementById('pfStock').value.trim();
   const data = {
-    nombre, catId, cat: cat?.nombre||'Mis productos',
-    precio, unidad: document.getElementById('pfUnidad').value.trim()||'unidad',
+    nombre,
+    catId: catId||'',
+    cat: cat?.nombre||'Mis productos',
+    precio,
+    unidad: document.getElementById('pfUnidad').value.trim()||'unidad',
     costoUnit: parseFloat(document.getElementById('pfPrecioUnit').value)||0,
     costoLote: parseFloat(document.getElementById('pfCostoLote').value)||0,
     cantAdq: parseFloat(document.getElementById('pfCantAdq').value)||0,
@@ -878,9 +893,11 @@ async function saveProdFisica() {
     pesoEquiv: parseFloat(document.getElementById('pfPesoEquiv').value)||0,
     pesoUnit,
     origen: 'fisica',
-    activoVirtual: false, // inactivo en tienda virtual hasta que admin lo active
+    activoVirtual: false,
     updatedAt: fs.serverTimestamp()
   };
+  // Remove null values that Firestore doesn't accept well
+  if(data.stock === null) delete data.stock;
   try {
     if(editProdFisicaId) {
       await fs.updateDoc(fs.doc(db,'tempProducts',editProdFisicaId), data);
@@ -888,8 +905,13 @@ async function saveProdFisica() {
       data.createdAt = fs.serverTimestamp();
       await fs.addDoc(fs.collection(db,'tempProducts'), data);
     }
-    closeModal('prodFisicaModal'); showToast('✅ Producto guardado');
-  } catch(e) { showToast('Error: '+e.message, true); }
+    editProdFisicaId = null;
+    closeModal('prodFisicaModal');
+    showToast('✅ Producto guardado');
+  } catch(e) {
+    console.error('saveProdFisica error:', e);
+    showToast('Error: ' + (e.message||e.code||'desconocido'), true);
+  }
 }
 
 function renderProdFisicaList() {
