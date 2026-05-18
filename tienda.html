@@ -1847,12 +1847,56 @@ function stopVoiceSearch(){
 }
 function closeVoicePanel(){ stopVoiceSearch(); }
 
-// ════════════════════════════════════
-// UTILS
-// ════════════════════════════════════
-function openModal(id){document.getElementById(id).classList.add("open");}
-function closeModal(id){document.getElementById(id).classList.remove("open");}
-document.querySelectorAll(".modal-ov").forEach(m=>m.addEventListener("click",e=>{if(e.target===m)m.classList.remove("open");}));
+// ══ EXPOSE GLOBALS (required when mixing with ES modules) ══
+window.pinPress = pinPress;
+window.logout = logout;
+window.showTab = showTab;
+window.switchProdTab = switchProdTab;
+window.openAddTemp = openAddTemp;
+window.addToCart = addToCart;
+window.changeCartQty = changeCartQty;
+window.removeFromCart = removeFromCart;
+window.clearCart = clearCart;
+window.openCheckout = openCheckout;
+window.closeCheckout = closeCheckout;
+window.selectPayMethod = selectPayMethod;
+window.calcCheckoutVuelto = calcCheckoutVuelto;
+window.confirmSale = confirmSale;
+window.saveTempProd = saveTempProd;
+window.openAddFiado = openAddFiado;
+window.saveFiado = saveFiado;
+window.cobrarFiado = cobrarFiado;
+window.openAddGasto = openAddGasto;
+window.saveGasto = saveGasto;
+window.openAddCompra = openAddCompra;
+window.saveCompra = saveCompra;
+window.downloadDayReportDialog = downloadDayReportDialog;
+window.openFiarCheckout = openFiarCheckout;
+window.buscarDeudor = buscarDeudor;
+window.seleccionarDeudor = seleccionarDeudor;
+window.clearFiarDeudor = clearFiarDeudor;
+window.calcFiarSaldo = calcFiarSaldo;
+window.confirmarFiar = confirmarFiar;
+window.verDetalleFiado = verDetalleFiado;
+window.openPagoParc = openPagoParc;
+window.savePagoParc = savePagoParc;
+window.openAddCatFisica = openAddCatFisica;
+window.saveCatFisica = saveCatFisica;
+window.deleteCatFisica = deleteCatFisica;
+window.openAddProdFisica = openAddProdFisica;
+window.saveProdFisica = saveProdFisica;
+window.deleteProdFisica = deleteProdFisica;
+window.checkPesoCategory = checkPesoCategory;
+window.calcPFPrecioUnit = calcPFPrecioUnit;
+window.calcPesoEquiv = calcPesoEquiv;
+window.togglePFDetalle = togglePFDetalle;
+window.setPesoUnit = setPesoUnit;
+window.cambiarPin = cambiarPin;
+window.toggleVoiceSearch = toggleVoiceSearch;
+window.onVendSearch = onVendSearch;
+window.clearVendSearch = clearVendSearch;
+window.openModal = openModal;
+window.closeModal = closeModal;
 
 let toastTimer;
 function showToast(msg,error=false){
