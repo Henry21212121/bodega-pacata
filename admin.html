@@ -278,21 +278,20 @@ input[type=file]{display:none;}
     <!-- PEDIDOS -->
     <div id="tab-pedidos" class="tab-content" style="display:none">
       <div class="panel">
-        <h2>📦 Gestión de pedidos
-          <button onclick="renderOrders()" class="btn btn-sec btn-sm" style="margin-left:10px;font-size:.75rem">🔄 Actualizar</button>
+        <h2 style="display:flex;align-items:center;gap:10px">
+          📦 Gestión de pedidos
+          <span id="newOrderBadge" style="display:none;background:var(--ro);color:#fff;border-radius:50px;padding:2px 10px;font-size:.72rem;font-weight:900;animation:pulse .8s infinite">🔔 NUEVO</span>
+          <button onclick="renderOrders()" class="btn btn-sec btn-sm" style="margin-left:auto;font-size:.75rem">🔄 Actualizar</button>
         </h2>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-          <button class="btn btn-sec btn-sm fpill active" data-status="all" onclick="filterOrders('all',this)">Todos</button>
-          <button class="btn btn-sec btn-sm fpill active" data-status="pending" onclick="filterOrders('pending',this)">⏳ Pendientes</button>
-          <button class="btn btn-sec btn-sm fpill active" data-status="scheduled" onclick="filterOrders('scheduled',this)">⏰ Programados</button>
-          <button class="btn btn-sec btn-sm fpill active" data-status="confirmed" onclick="filterOrders('confirmed',this)">✅ Confirmados</button>
-          <button class="btn btn-sec btn-sm fpill active" data-status="on_way" onclick="filterOrders('on_way',this)">🚲 En camino</button>
-          <button class="btn btn-sec btn-sm fpill active" data-status="delivered" onclick="filterOrders('delivered',this)">📦 Entregados</button>
-          <button class="btn btn-sec btn-sm fpill active" data-status="cancelled" onclick="filterOrders('cancelled',this)">❌ Cancelados</button>
+          <button class="btn btn-sec btn-sm fpill active" data-filter="all" onclick="filterOrdersGroup('all',this)">📋 Todos</button>
+          <button class="btn btn-sec btn-sm fpill" data-filter="active" onclick="filterOrdersGroup('active',this)">🔄 En curso <span id="activeCount" style="background:#fff;color:var(--v);border-radius:50px;padding:0 6px;font-size:.68rem;margin-left:4px">0</span></button>
+          <button class="btn btn-sec btn-sm fpill" data-filter="done" onclick="filterOrdersGroup('done',this)">✅ Concluidos</button>
+          <button class="btn btn-sec btn-sm fpill" data-filter="cancelled" onclick="filterOrdersGroup('cancelled',this)">❌ Cancelados</button>
         </div>
         <div class="tbl-wrap">
           <table class="tbl">
-            <thead><tr><th>Código</th><th>Cliente</th><th>Total</th><th>Estado</th><th>Repartidor</th><th>Fecha</th><th>Acciones</th></tr></thead>
+            <thead><tr><th>Código</th><th>Cliente</th><th>Total</th><th>Estado</th><th>Repartidor</th><th>Hora</th><th>Acciones</th></tr></thead>
             <tbody id="ordersBody"></tbody>
           </table>
         </div>
@@ -882,11 +881,47 @@ async function loadAdminData() {
     });
 
     // Orders (real-time last 200)
+    let _knownOrderIds = new Set();
     fs.onSnapshot(
       fs.query(fs.collection(db,"orders"), fs.orderBy("createdAt","desc"), fs.limit(200)),
       snap => {
+        const prevIds = new Set(_knownOrderIds);
         DB.orders = [];
-        snap.forEach(d => DB.orders.push({...d.data(), id:d.id}));
+        snap.forEach(d => {
+          DB.orders.push({...d.data(), id:d.id});
+          _knownOrderIds.add(d.id);
+        });
+
+        // Detect new orders (not seen before) that are pending
+        const hasNew = DB.orders.some(o =>
+          ['pending','new_order'].includes(o.status) && !prevIds.has(o.id)
+        );
+
+        if(hasNew && prevIds.size > 0) {
+          // Play alert sound
+          try {
+            const ctx = new (window.AudioContext||window.webkitAudioContext)();
+            [523, 659, 784].forEach((freq, i) => {
+              const osc = ctx.createOscillator();
+              const gain = ctx.createGain();
+              osc.connect(gain); gain.connect(ctx.destination);
+              osc.frequency.value = freq;
+              osc.type = 'sine';
+              gain.gain.setValueAtTime(0.3, ctx.currentTime + i*0.15);
+              gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i*0.15 + 0.3);
+              osc.start(ctx.currentTime + i*0.15);
+              osc.stop(ctx.currentTime + i*0.15 + 0.3);
+            });
+          } catch(e) {}
+          // Show new order badge
+          const badge = document.getElementById('newOrderBadge');
+          if(badge) {
+            badge.style.display = 'inline-block';
+            setTimeout(() => { badge.style.display = 'none'; }, 8000);
+          }
+          showToast('🔔 ¡Nuevo pedido recibido!');
+        }
+
         renderOrders();
         renderDashboard();
       }
@@ -1111,64 +1146,39 @@ function downloadStockReportPDF() {
 
 function statusChip(s) {
   const map = {
-    pending:   '<span class="chip chip-pend">⏳ Pendiente</span>',
-    scheduled: '<span class="chip" style="background:#e8f4fd;color:#1565c0">⏰ Programado</span>',
-    confirmed: '<span class="chip chip-conf">✅ Confirmado</span>',
-    on_way:    '<span class="chip" style="background:#fff8e1;color:#f57f17">🚲 En camino</span>',
-    delivered: '<span class="chip chip-del">📦 Entregado</span>',
-    cancelled: '<span class="chip chip-canc">❌ Cancelado</span>',
+    pending:     ['🆕 Pedido nuevo',     '#e8f5e9','#1b5e20'],
+    new_order:   ['🆕 Pedido nuevo',     '#e8f5e9','#1b5e20'],
+    scheduled:   ['⏰ Programado',       '#e8f4fd','#1565c0'],
+    confirmed:   ['🆕 Pedido nuevo',     '#e8f5e9','#1b5e20'],
+    preparing:   ['👨‍🍳 Preparando',      '#fff8e1','#f57f17'],
+    on_way:      ['🚲 En camino',        '#fff3e0','#e65100'],
+    at_door:     ['🚪 Rep. en la puerta','#f3e5f5','#7b1fa2'],
+    delivered:   ['📦 Entregado',        '#e0f2f1','#00695c'],
+    cancelled:   ['❌ Cancelado',        '#ffebee','#c62828'],
   };
-  return map[s] || `<span class="chip">${s}</span>`;
+  const [label,bg,color] = map[s] || [s,'#f5f5f5','#666'];
+  return `<span style="background:${bg};color:${color};padding:3px 9px;border-radius:50px;font-size:.7rem;font-weight:800;white-space:nowrap">${label}</span>`;
 }
 
 // ─── ORDERS ────────────────────────
-// ── MULTI-SELECT FILTER ───────────────────────────────────
-// activeFilters: set of active statuses. Empty = show all.
-let activeFilters = new Set(["all","pending","scheduled","confirmed","on_way","delivered","cancelled"]);
-let _lastClickedFilter = null;
-let _lastClickTime = 0;
+// ── ORDER FILTER GROUP ────────────────────────────────────
+let currentOrderGroup = 'all'; // 'all' | 'active' | 'done' | 'cancelled'
 
-function filterOrders(status, btn) {
-  const now = Date.now();
-  const isDoubleClick = (_lastClickedFilter === status) && (now - _lastClickTime < 400);
-  _lastClickedFilter = status;
-  _lastClickTime = now;
+const ACTIVE_STATUSES   = ['pending','new_order','confirmed','preparing','scheduled'];
+const ON_ROUTE_STATUSES = ['on_way','at_door'];
+const DONE_STATUSES     = ['delivered'];
+const CANCEL_STATUSES   = ['cancelled'];
 
-  if(isDoubleClick) {
-    // Double click: solo mode — show ONLY this status
-    activeFilters = new Set([status]);
-    document.querySelectorAll("[data-status]").forEach(b => {
-      b.classList.toggle("active", b.dataset.status === status);
-    });
-  } else {
-    if(status === "all") {
-      // "Todos" toggles all on/off
-      const allOn = activeFilters.size >= 6;
-      if(allOn) {
-        activeFilters.clear();
-      } else {
-        activeFilters = new Set(["all","pending","scheduled","confirmed","on_way","delivered","cancelled"]);
-      }
-      document.querySelectorAll("[data-status]").forEach(b => {
-        b.classList.toggle("active", activeFilters.has(b.dataset.status));
-      });
-    } else {
-      // Toggle this status
-      if(activeFilters.has(status)) {
-        activeFilters.delete(status);
-        btn.classList.remove("active");
-      } else {
-        activeFilters.add(status);
-        btn.classList.add("active");
-      }
-      // Update "Todos" state
-      const allBtn = document.querySelector("[data-status='all']");
-      const allStatuses = ["pending","scheduled","confirmed","on_way","delivered","cancelled"];
-      const allActive = allStatuses.every(s => activeFilters.has(s));
-      if(allBtn) allBtn.classList.toggle("active", allActive);
-    }
-  }
+function filterOrdersGroup(group, btn) {
+  currentOrderGroup = group;
+  document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
   renderOrders();
+}
+
+// Keep old filterOrders alias for any remaining calls
+function filterOrders(status, btn) {
+  filterOrdersGroup('all', document.querySelector('[data-filter="all"]') || btn);
 }
 
 async function openOrder(id) {
@@ -1308,10 +1318,12 @@ async function acceptAndNotify(id, btn) {
   if(btn) btn.disabled = true;
   try {
     await fs.updateDoc(fs.doc(db,"orders",id), {
-      status: "confirmed",
+      status: "new_order",
       confirmedAt: fs.serverTimestamp()
     });
-    showToast("✅ Pedido confirmado");
+    showToast("✅ Pedido aceptado");
+    // Auto-assign if only one repartidor active
+    await autoAssignIfSingle(id);
   } catch(e) { showToast("Error",true); if(btn) btn.disabled=false; return; }
 
   // Single WhatsApp message to client with full detail
@@ -3332,56 +3344,88 @@ const _origRenderOrders = renderOrders;
 function renderOrders() {
   let orders = DB.orders;
 
-  // Multi-filter: show orders matching ANY active status
-  if(activeFilters.size > 0) {
-    const allStatuses = ["pending","scheduled","confirmed","on_way","delivered","cancelled"];
-    const noneActive = allStatuses.every(s => !activeFilters.has(s));
-    if(!noneActive) orders = orders.filter(o => activeFilters.has(o.status));
+  // Apply group filter
+  if(currentOrderGroup === 'active') {
+    orders = orders.filter(o => [...ACTIVE_STATUSES, ...ON_ROUTE_STATUSES].includes(o.status));
+  } else if(currentOrderGroup === 'done') {
+    orders = orders.filter(o => DONE_STATUSES.includes(o.status));
+  } else if(currentOrderGroup === 'cancelled') {
+    orders = orders.filter(o => CANCEL_STATUSES.includes(o.status));
   }
 
+  // Update active count badge
+  const activeCount = DB.orders.filter(o => [...ACTIVE_STATUSES,...ON_ROUTE_STATUSES].includes(o.status)).length;
+  const badge = document.getElementById('activeCount');
+  if(badge) badge.textContent = activeCount;
+
   const tbody = document.getElementById("ordersBody");
-  if(!orders.length) { tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--gr);padding:20px">Sin pedidos para los filtros seleccionados</td></tr>'; return; }
+  if(!orders.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--gr);padding:20px">Sin pedidos</td></tr>';
+    return;
+  }
 
   const activeRepsList = DB_repartidores.filter(r=>r.activo!==false);
 
   tbody.innerHTML = orders.map(o => {
-    const dt = o.createdAt ? new Date(o.createdAt.seconds*1000).toLocaleString("es-BO",{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : "-";
-    const isScheduled = o.status === "scheduled";
-    let quickBtn = "";
+    const dt = o.createdAt?.seconds
+      ? new Date(o.createdAt.seconds*1000).toLocaleString("es-BO",{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})
+      : "—";
 
-    if(o.status==="pending" || o.status==="scheduled") {
-      quickBtn = '<button class="btn btn-v btn-sm" onclick="acceptAndNotify(\''+o.id+'\',this)">✅ Aceptar</button>';
-    } else if(o.status==="confirmed") {
+    const schedBadge = o.scheduledSlot
+      ? `<br><span style="font-size:.6rem;background:#e8f4fd;color:#1565c0;padding:1px 5px;border-radius:50px;font-weight:800">⏰ ${o.scheduledSlot}</span>`
+      : "";
+
+    // ── Repartidor cell ──
+    let repCell = '';
+    const effectiveStatus = o.status;
+
+    if(['pending','new_order','confirmed'].includes(effectiveStatus) && !o.repartidorId) {
+      // No rep assigned yet — show dropdown
       const repOpts = activeRepsList.map(r => {
         const online = r.online && r.lastSeen?.seconds && (Date.now()/1000 - r.lastSeen.seconds < 120);
-        return '<option value="'+r.id+'" '+(o.repartidorId===r.id?'selected':'')+'>'+ r.nombre +' '+(online?'🟢':'⚫')+'</option>';
+        return `<option value="${r.id}">${r.nombre} ${online?'🟢':'⚫'}</option>`;
       }).join('');
-      quickBtn = '<div style="display:flex;flex-direction:column;gap:3px">' +
-        '<select onchange="assignAndPrint(\''+o.id+'\',this.value)" style="font-size:.7rem;padding:4px;border:1.5px solid var(--vbg);border-radius:8px;outline:none">' +
-        '<option value="">🚲 Asignar...</option>' + repOpts + '</select>' +
-        (o.repartidorId ? '<button class="btn btn-or btn-sm" onclick="sendOnWay(\''+o.id+'\',this)" style="font-size:.7rem">🚲 En camino</button>' : '') +
-        '<button class="btn btn-sec btn-sm" onclick="printOrderWithRep(\''+o.id+'\')" style="font-size:.7rem">🖨️</button>' +
-        '</div>';
-    } else if(o.status==="on_way") {
-      quickBtn = '<button class="btn btn-v btn-sm" onclick="markDelivered(\''+o.id+'\',this)">📦 Entregado</button>';
-    } else if(o.status==="delivered") {
-      quickBtn = '<button class="btn btn-sec btn-sm" onclick="openCalModal(\''+o.id+'\')">⭐ Calificar</button>';
+      repCell = activeRepsList.length
+        ? `<select onchange="assignAndPrint('${o.id}',this.value)" style="font-size:.7rem;padding:4px 6px;border:1.5px solid var(--vbg);border-radius:8px;outline:none;max-width:130px">
+            <option value="">🚲 Asignar...</option>${repOpts}
+           </select>`
+        : `<span style="font-size:.7rem;color:var(--gr)">Sin repartidores</span>`;
+    } else if(o.repartidorNombre) {
+      repCell = `<span style="font-size:.72rem;color:var(--v);font-weight:700">🚲 ${o.repartidorNombre}</span>`;
+    } else {
+      repCell = `<span style="font-size:.7rem;color:var(--gr)">—</span>`;
     }
 
-    const schedBadge = isScheduled ? '<br><span style="font-size:.62rem;background:#e8f4fd;color:#1565c0;padding:1px 5px;border-radius:50px;font-weight:800">⏰ '+(o.scheduledSlot||"")+'</span>' : "";
-    const repCell = o.repartidorNombre
-      ? '<span style="font-size:.72rem;color:var(--v);font-weight:700">🚲 '+ o.repartidorNombre +'</span>'
-      : '<span style="font-size:.7rem;color:var(--gr)">—</span>';
+    // ── Actions ──
+    let quickBtn = '';
+    if(['pending','new_order','scheduled'].includes(effectiveStatus)) {
+      quickBtn = `<button class="btn btn-v btn-sm" onclick="acceptAndNotify('${o.id}',this)">✅ Aceptar</button>`;
+    } else if(effectiveStatus === 'confirmed' || (effectiveStatus === 'preparing' && !o.repartidorId)) {
+      quickBtn = `<button class="btn btn-sec btn-sm" onclick="printOrderWithRep('${o.id}')">🖨️ Imprimir</button>`;
+    } else if(effectiveStatus === 'preparing') {
+      quickBtn = `<button class="btn btn-sec btn-sm" onclick="printOrderWithRep('${o.id}')">🖨️ Imprimir</button>`;
+    } else if(effectiveStatus === 'on_way') {
+      quickBtn = `<span style="font-size:.72rem;color:var(--or);font-weight:700">🚲 En camino...</span>`;
+    } else if(effectiveStatus === 'at_door') {
+      quickBtn = `<span style="font-size:.72rem;color:#7b1fa2;font-weight:700">🚪 En la puerta</span>`;
+    } else if(effectiveStatus === 'delivered') {
+      quickBtn = o.calSent
+        ? `<span style="font-size:.7rem;color:var(--v)">⭐ Cal. enviada</span>`
+        : `<button class="btn btn-sec btn-sm" onclick="openCalModal('${o.id}')">⭐ Calificar</button>`;
+    }
 
-    return '<tr>' +
-      '<td><b>'+(o.code||"-")+'</b>'+ schedBadge +'</td>' +
-      '<td>'+(o.clientName||"-")+'<br><small style="color:var(--gr)">'+(o.clientPhone||"")+'</small></td>' +
-      '<td>Bs. '+(o.total||0).toFixed(2)+'</td>' +
-      '<td>'+statusChip(o.status)+'</td>' +
-      '<td>'+repCell+'</td>' +
-      '<td style="font-size:.72rem">'+dt+'</td>' +
-      '<td>'+quickBtn+'<button class="btn btn-sec btn-sm" onclick="openOrder(\''+o.id+'\')">👁️</button></td>' +
-      '</tr>';
+    return `<tr>
+      <td><b>${o.code||"—"}</b>${schedBadge}</td>
+      <td>${o.clientName||"—"}<br><small style="color:var(--gr)">${o.clientPhone||""}</small></td>
+      <td>Bs. ${(o.total||0).toFixed(2)}</td>
+      <td>${statusChip(o.status)}</td>
+      <td>${repCell}</td>
+      <td style="font-size:.72rem">${dt}</td>
+      <td style="display:flex;gap:3px;flex-wrap:wrap;align-items:center">
+        ${quickBtn}
+        <button class="btn btn-sec btn-sm" onclick="openOrder('${o.id}')">👁️</button>
+      </td>
+    </tr>`;
   }).join("");
 }
 
@@ -3394,6 +3438,7 @@ async function assignAndPrint(orderId, repId) {
       repartidorId: repId,
       repartidorNombre: rep.nombre,
       repartidorTel: rep.telefono||'',
+      status: 'preparing',
       assignedAt: fs.serverTimestamp()
     });
     showToast("✅ Asignado a " + rep.nombre + " — imprimiendo...");
