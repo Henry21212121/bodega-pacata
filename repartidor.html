@@ -526,7 +526,11 @@ async function renderOrders() {
         <button class="action-btn" style="width:100%;background:var(--or);color:#fff;margin-bottom:8px;font-size:.88rem;font-weight:900"
           onclick="marcarEnCamino('${o.id}')">
           🚲 SALIR — Marcar en camino
-        </button>` : ''}
+        </button>` : `
+        <button class="action-btn" style="width:100%;background:#7b1fa2;color:#fff;margin-bottom:6px;font-size:.82rem;font-weight:800"
+          onclick="marcarLlegada('${o.id}')">
+          🚪 Llegué al cliente
+        </button>`}
 
         <div class="action-row">
           <button class="action-btn btn-nav" onclick="window.open('${mapsUrl}','_blank')">🗺️ Navegar</button>
@@ -681,6 +685,16 @@ async function savePhoto() {
 }
 
 // ─── DELIVERY ────────────────────────────────────────
+async function marcarLlegada(orderId) {
+  try {
+    await fs.updateDoc(fs.doc(db,'orders',orderId), {
+      arrivedAt: fs.serverTimestamp()
+    });
+    showToast('🚪 Llegada registrada');
+    loadOrders();
+  } catch(e) { showToast('Error: '+e.message, true); }
+}
+
 // ─── MARCAR EN CAMINO ────────────────────────────────────
 async function marcarEnCamino(orderId) {
   try {
