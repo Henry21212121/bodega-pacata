@@ -402,7 +402,7 @@ async function loadAll() {
   loadHistory();
   // Real-time orders listener
   fs.onSnapshot(
-    fs.query(fs.collection(db,'orders'), fs.where('repartidorId','==',currentRep.id), fs.where('status','in',['confirmed','on_way'])),
+    fs.query(fs.collection(db,'orders'), fs.where('repartidorId','==',currentRep.id), fs.where('status','in',['preparing','new_order','confirmed','on_way','at_door'])),
     snap => { myOrders = snap.docs.map(d=>({...d.data(),id:d.id})); renderOrders(); updateStats(); }
   );
   fs.onSnapshot(
@@ -416,7 +416,7 @@ async function loadOrders() {
     const snap = await fs.getDocs(fs.query(
       fs.collection(db,'orders'),
       fs.where('repartidorId','==',currentRep.id),
-      fs.where('status','in',['confirmed','on_way'])
+      fs.where('status','in',['preparing','new_order','confirmed','on_way','at_door'])
     ));
     myOrders = snap.docs.map(d=>({...d.data(),id:d.id}))
     renderOrders(); updateStats();
@@ -685,17 +685,6 @@ async function savePhoto() {
 }
 
 // ─── DELIVERY ────────────────────────────────────────
-async function marcarLlegada(orderId) {
-  try {
-    await fs.updateDoc(fs.doc(db,'orders',orderId), {
-      arrivedAt: fs.serverTimestamp()
-    });
-    showToast('🚪 Llegada registrada');
-    loadOrders();
-  } catch(e) { showToast('Error: '+e.message, true); }
-}
-
-// ─── MARCAR EN CAMINO ────────────────────────────────────
 async function marcarEnCamino(orderId) {
   try {
     await fs.updateDoc(fs.doc(db,'orders',orderId), {
@@ -703,9 +692,19 @@ async function marcarEnCamino(orderId) {
       onWayAt: fs.serverTimestamp(),
       repartidorNombre: currentRep.nombre
     });
-    showToast('🚲 ¡En camino! Enviando ubicación cada 30s');
-    // Start sending location only when on the way
+    showToast('🚲 ¡En camino! GPS activo cada 30s');
     if(!locationInterval) startLocationTracking();
+    loadOrders();
+  } catch(e) { showToast('Error: '+e.message, true); }
+}
+
+async function marcarLlegada(orderId) {
+  try {
+    await fs.updateDoc(fs.doc(db,'orders',orderId), {
+      status: 'at_door',
+      arrivedAt: fs.serverTimestamp()
+    });
+    showToast('🚪 Llegada al cliente registrada');
     loadOrders();
   } catch(e) { showToast('Error: '+e.message, true); }
 }
