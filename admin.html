@@ -3329,13 +3329,26 @@ function openCalModal(orderId) {
 function sendCalLink() {
   const o = DB.orders.find(x=>x.id===currentAssignOrderId);
   if(!o) return;
-  const wa = (DB.config.wa||'').replace(/\D/g,'');
   const clientPhone = `591${(o.clientPhone||'').replace(/\D/g,'')}`;
   const nombre = (o.clientName||'').split(' ')[0];
-  const calUrl = `${location.origin}/index.html?cal=${currentAssignOrderId}`;
-  const msg = `🎉 Hola ${nombre}, tu pedido *${o.code}* fue entregado. ¡Gracias por elegirnos!\n\n¿Podés tomarte un momento para calificar tu experiencia?\n⭐ ${calUrl}\n\n¡Tu opinión nos ayuda a mejorar! 🙏`;
+
+  const msg = `━━━━━━━━━━━━━━━━\n` +
+    `⭐ Hola ${nombre}, tu pedido *${o.code||''}* fue entregado. ¡Muchas gracias por elegirnos!\n` +
+    `━━━━━━━━━━━━━━━━\n` +
+    `¿Cómo calificarías tu experiencia?\n\n` +
+    `Solo respondé con un número:\n\n` +
+    `1️⃣ — Muy malo\n` +
+    `2️⃣ — Malo\n` +
+    `3️⃣ — Regular\n` +
+    `4️⃣ — Bueno\n` +
+    `5️⃣ — Excelente 🌟\n\n` +
+    `¡Tu opinión nos ayuda a mejorar! 🙏\n` +
+    `— La Bodega Online Pacata\n` +
+    `━━━━━━━━━━━━━━━━`;
+
   close2('calModal');
-  window.open(`https://wa.me/${clientPhone}?text=${encodeURIComponent(msg)}`,'_blank');
+  window.open(`https://wa.me/${clientPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+  fs.updateDoc(fs.doc(db,'orders',currentAssignOrderId), {calSent:true}).catch(()=>{});
 }
 
 // ── UPDATE renderOrders TO INCLUDE REPARTIDOR COLUMN ─────
@@ -3545,11 +3558,12 @@ async function trackApiUsage(type, count=1) {
 <!-- MODAL: CALIFICACION -->
 <div class="confirm-ov" id="calModal">
   <div class="confirm-box" style="max-width:360px">
-    <h3>⭐ Enviar enlace de calificación</h3>
+    <h3>⭐ Enviar calificación</h3>
     <p style="font-size:.78rem;color:var(--gr);margin-bottom:10px" id="calOrderInfo"></p>
-    <div style="text-align:center;margin:12px 0">
-      <div style="font-size:.82rem;font-weight:800;margin-bottom:8px">Link para el cliente:</div>
-      <div id="calLink" style="font-size:.72rem;color:var(--v);word-break:break-all;background:var(--vbg);padding:8px;border-radius:8px"></div>
+    <div style="background:var(--vbg);border-radius:10px;padding:12px;margin-bottom:12px;font-size:.78rem;line-height:1.7;color:var(--tx)">
+      El cliente recibirá este mensaje y solo deberá responder con un número:<br><br>
+      <b>1️⃣</b> Muy malo &nbsp; <b>2️⃣</b> Malo &nbsp; <b>3️⃣</b> Regular<br>
+      <b>4️⃣</b> Bueno &nbsp; <b>5️⃣</b> Excelente 🌟
     </div>
     <div class="confirm-btns">
       <button class="cbtn cbtn-s" onclick="close2('calModal')">Cancelar</button>
