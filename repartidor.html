@@ -473,8 +473,9 @@ async function renderOrders() {
     return;
   }
   el.innerHTML = '';
+
   for(const o of myOrders) {
-    // Check if address is verified
+    // Load verified location / facade photo
     let verified = null;
     if(o.clientId) {
       try {
@@ -482,31 +483,111 @@ async function renderOrders() {
         if(vsnap.exists()) verified = vsnap.data();
       } catch(e) {}
     }
+
     const card = document.createElement('div');
     card.className = 'order-card';
+
     const itemsHtml = (o.items||[]).map(i=>`<div>${i.qty}× ${i.nombre} — Bs.${(i.subtotal||0).toFixed(2)}</div>`).join('');
+
     const verifiedHtml = verified
       ? `<span class="verified-badge">✅ Dirección verificada</span>${verified.nota?`<div style="font-size:.72rem;color:var(--gr);margin-bottom:4px">${verified.nota}</div>`:''}`
       : '<span class="unverified-badge">⚠️ Primera vez — verificar dirección</span>';
+
     const photoHtml = verified?.fotoUrl
-      ? `<img src="${verified.fotoUrl}" class="order-photo" alt="Foto de la puerta">`
-      : '';
+      ? `<img src="${verified.fotoUrl}" class="order-photo" alt="Foto de la puerta">` : '';
+
     const mapsUrl = o.clientLat && o.clientLng
       ? `https://www.google.com/maps/dir/?api=1&destination=${o.clientLat},${o.clientLng}&travelmode=bicycling`
       : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(o.clientAddr||'')}`;
 
-    // WhatsApp call to client
     const clientWAPhone = `591${(o.clientPhone||'').replace(/\D/g,'')}`;
-    const waCallUrl = `https://wa.me/${clientWAPhone}`;
+    const waUrl = `https://wa.me/${clientWAPhone}`;
 
-    const isOnWay = o.status === 'on_way';
+    // ── Status-based button layout ──────────────────────────
+    // PHASE 1 — preparing / new_order / confirmed: ONLY "SALIR" active
+    const isPhase1 = ['preparing','new_order','confirmed'].includes(o.status);
+    // PHASE 2 — on_way: SALIR done, show Navegar + Llegué
+    const isPhase2 = o.status === 'on_way';
+    // PHASE 3 — at_door: show WA + Ajustar pin + Foto + Marcar entregado
+    const isPhase3 = o.status === 'at_door';
+
+    // Status badge
+    const statusLabel = {
+      preparing: '👨‍🍳 Preparando — listo para salir',
+      new_order: '🆕 Pedido asignado',
+      confirmed: '✅ Pedido confirmado',
+      on_way: '🚲 En camino',
+      at_door: '🚪 En la puerta del cliente',
+    }[o.status] || o.status;
+
+    const statusColor = {
+      preparing: '#f57f17', new_order: '#1b5e20', confirmed: '#1b5e20',
+      on_way: '#e65100', at_door: '#7b1fa2'
+    }[o.status] || '#666';
+
+    // Build buttons HTML
+    let buttonsHtml = '';
+
+    if(isPhase1) {
+      // SOLO el botón SALIR activo — todo lo demás deshabilitado y gris
+      buttonsHtml = `
+        <button class="action-btn" style="width:100%;background:var(--or);color:#fff;margin-bottom:10px;font-size:.95rem;font-weight:900;padding:14px"
+          onclick="marcarEnCamino('${o.id}')">
+          🚲 SALIR — Marcar en camino
+        </button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;opacity:.35;pointer-events:none">
+          <button class="action-btn btn-nav" disabled>🗺️ Navegar</button>
+          <button class="action-btn" style="background:#25d366;color:#fff" disabled>💬 WhatsApp</button>
+          <button class="action-btn btn-adjust" disabled>📍 Ajustar pin</button>
+          <button class="action-btn btn-photo" disabled>📸 Foto puerta</button>
+        </div>
+        <button class="action-btn btn-deliver" style="width:100%;margin-top:6px;opacity:.35;pointer-events:none" disabled>✅ MARCAR ENTREGADO</button>`;
+
+    } else if(isPhase2) {
+      // SALIR ya fue → activos: Navegar + Llegué al cliente
+      buttonsHtml = `
+        <div style="background:#e8f5e9;border-radius:10px;padding:8px 10px;margin-bottom:8px;font-size:.78rem;font-weight:700;color:var(--v)">
+          🚲 GPS activo — enviando ubicación cada 30s
+        </div>
+        <button class="action-btn" style="width:100%;background:#7b1fa2;color:#fff;margin-bottom:8px;font-size:.88rem;font-weight:900;padding:12px"
+          onclick="marcarLlegada('${o.id}')">
+          🚪 Llegué al cliente
+        </button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+          <button class="action-btn btn-nav" onclick="window.open('${mapsUrl}','_blank')">🗺️ Navegar</button>
+          <button class="action-btn" style="background:#aaa;color:#fff;opacity:.4;pointer-events:none" disabled>💬 WhatsApp</button>
+          <button class="action-btn btn-adjust" style="opacity:.4;pointer-events:none" disabled>📍 Ajustar pin</button>
+          <button class="action-btn btn-photo" style="opacity:.4;pointer-events:none" disabled>📸 Foto puerta</button>
+        </div>
+        <button class="action-btn btn-deliver" style="width:100%;opacity:.4;pointer-events:none" disabled>✅ MARCAR ENTREGADO</button>`;
+
+    } else if(isPhase3) {
+      // Llegué presionado → todos los botones activos excepto SALIR
+      buttonsHtml = `
+        <div style="background:#f3e5f5;border-radius:10px;padding:8px 10px;margin-bottom:8px;font-size:.78rem;font-weight:700;color:#7b1fa2">
+          🚪 Estás en la puerta — confirmá la entrega
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+          <button class="action-btn btn-nav" onclick="window.open('${mapsUrl}','_blank')">🗺️ Navegar</button>
+          <button class="action-btn" style="background:#25d366;color:#fff" onclick="window.open('${waUrl}','_blank')">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="flex-shrink:0"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.075.534 4.065 1.475 5.8L0 24l6.335-1.44A11.937 11.937 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.011-1.37l-.36-.214-3.732.848.88-3.629-.235-.372A9.818 9.818 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182c5.43 0 9.818 4.388 9.818 9.818 0 5.43-4.388 9.818-9.818 9.818z"/></svg>
+            WhatsApp
+          </button>
+          <button class="action-btn btn-adjust" onclick="openAdjustModal('${o.id}','${o.clientLat}','${o.clientLng}','${o.clientId}')">📍 Ajustar pin</button>
+          <button class="action-btn btn-photo" onclick="openPhotoModal('${o.id}','${o.clientId}')">📸 Foto puerta</button>
+        </div>
+        <button class="action-btn btn-deliver" style="width:100%;margin-top:4px;padding:14px;font-size:.95rem;font-weight:900"
+          onclick="openDeliverModal('${o.id}')">
+          ✅ MARCAR ENTREGADO
+        </button>`;
+    }
 
     card.innerHTML = `
       <div class="order-card-header">
         <div>
           <div class="order-code">${o.code||'—'}</div>
           ${o.scheduledSlot?`<div style="font-size:.68rem;background:var(--blbg);color:var(--bl);padding:2px 8px;border-radius:50px;display:inline-block;margin-top:3px">⏰ ${o.scheduledSlot}</div>`:''}
-          ${isOnWay?`<div style="font-size:.68rem;background:#e8f5e9;color:var(--v);padding:2px 8px;border-radius:50px;display:inline-block;margin-top:3px;font-weight:800">🚲 En camino</div>`:''}
+          <div style="font-size:.68rem;font-weight:800;color:${statusColor};margin-top:3px">${statusLabel}</div>
         </div>
         <div style="text-align:right">
           <div class="order-client">${o.clientName||'—'}</div>
@@ -517,52 +598,31 @@ async function renderOrders() {
         ${verifiedHtml}
         ${photoHtml}
         <div class="order-addr">📍 ${o.clientAddr||'Sin dirección'}</div>
-        ${o.clientLat?`<div style="font-size:.72rem;color:var(--bl);margin-bottom:6px">📏 ${o.dist?.toFixed(1)||'?'} km — ⏱️ ~${o.estimatedMins||'?'} min estimados</div>`:''}
+        ${o.clientLat?`<div style="font-size:.72rem;color:var(--bl);margin-bottom:6px">📏 ${o.dist?.toFixed(1)||'?'} km — ⏱️ ~${o.estimatedMins||'?'} min</div>`:''}
         ${o.adminNote?`<div style="background:#fff8e1;border-radius:6px;padding:6px 8px;font-size:.75rem;margin-bottom:6px;color:#e65100">📝 ${o.adminNote}</div>`:''}
         <div class="order-items">${itemsHtml}</div>
         <div class="order-total">💰 Total: Bs. ${(o.total||0).toFixed(2)}</div>
-
-        ${!isOnWay ? `
-        <button class="action-btn" style="width:100%;background:var(--or);color:#fff;margin-bottom:8px;font-size:.88rem;font-weight:900"
-          onclick="marcarEnCamino('${o.id}')">
-          🚲 SALIR — Marcar en camino
-        </button>` : `
-        <button class="action-btn" style="width:100%;background:#7b1fa2;color:#fff;margin-bottom:6px;font-size:.82rem;font-weight:800"
-          onclick="marcarLlegada('${o.id}')">
-          🚪 Llegué al cliente
-        </button>`}
-
-        <div class="action-row">
-          <button class="action-btn btn-nav" onclick="window.open('${mapsUrl}','_blank')">🗺️ Navegar</button>
-          <button class="action-btn btn-call" onclick="window.open('${waCallUrl}','_blank')" style="background:#25d366">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="flex-shrink:0"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.075.534 4.065 1.475 5.8L0 24l6.335-1.44A11.937 11.937 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.011-1.37l-.36-.214-3.732.848.88-3.629-.235-.372A9.818 9.818 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182c5.43 0 9.818 4.388 9.818 9.818 0 5.43-4.388 9.818-9.818 9.818z"/></svg>
-            WhatsApp
-          </button>
-        </div>
-        <div class="action-row" style="margin-top:6px">
-          <button class="action-btn btn-adjust" onclick="openAdjustModal('${o.id}','${o.clientLat}','${o.clientLng}','${o.clientId}')">📍 Ajustar pin</button>
-          <button class="action-btn btn-photo" onclick="openPhotoModal('${o.id}','${o.clientId}')">📸 Foto puerta</button>
-        </div>
-        <button class="action-btn btn-deliver" style="width:100%;margin-top:6px" onclick="openDeliverModal('${o.id}')">✅ MARCAR ENTREGADO</button>
+        <div style="margin-top:10px">${buttonsHtml}</div>
       </div>`;
     el.appendChild(card);
   }
 
-  // Show route optimizer if more than 1 order
-  if(myOrders.length > 1) {
+  // Route optimizer — only show if multiple orders in phase 1 or 2
+  const routeOrders = myOrders.filter(o => ['preparing','new_order','confirmed','on_way'].includes(o.status));
+  if(routeOrders.length > 1) {
     const routeEl = document.createElement('div');
-    routeEl.style.cssText = 'background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:var(--sh);order:-1';
+    routeEl.style.cssText = 'background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:var(--sh)';
     routeEl.innerHTML = `
       <div style="font-weight:800;font-size:.88rem;margin-bottom:10px;color:var(--v)">🗺️ Planificar ruta óptima</div>
-      <div style="font-size:.78rem;color:var(--gr);margin-bottom:8px">Seleccioná los pedidos a entregar en este viaje:</div>
-      ${myOrders.map(o=>`
+      <div style="font-size:.78rem;color:var(--gr);margin-bottom:8px">Seleccioná los pedidos a llevar:</div>
+      ${routeOrders.map(o=>`
         <label style="display:flex;align-items:center;gap:8px;padding:6px;background:var(--vbg);border-radius:8px;margin-bottom:5px;cursor:pointer">
           <input type="checkbox" class="route-check" value="${o.id}" checked style="width:16px;height:16px;accent-color:var(--v)">
           <span style="font-size:.8rem;font-weight:700">${o.code} — ${o.clientName}</span>
           <span style="font-size:.72rem;color:var(--gr);margin-left:auto">${o.dist?o.dist.toFixed(1)+'km':''}</span>
         </label>`).join('')}
       <div style="display:flex;gap:8px;margin-top:10px">
-        <button onclick="calcRoute()" style="flex:1;background:var(--v);color:#fff;border:none;border-radius:10px;padding:10px;font-size:.82rem;font-weight:800;cursor:pointer">🗺️ Calcular ruta óptima</button>
+        <button onclick="calcRoute()" style="flex:1;background:var(--v);color:#fff;border:none;border-radius:10px;padding:10px;font-size:.82rem;font-weight:800;cursor:pointer">🗺️ Ruta óptima</button>
         <button onclick="calcRoute(true)" style="background:var(--vbg);color:var(--v);border:none;border-radius:10px;padding:10px;font-size:.78rem;font-weight:700;cursor:pointer">Todos →</button>
       </div>
       <div id="routeResult" style="margin-top:8px;display:none"></div>`;
