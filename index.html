@@ -897,26 +897,68 @@ function waitForDB() {
 }
 
 async function startApp() {
+  // 1. Show intro image INSIDE loading screen immediately while data loads
+  let introDuration = 3; // default seconds
+  let introMinTimePromise = Promise.resolve();
+
+  try {
+    if(db && fs) {
+      const snap = await fs.getDoc(fs.doc(db,"config","intro"));
+      if(snap.exists()) {
+        const intro = snap.data();
+        if(intro.active && intro.media) {
+          // Replace loading logo with intro image/video
+          const logoWrap = document.getElementById("loadingLogo");
+          if(logoWrap) {
+            if(intro.mediaType === "video") {
+              logoWrap.innerHTML = `<video autoplay muted playsinline src="${intro.media}" style="max-width:90vw;max-height:60vh;border-radius:12px;object-fit:contain"></video>`;
+            } else {
+              logoWrap.innerHTML = `<img src="${intro.media}" style="max-width:90vw;max-height:60vh;border-radius:12px;object-fit:contain" alt="Bienvenida">`;
+            }
+          }
+          introDuration = intro.duration || 3;
+        }
+      }
+    }
+  } catch(e) {}
+
+  // 2. Start minimum display timer (won't hide before this)
+  const startTime = Date.now();
+  const minMs = introDuration * 1000;
+
+  // 3. Load all data
   try {
     await loadAll();
   } catch(e) {
     console.error("startApp error:", e);
   }
+
+  // 4. Wait remaining time if data loaded faster than min duration
+  const elapsed = Date.now() - startTime;
+  const remaining = Math.max(0, minMs - elapsed);
+  if(remaining > 0) {
+    await new Promise(r => {
+      window._loadingMinResolve = r;
+      setTimeout(r, remaining);
+    });
+    window._loadingMinResolve = null;
+  }
+
+  // 5. Hide loading → show products (no separate intro screen)
   hideLoading();
   checkNotice();
   checkStatus();
   setInterval(checkStatus, 60000);
-  // Show intro FIRST, then after it closes show the offer popup
-  await showIntroIfConfigured();
-  // Offer popup comes right after intro ends (or immediately if no intro)
+
+  // 6. Offer popup after loading (no intro screen anymore)
   await loadActiveOffers();
   countVisit();
 }
 
-// ── Mostrar productos locales INMEDIATAMENTE pero mantener loading hasta que Firebase decida si hay intro
+// ── INIT ────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
   try {
-    // Pre-load seed data into memory immediately (products ready but hidden behind loadingScreen)
+    // Pre-load seed data into memory (hidden behind loadingScreen)
     DB.categories = {...SEED_CATEGORIES};
     SEED_PRODUCTS.forEach(p => { DB.products[p.id] = {...p}; });
     DB.config = {
@@ -927,28 +969,28 @@ document.addEventListener('DOMContentLoaded', function() {
       openDays: [0,1,2,3,4,5,6]
     };
     buildCats();
-    renderProducts();
     applyBranding();
-    // DO NOT call hideLoading() here — startApp() does it after checking for intro
     checkStatus();
     setInterval(checkStatus, 60000);
-    // Restore client from localStorage
+    // Restore client
     try {
       const cid = localStorage.getItem("bdp_cli");
       const cdata = localStorage.getItem("bdp_cdata");
       if(cid && cdata) currentClient = {...JSON.parse(cdata), id:cid};
     } catch(e) {}
-    // Connect Firebase — startApp() will handle loading screen + intro
+    // Connect Firebase — startApp handles loading + intro + products
     waitForDB();
-    // Safety fallback: if Firebase takes more than 5s, show products anyway
+    // Safety fallback: if Firebase takes more than 8s, show products anyway
     setTimeout(() => {
       const ls = document.getElementById("loadingScreen");
       if(ls && ls.style.display !== "none" && !ls.classList.contains("hidden")) {
+        renderProducts();
         hideLoading();
       }
-    }, 5000);
+    }, 8000);
   } catch(e) {
     console.error("Init error:", e);
+    renderProducts();
     hideLoading();
   }
 });
@@ -1072,8 +1114,17 @@ function updateLoadingProgress(done, total) {
 }
 
 function hideLoading() {
+  // Render products so they're ready when screen fades
+  try { renderProducts(); buildCats(); } catch(e) {}
   const ls = document.getElementById("loadingScreen");
-  if(ls) ls.style.display = "none";
+  if(!ls) return;
+  ls.style.transition = "opacity .6s ease";
+  ls.style.opacity = "0";
+  setTimeout(() => {
+    ls.style.display = "none";
+    ls.style.opacity = "";
+    ls.style.transition = "";
+  }, 650);
 }
 
 // ── BRANDING ───────────────────────
@@ -2765,59 +2816,25 @@ function checkPromoConsistency() {
 }
 
 // ── INTRO SCREEN ───────────────────────────────────────
+// Skip loading screen early
+function skipLoading() {
+  if(window._loadingMinResolve) {
+    window._loadingMinResolve();
+    window._loadingMinResolve = null;
+  }
+}
+
 async function showIntroIfConfigured() {
-  return new Promise(async (resolve) => {
-    try {
-      if(!db||!fs) { resolve(); return; }
-      const snap = await fs.getDoc(fs.doc(db,"config","intro"));
-      if(!snap.exists()) { resolve(); return; }
-      const intro = snap.data();
-      if(!intro.active || !intro.media) { resolve(); return; }
-
-      const screen = document.getElementById("introScreen");
-      const content = document.getElementById("introContent");
-      const duration = intro.duration || 3;
-
-      if(intro.mediaType === "video") {
-        content.innerHTML = `<video class="intro-video" autoplay muted playsinline src="${intro.media}"></video>`;
-      } else {
-        content.innerHTML = `<img class="intro-img" src="${intro.media}" alt="Bienvenida">`;
-      }
-
-      screen.classList.remove("hidden");
-
-      // Countdown
-      let count = duration;
-      document.getElementById("introCounter").textContent = count;
-      const timer = setInterval(() => {
-        count--;
-        const el = document.getElementById("introCounter");
-        if(el) el.textContent = count;
-        if(count <= 0) {
-          clearInterval(timer);
-          hideIntro();
-          setTimeout(resolve, 650); // wait for fadeout animation
-        }
-      }, 1000);
-
-      window._introTimer = timer;
-      // Allow skip button to also resolve
-      window._introResolve = resolve;
-    } catch(e) { resolve(); }
-  });
+  // Intro is now merged into the loading screen — nothing to do here
+  return Promise.resolve();
 }
 
 function skipIntro() {
-  if(window._introTimer) clearInterval(window._introTimer);
-  hideIntro();
-  if(window._introResolve) { setTimeout(window._introResolve, 650); window._introResolve = null; }
+  skipLoading();
 }
 
 function hideIntro() {
-  const screen = document.getElementById("introScreen");
-  if(!screen || screen.classList.contains("hidden")) return;
-  screen.classList.add("fadeout");
-  setTimeout(() => screen.classList.add("hidden"), 600);
+  // No separate intro screen — intro is inside loadingScreen
 }
 
 // ── PEDIDOS POR VOZ ────────────────────────────────────────
