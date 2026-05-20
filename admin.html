@@ -278,7 +278,9 @@ input[type=file]{display:none;}
     <!-- PEDIDOS -->
     <div id="tab-pedidos" class="tab-content" style="display:none">
       <div class="panel">
-        <h2>📦 Gestión de pedidos</h2>
+        <h2>📦 Gestión de pedidos
+          <button onclick="renderOrders()" class="btn btn-sec btn-sm" style="margin-left:10px;font-size:.75rem">🔄 Actualizar</button>
+        </h2>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
           <button class="btn btn-sec btn-sm fpill active" data-status="all" onclick="filterOrders('all',this)">Todos</button>
           <button class="btn btn-sec btn-sm fpill active" data-status="pending" onclick="filterOrders('pending',this)">⏳ Pendientes</button>
@@ -885,11 +887,13 @@ async function loadAdminData() {
       snap => {
         DB.orders = [];
         snap.forEach(d => DB.orders.push({...d.data(), id:d.id}));
-
-        // renderOrders();
+        renderOrders();
         renderDashboard();
       }
     );
+
+    // Repartidores (real-time) — load on startup so assign dropdown works
+    loadRepartidores();
 
     // Clients
     const cliSnap = await fs.getDocs(fs.collection(db,"clients"));
@@ -930,6 +934,8 @@ function showTab(tab, btn) {
   btn.classList.add("active");
   if(tab==="reportes") genReport();
   if(tab==="mensajes") renderSugs();
+  if(tab==="pedidos") renderOrders();
+  if(tab==="repartidores") { loadRepartidores(); setTimeout(initRepsMap, 200); }
 }
 
 // ─── DASHBOARD ─────────────────────
@@ -1170,70 +1176,181 @@ async function openOrder(id) {
   currentOrderDetail = o;
   document.getElementById("odCode").textContent = o.code || id;
 
+  // Format timestamp helper
+  const fmtTime = (ts) => {
+    if(!ts) return '—';
+    const d = ts.seconds ? new Date(ts.seconds*1000) : new Date(ts);
+    return d.toLocaleTimeString('es-BO',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) + ' ' + d.toLocaleDateString('es-BO',{day:'2-digit',month:'2-digit'});
+  };
+
   let itemsHtml = (o.items||[]).map(i =>
-    `<div class="ord-item"><span>${i.nombre} × ${i.qty}</span><span>Bs. ${(i.subtotal||0).toFixed(2)}</span></div>`
+    `<div class="ord-item"><span>[${i.id||''}] ${i.nombre} × ${i.qty}</span><span>Bs. ${(i.subtotal||0).toFixed(2)}</span></div>`
   ).join("");
 
+  // Load verified location / facade photo
+  let facadeHtml = '';
+  if(o.clientId) {
+    try {
+      const vsnap = await fs.getDoc(fs.doc(db,'ubicaciones_verificadas',o.clientId));
+      if(vsnap.exists()) {
+        const v = vsnap.data();
+        if(v.fotoUrl) facadeHtml = `<div style="margin-bottom:8px">
+          <div style="font-size:.72rem;font-weight:800;color:var(--v);margin-bottom:4px">📸 Foto fachada del cliente</div>
+          <img src="${v.fotoUrl}" style="width:100%;border-radius:8px;max-height:160px;object-fit:cover">
+          ${v.nota?`<div style="font-size:.7rem;color:var(--gr);margin-top:3px">📝 ${v.nota}</div>`:''}
+        </div>`;
+      }
+    } catch(e) {}
+  }
+
+  // Delivery timeline with timestamps
+  const timeline = [
+    {icon:'📋', label:'Pedido recibido', ts: o.createdAt},
+    {icon:'✅', label:'Aceptado / Confirmado', ts: o.confirmedAt},
+    {icon:'🚲', label:'Repartidor asignado', ts: o.assignedAt},
+    {icon:'🛫', label:'Salida del repartidor', ts: o.onWayAt},
+    {icon:'🚪', label:'Llegada al cliente', ts: o.arrivedAt},
+    {icon:'📦', label:'Entregado', ts: o.deliveredAt},
+  ].filter(t => t.ts);
+
+  const timelineHtml = timeline.length ? `
+    <div style="margin-top:10px;border-top:1px solid var(--vbg);padding-top:8px">
+      <div style="font-size:.75rem;font-weight:800;color:var(--v);margin-bottom:6px">🕐 Historial de tiempos</div>
+      ${timeline.map(t=>`
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:.75rem;border-bottom:1px dashed var(--vbg)">
+          <span>${t.icon}</span>
+          <span style="flex:1;color:var(--gr)">${t.label}</span>
+          <span style="font-weight:700;color:var(--tx)">${fmtTime(t.ts)}</span>
+        </div>`).join('')}
+    </div>` : '';
+
   document.getElementById("odContent").innerHTML = `
-    <div style="background:var(--vbg);border-radius:8px;padding:10px;margin-bottom:10px;font-size:.82rem">
-      👤 <b>${o.clientName}</b> &nbsp;📱 ${o.clientPhone}<br>📍 ${o.clientAddr}
+    <div style="background:var(--vbg);border-radius:8px;padding:10px;margin-bottom:8px;font-size:.82rem">
+      👤 <b>${o.clientName}</b> &nbsp;📱 ${o.clientPhone}<br>
+      📍 ${o.clientAddr||'—'}
+      ${o.clientLat?`<br><a href="https://maps.google.com/?q=${o.clientLat},${o.clientLng}" target="_blank" style="font-size:.72rem;color:var(--v)">🗺️ Ver en mapa</a>`:''}
+      ${o.dist?`<br>📏 ${o.dist.toFixed(1)}km — ~${o.estimatedMins||'?'} min`:''}
     </div>
+    ${facadeHtml}
+    ${o.adminNote?`<div style="background:#fff8e1;border-radius:8px;padding:8px;margin-bottom:8px;font-size:.78rem">📝 <b>Nota:</b> ${o.adminNote}</div>`:''}
+    ${o.scheduledSlot?`<div style="background:var(--blbg);border-radius:8px;padding:6px 10px;margin-bottom:8px;font-size:.78rem;color:var(--bl)">⏰ Programado: ${o.scheduledSlot}</div>`:''}
     <div style="margin-bottom:8px">${itemsHtml}</div>
-    <div style="text-align:right;font-size:.85rem">
+    <div style="text-align:right;font-size:.85rem;padding:6px;background:var(--vbg);border-radius:6px">
       Subtotal: Bs. ${(o.subtotal||0).toFixed(2)}<br>
-      ${o.delivery>0?`Delivery: Bs. ${o.delivery.toFixed(2)}<br>`:""}
+      ${(o.delivery||0)>0?`Delivery: Bs. ${(o.delivery||0).toFixed(2)}<br>`:''}
       <b>Total: Bs. ${(o.total||0).toFixed(2)}</b>
     </div>
     <div style="margin-top:8px">${statusChip(o.status)}</div>
+    ${o.repartidorNombre?`<div style="margin-top:4px;font-size:.78rem;color:var(--v)">🚲 Repartidor: <b>${o.repartidorNombre}</b></div>`:''}
+    ${timelineHtml}
   `;
 
   // Actions based on status
   const acts = document.getElementById("odActions");
   acts.innerHTML = "";
+
   if(o.status==="pending") {
-    acts.innerHTML += `<button class="btn btn-v btn-sm" onclick="acceptAndNotify('${id}',this);close2('orderDetail')">✅ Aceptar + Notificar</button>`;
+    acts.innerHTML += `<button class="btn btn-v btn-sm" onclick="acceptAndNotify('${id}',this);close2('orderDetail')">✅ Aceptar</button>`;
+    acts.innerHTML += `<button class="btn btn-sec btn-sm" onclick="scheduleOrderTomorrow('${id}')">⏰ Programar mañana</button>`;
     acts.innerHTML += `<button class="btn btn-ro btn-sm" onclick="updateOrderStatus('${id}','cancelled')">❌ Cancelar</button>`;
   }
   if(o.status==="scheduled") {
-    acts.innerHTML += `<button class="btn btn-v btn-sm" onclick="acceptScheduled('${id}',this);close2('orderDetail')">✅ Confirmar + Notificar</button>`;
+    acts.innerHTML += `<button class="btn btn-v btn-sm" onclick="acceptScheduled('${id}',this);close2('orderDetail')">✅ Confirmar</button>`;
     acts.innerHTML += `<button class="btn btn-ro btn-sm" onclick="updateOrderStatus('${id}','cancelled')">❌ Cancelar</button>`;
   }
   if(o.status==="confirmed") {
-    acts.innerHTML += `<button class="btn btn-or btn-sm" onclick="sendOnWay('${id}',this);close2('orderDetail')">🚲 En camino + WhatsApp</button>`;
-    acts.innerHTML += `<button class="btn btn-v btn-sm" onclick="updateOrderStatus('${id}','delivered')">📦 Marcar entregado</button>`;
+    // Show repartidor assign
+    const repOpts = DB_repartidores.filter(r=>r.activo!==false).map(r=>{
+      const online = r.online && r.lastSeen?.seconds && (Date.now()/1000 - r.lastSeen.seconds < 120);
+      return `<option value="${r.id}" ${o.repartidorId===r.id?'selected':''}>${r.nombre} ${online?'🟢':'⚫'}</option>`;
+    }).join('');
+    acts.innerHTML += `<select id="detailRepSel" style="padding:6px;border:1.5px solid var(--vbg);border-radius:8px;font-size:.8rem;outline:none">
+      <option value="">🚲 Asignar repartidor...</option>${repOpts}</select>`;
+    acts.innerHTML += `<button class="btn btn-or btn-sm" onclick="assignFromDetail('${id}')">✅ Asignar e imprimir</button>`;
     acts.innerHTML += `<button class="btn btn-ro btn-sm" onclick="updateOrderStatus('${id}','cancelled')">❌ Cancelar</button>`;
   }
   if(o.status==="on_way") {
-    acts.innerHTML += `<button class="btn btn-v btn-sm" onclick="updateOrderStatus('${id}','delivered')">📦 Marcar entregado</button>`;
-    acts.innerHTML += `<button class="btn btn-or btn-sm" onclick="_openClientWA(DB.orders.find(x=>x.id==='${id}'),'on_way')">💬 Reenviar WhatsApp</button>`;
+    acts.innerHTML += `<button class="btn btn-v btn-sm" onclick="markDelivered('${id}',this);close2('orderDetail')">📦 Entregado</button>`;
   }
-  acts.innerHTML += `<button class="btn btn-sec btn-sm" onclick="printOrder('${id}')">🖨️ Imprimir</button>`;
+  if(o.status==="delivered" && !o.calSent) {
+    acts.innerHTML += `<button class="btn btn-sec btn-sm" onclick="openCalModal('${id}')">⭐ Enviar calificación</button>`;
+  }
+  acts.innerHTML += `<button class="btn btn-sec btn-sm" onclick="printOrderWithRep('${id}')">🖨️ Imprimir</button>`;
 
   open2("orderDetail");
 }
 
+// Assign from inside order detail
+async function assignFromDetail(orderId) {
+  const repId = document.getElementById('detailRepSel')?.value;
+  if(!repId) { showToast('Seleccioná un repartidor', true); return; }
+  await assignAndPrint(orderId, repId);
+  close2('orderDetail');
+}
+
+// Schedule pending order for tomorrow
+async function scheduleOrderTomorrow(orderId) {
+  const slots = generateDeliverySlots();
+  if(!slots.length) { showToast('Sin franjas disponibles', true); return; }
+  const slot = slots[0].label; // First slot of tomorrow
+  await fs.updateDoc(fs.doc(db,'orders',orderId), {
+    status: 'scheduled',
+    scheduledSlot: slot,
+    updatedAt: fs.serverTimestamp()
+  });
+  showToast('⏰ Pedido programado para ' + slot);
+  close2('orderDetail');
+}
+
 async function acceptAndNotify(id, btn) {
-  const o = DB.orders.find(x=>x.id===id); if(!o) return;
+  const o = DB.orders.find(x=>x.id===id);
+  if(!o) return;
   if(btn) btn.disabled = true;
   try {
-    await fs.updateDoc(fs.doc(db,"orders",id), { status:"confirmed", confirmedAt: fs.serverTimestamp() });
+    await fs.updateDoc(fs.doc(db,"orders",id), {
+      status: "confirmed",
+      confirmedAt: fs.serverTimestamp()
+    });
     showToast("✅ Pedido confirmado");
-    // Auto-assign if only one repartidor
-    await autoAssignIfSingle(id);
   } catch(e) { showToast("Error",true); if(btn) btn.disabled=false; return; }
-  // Build "en camino" WhatsApp message ready to send to client
-  // Admin opens WhatsApp to client's number
-  _openClientWA(o, "confirmed");
+
+  // Single WhatsApp message to client with full detail
+  const clientPhone = `591${(o.clientPhone||'').replace(/\D/g,'')}`;
+  const nombre = (o.clientName||'').split(' ')[0];
+  const mins = o.estimatedMins || 15;
+  const minsMax = mins + 5;
+  const dist = o.dist ? ` (${o.dist.toFixed(1)}km)` : '';
+
+  let msg = `━━━━━━━━━━━━━━━━\n`;
+  msg += `🛒 Hola ${nombre}, tu pedido *${o.code||''}* fue recibido y está siendo preparado.\n`;
+  msg += `━━━━━━━━━━━━━━━━\n`;
+  msg += `*Detalle*\n`;
+  (o.items||[]).forEach(i => {
+    msg += `• [${i.id||''}] ${i.nombre}\n  ${i.qty} × Bs.${(i.precio||0).toFixed(2)} = Bs.${(i.subtotal||0).toFixed(2)}\n`;
+  });
+  msg += `━━━━━━━━━━━━━━━━\n`;
+  msg += `💰 Subtotal: Bs. ${(o.subtotal||0).toFixed(2)}\n`;
+  msg += `🚚 Delivery: ${(o.delivery||0)===0?'GRATIS 🎉':'Bs. '+(o.delivery||0).toFixed(2)}\n`;
+  msg += `💰 *TOTAL: Bs. ${(o.total||0).toFixed(2)}*\n`;
+  msg += `💳 Puedes pagar con: Efectivo o QR\n`;
+  if(o.scheduledSlot) {
+    msg += `⏰ Tu pedido está programado para las *${o.scheduledSlot}*.\n`;
+  } else if(o.dist) {
+    msg += `🚲 Estaremos en aproximadamente *${mins} a ${minsMax} minutos* en tu puerta${dist}.\n`;
+  } else {
+    msg += `🚲 Estaremos pronto en tu puerta.\n`;
+  }
+  msg += `Si tienes alguna consulta, escríbeme aquí. 🙏\n`;
+  msg += `— La Bodega Online Pacata\n`;
+  msg += `━━━━━━━━━━━━━━━━`;
+
+  window.open(`https://wa.me/${clientPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+  // Mark WA sent so we don't send again
+  await fs.updateDoc(fs.doc(db,"orders",id), {confirmWaSent: true}).catch(()=>{});
 }
 
 async function acceptScheduled(id, btn) {
-  const o = DB.orders.find(x=>x.id===id); if(!o) return;
-  if(btn) btn.disabled = true;
-  try {
-    await fs.updateDoc(fs.doc(db,"orders",id), { status:"confirmed", confirmedAt: fs.serverTimestamp() });
-    showToast("✅ Pedido programado confirmado");
-    _openClientWA(o, "scheduled");
-  } catch(e) { showToast("Error",true); if(btn) btn.disabled=false; }
+  return acceptAndNotify(id, btn);
 }
 
 async function sendOnWay(id, btn) {
@@ -1657,7 +1774,7 @@ function renderAdmClients() {
   }).join("");
 }
 
-function openClientDetail(id) {
+async function openClientDetail(id) {
   const c = DB.clients.find(x=>x.id===id); if(!c) return;
   currentClientDetail = c;
   document.getElementById("cdName").textContent = c.name;
@@ -1665,17 +1782,38 @@ function openClientDetail(id) {
   const topProds = {};
   orders.forEach(o=>(o.items||[]).forEach(i=>{topProds[i.nombre]=(topProds[i.nombre]||0)+i.qty;}));
   const top = Object.entries(topProds).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+  // Load facade photo and verified location
+  let facadeHtml = '';
+  try {
+    const vsnap = await fs.getDoc(fs.doc(db,'ubicaciones_verificadas',id));
+    if(vsnap.exists()) {
+      const v = vsnap.data();
+      facadeHtml = `<div style="margin-bottom:10px">
+        <div style="font-size:.78rem;font-weight:800;color:var(--v);margin-bottom:5px">📍 Ubicación verificada</div>
+        ${v.fotoUrl?`<img src="${v.fotoUrl}" style="width:100%;border-radius:8px;max-height:180px;object-fit:cover;margin-bottom:5px">`:''}
+        ${v.nota?`<div style="font-size:.72rem;color:var(--gr)">📝 ${v.nota}</div>`:''}
+        ${v.verificadoPorNombre?`<div style="font-size:.7rem;color:var(--gr)">✅ Verificado por: ${v.verificadoPorNombre}</div>`:''}
+        ${v.lat&&v.lng?`<a href="https://maps.google.com/?q=${v.lat},${v.lng}" target="_blank" style="font-size:.72rem;color:var(--v)">🗺️ Ver en mapa</a>`:''}
+      </div>`;
+    }
+  } catch(e) {}
+
   document.getElementById("cdContent").innerHTML = `
     <div style="font-size:.82rem;line-height:1.8;background:var(--vbg);padding:10px;border-radius:8px;margin-bottom:10px">
-      📱 ${c.phone}<br>📍 ${c.addr}<br>
+      📱 ${c.phone}<br>📍 ${c.addr||'—'}<br>
       🛒 ${c.orderCount||0} pedidos · Bs. ${(c.totalSpent||0).toFixed(2)} gastados
     </div>
+    ${facadeHtml}
     <div style="font-size:.8rem;font-weight:700;margin-bottom:6px">Productos favoritos:</div>
     ${top.map(([n,q])=>`<div style="display:flex;justify-content:space-between;font-size:.78rem;padding:3px 0;border-bottom:1px solid #f5f5f5"><span>${n}</span><span>×${q}</span></div>`).join("")}
     <div style="font-size:.8rem;font-weight:700;margin:10px 0 6px">Últimos pedidos:</div>
-    ${orders.slice(0,5).map(o=>`<div style="font-size:.75rem;padding:3px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between">
-      <span>${o.code} — ${statusChip(o.status)}</span><span>Bs. ${(o.total||0).toFixed(2)}</span>
-    </div>`).join("")}`;
+    ${orders.slice(0,5).map(o=>{
+      const t = o.createdAt?.seconds ? new Date(o.createdAt.seconds*1000).toLocaleString('es-BO',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+      return `<div style="font-size:.75rem;padding:4px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between">
+        <span>${o.code||'—'} ${statusChip(o.status)}</span><span style="font-size:.7rem;color:var(--gr)">${t} · Bs.${(o.total||0).toFixed(2)}</span>
+      </div>`;
+    }).join("")}`;
   open2("clientDetail");
 }
 
@@ -2851,6 +2989,29 @@ let repsMarkers = {};
 let repsMapInterval = null;
 let currentAssignOrderId = null;
 
+function generateDeliverySlots() {
+  const c = DB.config;
+  const [oh,om] = (c.openTime||"08:00").split(":").map(Number);
+  const [ch,cm] = (c.closeTime||"16:00").split(":").map(Number);
+  const slotMins = parseInt(c.deliverySlotMins)||30;
+  const slots = [];
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate()+1);
+  const dateStr = tomorrow.toLocaleDateString("es-BO",{weekday:"long",day:"numeric",month:"long"});
+  let cur = oh*60+om;
+  const end = ch*60+cm;
+  while(cur < end) {
+    const h1 = String(Math.floor(cur/60)).padStart(2,"0");
+    const m1 = String(cur%60).padStart(2,"0");
+    const next = cur + slotMins;
+    const h2 = String(Math.floor(next/60)).padStart(2,"0");
+    const m2 = String(next%60).padStart(2,"0");
+    slots.push({value:`${h1}:${m1}`,label:`${dateStr} — ${h1}:${m1} a ${h2}:${m2}`});
+    cur = next;
+  }
+  return slots;
+}
+
 // ── LOAD REPARTIDORES ─────────────────────────────────────
 async function loadRepartidores() {
   try {
@@ -3232,24 +3393,18 @@ async function assignAndPrint(orderId, repId) {
     await fs.updateDoc(fs.doc(db,"orders",orderId), {
       repartidorId: repId,
       repartidorNombre: rep.nombre,
+      repartidorTel: rep.telefono||'',
       assignedAt: fs.serverTimestamp()
     });
     showToast("✅ Asignado a " + rep.nombre + " — imprimiendo...");
     setTimeout(() => printOrderWithRep(orderId), 600);
-  } catch(e) { showToast("Error",true); }
+  } catch(e) { showToast("Error: "+e.message, true); }
 }
-
 
 async function autoAssignIfSingle(orderId) {
   const activeReps = DB_repartidores.filter(r=>r.activo!==false);
   if(activeReps.length === 1) {
-    const rep = activeReps[0];
-    await fs.updateDoc(fs.doc(db,"orders",orderId), {
-      repartidorId: rep.id,
-      repartidorNombre: rep.nombre,
-      assignedAt: fs.serverTimestamp()
-    });
-    showToast(`🚲 Auto-asignado a ${rep.nombre}`);
+    await assignAndPrint(orderId, activeReps[0].id);
   }
 }
 
