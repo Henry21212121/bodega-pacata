@@ -353,6 +353,23 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 <div class="modal-ov" id="coquetteProdModal">
   <div class="modal-box">
     <div class="modal-title" id="cqProdTitle">➕ Nuevo producto</div>
+
+    <!-- Image upload -->
+    <div class="fld">
+      <label>Foto del producto (opcional)</label>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div id="cqImgPrev" onclick="document.getElementById('cqImgFile').click()"
+          style="width:72px;height:72px;border-radius:10px;background:var(--vbg);border:2px dashed var(--v);display:flex;align-items:center;justify-content:center;font-size:1.6rem;cursor:pointer;overflow:hidden;flex-shrink:0">📷</div>
+        <div>
+          <button type="button" onclick="document.getElementById('cqImgFile').click()"
+            style="background:var(--vbg);color:var(--v);border:1.5px solid var(--v);border-radius:8px;padding:7px 12px;font-size:.8rem;font-weight:800;cursor:pointer">📷 Elegir foto</button>
+          <div style="font-size:.68rem;color:var(--gr);margin-top:4px">Tocá la foto o el botón para cambiarla</div>
+          <button type="button" id="cqImgRemoveBtn" onclick="window.removeCqImg()" style="display:none;background:none;border:none;color:var(--ro);font-size:.72rem;cursor:pointer;margin-top:2px">✕ Quitar foto</button>
+        </div>
+      </div>
+      <input type="file" id="cqImgFile" accept="image/*" style="display:none" onchange="window.onCqImgSelected(event)">
+    </div>
+
     <div class="fld"><label>Nombre *</label><input type="text" id="cqNombre" placeholder="Ej: Tomate, Plátano, Pollo..."></div>
     <div class="fld">
       <label>Tipo de unidad *</label>
@@ -1988,7 +2005,53 @@ function closeVoicePanel(){ stopVoiceSearch(); }
 
 // ══ EXPOSE GLOBALS (required when mixing with ES modules) ══
 // ════════════ COQUETTE PRODUCTOS ════════════
-let cqProds = []; // productos coquette
+let cqImgTemp = ''; // current image URL or base64
+
+function onCqImgSelected(event) {
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    cqImgTemp = e.target.result; // base64
+    const prev = document.getElementById('cqImgPrev');
+    if(prev) prev.innerHTML = `<img src="${cqImgTemp}" style="width:100%;height:100%;object-fit:cover">`;
+    const rmBtn = document.getElementById('cqImgRemoveBtn');
+    if(rmBtn) rmBtn.style.display = 'block';
+    // Upload to Cloudinary in background
+    uploadCqImgToCloudinary(file);
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeCqImg() {
+  cqImgTemp = '';
+  const prev = document.getElementById('cqImgPrev');
+  if(prev) prev.innerHTML = '📷';
+  const rmBtn = document.getElementById('cqImgRemoveBtn');
+  if(rmBtn) rmBtn.style.display = 'none';
+  const fileInput = document.getElementById('cqImgFile');
+  if(fileInput) fileInput.value = '';
+}
+
+async function uploadCqImgToCloudinary(file) {
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('upload_preset', 'bodega_unsigned');
+    fd.append('folder', 'coquette');
+    const res = await fetch('https://api.cloudinary.com/v1_1/db9s1kpcf/image/upload', {method:'POST',body:fd});
+    const data = await res.json();
+    if(data.secure_url) {
+      cqImgTemp = data.secure_url;
+      showToast('✅ Foto subida');
+    }
+  } catch(e) {
+    // Keep base64 if Cloudinary fails
+  }
+}
+
+window.onCqImgSelected = onCqImgSelected;
+window.removeCqImg = removeCqImg;
 let cqFilterActive = 'all';
 let cqEditId = null;
 let cqCurrentProd = null; // for selector modal
@@ -2016,18 +2079,19 @@ function renderCoquetteProds() {
   const list = cqFilterActive==='all' ? cqProds : cqProds.filter(p=>p.tipo===cqFilterActive);
   if(!list.length) { el.innerHTML='<div style="text-align:center;padding:20px;color:var(--gr);font-size:.82rem">Sin productos. Tocá + Agregar.</div>'; return; }
   el.innerHTML = list.map(p=>`
-    <div style="background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:8px;box-shadow:var(--sh)">
-      <div style="display:flex;align-items:center;justify-content:space-between">
-        <div>
-          <div style="font-weight:800;font-size:.9rem">${p.nombre}</div>
-          <div style="font-size:.72rem;color:var(--gr)">${tipoLabel(p.tipo)} · ${p.unidad||''} · Bs.${(p.precioVenta||0).toFixed(2)}</div>
-          ${p.precioUnit?`<div style="font-size:.7rem;color:var(--gr)">P.U.: Bs.${(p.precioUnit||0).toFixed(2)}</div>`:''}
-        </div>
-        <div style="display:flex;gap:6px">
-          <button onclick="openCqSelector('${p.id}')" style="background:var(--v);color:#fff;border:none;border-radius:8px;padding:6px 10px;font-size:.78rem;font-weight:800;cursor:pointer">🛒 Agregar</button>
-          <button onclick="openAddProdCoquette('${p.id}')" style="background:var(--vbg);color:var(--v);border:none;border-radius:8px;padding:6px 8px;cursor:pointer;font-size:.72rem">✏️</button>
-          <button onclick="deleteCqProd('${p.id}')" style="background:#ffebee;color:var(--ro);border:none;border-radius:8px;padding:6px 8px;cursor:pointer;font-size:.72rem">🗑️</button>
-        </div>
+    <div style="background:#fff;border-radius:12px;padding:10px 12px;margin-bottom:8px;box-shadow:var(--sh);display:flex;align-items:center;gap:10px">
+      <div style="width:52px;height:52px;border-radius:8px;background:var(--vbg);flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:1.4rem">
+        ${p.img ? `<img src="${p.img}" style="width:100%;height:100%;object-fit:cover">` : (p.tipo==='libras'?'🥬':p.tipo==='kilos'?'🐔':'🔢')}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:800;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.nombre}</div>
+        <div style="font-size:.72rem;color:var(--gr)">${tipoLabel(p.tipo)} · ${p.unidad||''} · Bs.${(p.precioVenta||0).toFixed(2)}</div>
+        ${p.precioUnit?`<div style="font-size:.7rem;color:var(--gr)">P.U.: Bs.${(p.precioUnit||0).toFixed(2)}</div>`:''}
+      </div>
+      <div style="display:flex;gap:5px;flex-shrink:0">
+        <button onclick="window.openCqSelector('${p.id}')" style="background:var(--v);color:#fff;border:none;border-radius:8px;padding:7px 10px;font-size:.78rem;font-weight:800;cursor:pointer">🛒</button>
+        <button onclick="window.openAddProdCoquette('${p.id}')" style="background:var(--vbg);color:var(--v);border:none;border-radius:8px;padding:7px 8px;cursor:pointer;font-size:.72rem">✏️</button>
+        <button onclick="window.deleteCqProd('${p.id}')" style="background:#ffebee;color:var(--ro);border:none;border-radius:8px;padding:7px 8px;cursor:pointer;font-size:.72rem">🗑️</button>
       </div>
     </div>`).join('');
 }
@@ -2049,6 +2113,13 @@ function openAddProdCoquette(id) {
   document.getElementById('cqPrecioVenta').value = p?.precioVenta||'';
   document.getElementById('cqLbPorUnidad').value = p?.lbPorUnidad||'';
   document.getElementById('cqUnidsPorDocena').value = p?.unidsPorDocena||12;
+  // Image
+  cqImgTemp = p?.img||'';
+  const prev = document.getElementById('cqImgPrev');
+  const rmBtn = document.getElementById('cqImgRemoveBtn');
+  if(prev) prev.innerHTML = cqImgTemp ? `<img src="${cqImgTemp}" style="width:100%;height:100%;object-fit:cover">` : '📷';
+  if(rmBtn) rmBtn.style.display = cqImgTemp ? 'block' : 'none';
+  document.getElementById('cqImgFile').value = '';
   updateCqFields();
   openModal('coquetteProdModal');
 }
@@ -2086,6 +2157,7 @@ async function saveCoquetteProd() {
     precioVenta,
     lbPorUnidad: parseFloat(document.getElementById('cqLbPorUnidad').value)||6,
     unidsPorDocena: parseInt(document.getElementById('cqUnidsPorDocena').value)||12,
+    img: cqImgTemp||'',
     updatedAt: fs.serverTimestamp()
   };
   try {
