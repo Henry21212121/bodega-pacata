@@ -335,15 +335,15 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 <div class="tab-content" id="tab-productos">
   <div class="inner">
     <div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0 8px">
-      <div class="section-title" style="margin:0">🥬 Productos COQUETTE</div>
-      <button class="btn btn-or" onclick="openAddProdCoquette()" style="padding:7px 13px;font-size:.78rem">+ Agregar</button>
+      <div class="section-title" style="margin:0;font-size:.95rem">🥬 Productos COQUETTE</div>
+      <button onclick="window.openAddProdCoquette()" style="background:var(--or);color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:.82rem;font-weight:800;cursor:pointer;flex-shrink:0">+ Agregar</button>
     </div>
     <!-- Filter by unit type -->
     <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
-      <button onclick="filterProdsCoquette('all',this)" class="btn btn-v btn-sm cq-filter active" data-f="all">Todos</button>
-      <button onclick="filterProdsCoquette('libras',this)" class="btn btn-sec btn-sm cq-filter" data-f="libras">⚖️ Libras</button>
-      <button onclick="filterProdsCoquette('kilos',this)" class="btn btn-sec btn-sm cq-filter" data-f="kilos">🐔 Kilos</button>
-      <button onclick="filterProdsCoquette('unidades',this)" class="btn btn-sec btn-sm cq-filter" data-f="unidades">🔢 Unidades</button>
+      <button onclick="window.filterProdsCoquette('all',this)" class="btn btn-v btn-sm cq-filter" data-f="all" style="border-radius:50px">Todos</button>
+      <button onclick="window.filterProdsCoquette('libras',this)" class="btn btn-sec btn-sm cq-filter" data-f="libras" style="border-radius:50px">⚖️ Libras</button>
+      <button onclick="window.filterProdsCoquette('kilos',this)" class="btn btn-sec btn-sm cq-filter" data-f="kilos" style="border-radius:50px">🐔 Kilos</button>
+      <button onclick="window.filterProdsCoquette('unidades',this)" class="btn btn-sec btn-sm cq-filter" data-f="unidades" style="border-radius:50px">🔢 Unidades</button>
     </div>
     <div id="coquetteProdList"></div>
   </div>
@@ -356,7 +356,7 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
     <div class="fld"><label>Nombre *</label><input type="text" id="cqNombre" placeholder="Ej: Tomate, Plátano, Pollo..."></div>
     <div class="fld">
       <label>Tipo de unidad *</label>
-      <select id="cqTipo" onchange="updateCqFields()" style="width:100%;padding:9px;border:1.5px solid #d0e8d8;border-radius:10px;outline:none;font-size:.9rem">
+      <select id="cqTipo" onchange="window.updateCqFields()" style="width:100%;padding:9px;border:1.5px solid #d0e8d8;border-radius:10px;outline:none;font-size:.9rem">
         <option value="">-- Elegir tipo --</option>
         <option value="libras">⚖️ Libras (cuartilla, kg, etc.) — por peso</option>
         <option value="kilos">🐔 Kilos — precio por kilo</option>
@@ -367,8 +367,8 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 
     <!-- Fields shown for all types -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <div class="fld"><label>Cantidad adquirida</label><input type="number" id="cqCantAdq" step="0.5" min="0" onwheel="this.blur()" oninput="calcCqPrecioUnit()" placeholder="0"></div>
-      <div class="fld"><label>Precio por lote (Bs.)</label><input type="number" id="cqCostoLote" step="0.5" min="0" onwheel="this.blur()" oninput="calcCqPrecioUnit()" placeholder="0.00"></div>
+      <div class="fld"><label>Cantidad adquirida</label><input type="number" id="cqCantAdq" step="0.5" min="0" onwheel="this.blur()" oninput="window.calcCqPrecioUnit()" placeholder="0"></div>
+      <div class="fld"><label>Precio por lote (Bs.)</label><input type="number" id="cqCostoLote" step="0.5" min="0" onwheel="this.blur()" oninput="window.calcCqPrecioUnit()" placeholder="0.00"></div>
     </div>
     <div class="fld" style="background:var(--vbg);border-radius:10px;padding:10px">
       <label>Precio unitario (calculado)</label>
@@ -395,8 +395,8 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
     </div>
 
     <div class="btn-row">
-      <button class="btn btn-sec" onclick="closeModal('coquetteProdModal')">Cancelar</button>
-      <button class="btn btn-or" onclick="saveCoquetteProd()">💾 Guardar</button>
+      <button class="btn btn-sec" onclick="window.closeModal('coquetteProdModal')">Cancelar</button>
+      <button class="btn btn-or" onclick="window.saveCoquetteProd()">💾 Guardar</button>
     </div>
   </div>
 </div>
@@ -407,8 +407,8 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
     <div class="modal-title" id="cqSelTitle">Seleccionar cantidad</div>
     <div id="cqSelBody"></div>
     <div class="btn-row" style="margin-top:10px">
-      <button class="btn btn-sec" onclick="closeModal('cqSelectorModal')">Cancelar</button>
-      <button class="btn btn-v" onclick="confirmCqAdd()">🛒 Agregar al carrito</button>
+      <button class="btn btn-sec" onclick="window.closeModal('cqSelectorModal')">Cancelar</button>
+      <button class="btn btn-v" onclick="window.confirmCqAdd()">🛒 Agregar al carrito</button>
     </div>
   </div>
 </div>
@@ -492,7 +492,7 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 
     <!-- Unidad de peso -->
     <div style="background:#fff;border-radius:var(--rd);padding:14px;box-shadow:var(--sh);margin-bottom:12px">
-      <div class="section-title" style="margin-bottom:10px">⚖️ Unidad de peso para frutas/verduras</div>
+      <div class="section-title" style="margin-bottom:10px">⚖️ Unidad de peso</div>
       <div style="display:flex;gap:10px">
         <button id="pesoLibrasBtn" onclick="setPesoUnit('libras')" class="btn btn-v" style="flex:1">Libras (lb)</button>
         <button id="pesoGramosBtn" onclick="setPesoUnit('gramos')" class="btn btn-sec" style="flex:1">Gramos (g)</button>
@@ -500,24 +500,8 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
       <div style="font-size:.72rem;color:var(--gr);margin-top:8px;text-align:center" id="pesoUnitLabel">Unidad actual: <b>Libras</b></div>
     </div>
 
-    <!-- Categorías propias -->
-    <div style="background:#fff;border-radius:var(--rd);padding:14px;box-shadow:var(--sh);margin-bottom:12px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div class="section-title" style="margin:0">📂 Categorías propias</div>
-        <button class="btn btn-or" onclick="openAddCatFisica()" style="padding:6px 12px;font-size:.78rem">+ Nueva</button>
-      </div>
-      <div style="font-size:.72rem;color:var(--gr);margin-bottom:8px">Solo podés editar las categorías creadas aquí. Las de la tienda virtual son de solo lectura.</div>
-      <div id="catFisicaList"></div>
-    </div>
-
-    <!-- Productos propios -->
-    <div style="background:#fff;border-radius:var(--rd);padding:14px;box-shadow:var(--sh);margin-bottom:12px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div class="section-title" style="margin:0">📦 Mis productos</div>
-        <button class="btn btn-or" onclick="openAddProdFisica()" style="padding:6px 12px;font-size:.78rem">+ Agregar</button>
-      </div>
-      <div style="font-size:.72rem;color:var(--gr);margin-bottom:8px">Estos productos son visibles en el admin pero inactivos en la tienda virtual hasta que el admin los active.</div>
-      <div id="prodFisicaList"></div>
+    <div style="background:var(--vbg);border-radius:10px;padding:12px;font-size:.8rem;color:var(--gr);text-align:center">
+      📦 Los productos COQUETTE se gestionan en la pestaña <b>🥬 Productos</b>
     </div>
 
   </div>
@@ -2376,6 +2360,18 @@ window.cambiarPin = cambiarPin;
 window.toggleVoiceSearch = toggleVoiceSearch;
 window.onVendSearch = onVendSearch;
 window.clearVendSearch = clearVendSearch;
+function openModal(id) {
+  const el = document.getElementById(id);
+  if(el) el.classList.add('open');
+}
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if(el) el.classList.remove('open');
+}
+// Close modal-ov when clicking outside
+document.addEventListener('click', e => {
+  if(e.target.classList.contains('modal-ov')) e.target.classList.remove('open');
+});
 window.openModal = openModal;
 window.closeModal = closeModal;
 
