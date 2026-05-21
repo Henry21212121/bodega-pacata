@@ -1201,53 +1201,90 @@ function calcFiarSaldo() {
 
 async function confirmarFiar() {
   const total = cartTotal();
+  if(!total) { showToast('El carrito está vacío', true); return; }
   const aCuenta = parseFloat(document.getElementById('fiarACuenta').value)||0;
   const saldo = total - aCuenta;
   const items = Object.values(cart);
-  const detalle = items.map(e=>`${e.qty}× ${e.prod.nombre} (Bs.${((e.prod.precio||0)*e.qty).toFixed(2)})`).join(', ');
 
-  let nombre, celular, fiadoId;
+  // Build detail string
+  const detalle = items.map(e=>`${e.qty}× ${e.prod.nombre} Bs.${((e.prod.precio||0)*e.qty).toFixed(2)}`).join(' | ');
+  const itemsArr = items.map(e=>({
+    nombre: e.prod.nombre, qty: e.qty,
+    precio: e.prod.precio||0,
+    subtotal: (e.prod.precio||0)*e.qty,
+    tipo: e.tipo||'catalogo'
+  }));
+
+  let nombre, fiadoId;
 
   if(fiarDeudorSeleccionado) {
-    // Agregar deuda a deudor existente
+    // Add to existing deudor
     nombre = fiarDeudorSeleccionado.nombre;
     fiadoId = fiarDeudorSeleccionado.id;
-    const nuevoMonto = (fiarDeudorSeleccionado.monto||0) + saldo;
+    const montoAnterior = fiarDeudorSeleccionado.monto||0;
+    const pagadoAnterior = fiarDeudorSeleccionado.pagado||0;
+    const detalleAnterior = fiarDeudorSeleccionado.detalle||'';
     await fs.updateDoc(fs.doc(db,'fiados',fiadoId), {
-      monto: nuevoMonto,
-      detalle: (fiarDeudorSeleccionado.detalle||'') + ' | ' + detalle,
+      monto: montoAnterior + saldo,
+      pagado: pagadoAnterior + aCuenta,
+      detalle: detalleAnterior ? detalleAnterior + '\n' + detalle : detalle,
+      cobrado: false,
       updatedAt: fs.serverTimestamp()
     });
+    if(aCuenta > 0) {
+      await fs.addDoc(fs.collection(db,'pagos_fiado'), {
+        fiadoId, monto: aCuenta,
+        nota: 'Pago a cuenta',
+        createdAt: fs.serverTimestamp()
+      });
+    }
   } else {
+    // New deudor
     nombre = document.getElementById('fiarNuevoNombre').value.trim();
-    celular = document.getElementById('fiarNuevoCel').value.trim();
-    if(!nombre) { showToast('El nombre es obligatorio', true); return; }
-    // Create new fiado
+    const celular = document.getElementById('fiarNuevoCel').value.trim();
+    if(!nombre) { showToast('El nombre del cliente es obligatorio', true); return; }
+
+    // Check if name already exists (warn but don't block)
+    const existe = fiados.find(f=>f.nombre.toLowerCase()===nombre.toLowerCase());
+    if(existe && !window._fiarConfirmDup) {
+      window._fiarConfirmDup = true;
+      showToast(`⚠️ Ya existe "${existe.nombre}" con saldo Bs.${((existe.monto||0)-(existe.pagado||0)).toFixed(2)}. Tocá FIAR de nuevo para confirmar.`, true);
+      setTimeout(()=>{ window._fiarConfirmDup=false; }, 4000);
+      return;
+    }
+    window._fiarConfirmDup = false;
+
     const docRef = await fs.addDoc(fs.collection(db,'fiados'), {
-      nombre, celular: celular||null, monto: saldo,
-      pagado: aCuenta, aCuenta,
-      detalle, cobrado: saldo <= 0,
+      nombre, celular: celular||'',
+      monto: saldo,
+      pagado: aCuenta,
+      detalle,
+      items: itemsArr,
+      cobrado: false,
       createdAt: fs.serverTimestamp()
     });
     fiadoId = docRef.id;
-    // If paid something at door, register as pago
+
     if(aCuenta > 0) {
       await fs.addDoc(fs.collection(db,'pagos_fiado'), {
-        fiadoId, monto: aCuenta, nota: 'Pago a cuenta al momento del fiado',
+        fiadoId, monto: aCuenta,
+        nota: 'Pago a cuenta al momento del fiado',
         createdAt: fs.serverTimestamp()
       });
     }
   }
 
-  // Register sale as fiado
-  const sale = { items: items.map(e=>({prodNombre:e.prod.nombre,qty:e.qty,precio:e.prod.precio||0,subtotal:(e.prod.precio||0)*e.qty,tipo:e.tipo})),
-    total, payMethod:'fiado', fiadoId, fiadoNombre:nombre,
-    createdAt: fs.serverTimestamp() };
-  await fs.addDoc(fs.collection(db,'sales_physical'), sale);
+  // Register in sales_physical
+  await fs.addDoc(fs.collection(db,'sales_physical'), {
+    items: itemsArr, total,
+    payMethod: 'fiado',
+    fiadoId, fiadoNombre: nombre,
+    createdAt: fs.serverTimestamp()
+  });
 
   closeModal('fiarModal');
   cart = {}; renderCart();
-  showToast(`📋 Fiado registrado para ${nombre}`);
+  showToast(`📋 Fiado de Bs.${total.toFixed(2)} registrado para ${nombre}`);
 }
 
 // ════════════════════════════════════
@@ -1339,8 +1376,10 @@ async function loadAll() {
     renderDayStats(); renderDayGastos();
   });
 
-  fs.onSnapshot(fs.query(fs.collection(db,"fiados"), fs.where("cobrado","==",false), fs.orderBy("createdAt","desc")), snap => {
-    fiados = snap.docs.map(d=>({...d.data(),id:d.id}));
+  fs.onSnapshot(fs.collection(db,"fiados"), snap => {
+    fiados = snap.docs.map(d=>({...d.data(),id:d.id}))
+      .filter(f => !f.cobrado)
+      .sort((a,b)=> (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
     renderFiados();
   });
 
