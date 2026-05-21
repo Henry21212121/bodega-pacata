@@ -1496,62 +1496,71 @@ async function toggleHide(id) {
 function duplicateProd(id) {
   const p = DB.products[id];
   if(!p) return;
-  // Open editor with all data pre-filled but empty ID (will create new)
-  openProdEditor(null);
-  // After editor opens, fill all fields with the original product data
+
+  // Generate the next correlative code for the same category
+  const newCode = getNextProductCode(p.cat);
+
+  // Use openProdEditor in "new" mode (null id) but pre-seed with source data
+  window._dupSource = {...p, id: null}; // signal to openProdEditor
+  editProdId = null;
+
+  // Build product editor title
+  document.getElementById("pedTitle").textContent = "Nuevo producto (duplicado)";
+
+  // Build cat select
+  const sel = document.getElementById("pedCat");
+  sel.innerHTML = Object.values(DB.categories).sort((a,b)=>a.order-b.order)
+    .map(c=>`<option value="${c.name}" ${p.cat===c.name?"selected":""}>${c.emoji} ${c.name}</option>`).join("");
+
+  // Set new correlative code
+  const codeInput = document.getElementById("pedCodigo");
+  const codeStatus = document.getElementById("codigoStatus");
+  codeInput.value = newCode;
+  codeInput.readOnly = false;
+  codeInput.style.background = "#f0fff4";
+  codeStatus.innerHTML = `<span style="color:var(--v);font-size:.7rem">✅ Código sugerido: <b>${newCode}</b> — puedes modificarlo</span>`;
+  sel.onchange = () => {
+    if(!editProdId) {
+      const nc = getNextProductCode(sel.value);
+      codeInput.value = nc;
+      codeStatus.innerHTML = `<span style="color:var(--v);font-size:.7rem">✅ Código sugerido: <b>${nc}</b></span>`;
+    }
+  };
+
+  // Fill all fields with source product data
+  document.getElementById("pedNombre").value = p.nombre + " (copia)";
+  const unitSel = document.getElementById("pedUnidad");
+  const unitVal = p.unidad || "unidad";
+  const unitExists = Array.from(unitSel.options).some(o => o.value === unitVal);
+  if(unitExists) { unitSel.value = unitVal; }
+  else { unitSel.value = "__otro__"; document.getElementById("pedUnidadCustom").value = unitVal; document.getElementById("pedUnidadCustom").style.display="block"; }
+  document.getElementById("pedDesc").value = p.desc || "";
+  document.getElementById("pedExpiry").value = p.expiry || "";
+  document.getElementById("pedPrecio").value = p.precio || "";
+  document.getElementById("pedStock").value = p.stock ?? 0;
+  document.getElementById("pedStockMin").value = p.stockMin ?? 0;
+  document.getElementById("pedEstado").value = p.estado || "ok";
+  document.getElementById("pedCantAdq").value = p.cantAdq || "";
+  document.getElementById("pedCostoLote").value = p.costoLote || "";
+  document.getElementById("pedCostoUnit").value = p.costoUnit || "";
+  document.getElementById("pedPromoActive").checked = p.promoActive || false;
+  pedImgTemp = p.img || "";
+  if(pedImgTemp) {
+    document.getElementById("pedImgPrev").innerHTML = `<img src="${pedImgTemp}" style="width:100%;height:100%;object-fit:cover">`;
+  } else {
+    document.getElementById("pedImgPrev").innerHTML = "📷";
+  }
+  renderTiers(p.promos || [[1, p.precio||0]]);
+  calcCostoUnit();
+
+  open2("prodEditor");
+
+  // Focus and select the name so admin types new flavor/name immediately
   setTimeout(() => {
-    // Name: add "(copia)" so admin remembers to change the flavor/name
-    const nameEl = document.getElementById("peName");
-    if(nameEl) nameEl.value = p.nombre + " (copia)";
-    // Category
-    const catEl = document.getElementById("peCat");
-    if(catEl) catEl.value = p.cat || "";
-    // Unit
-    const unitEl = document.getElementById("peUnidad");
-    if(unitEl) unitEl.value = p.unidad || "";
-    // Prices
-    const pvEl = document.getElementById("pePrecio");
-    if(pvEl) pvEl.value = p.precio || "";
-    const pcEl = document.getElementById("peCosto");
-    if(pcEl) pcEl.value = p.costoUnit || "";
-    // Stock min
-    const smEl = document.getElementById("peStockMin");
-    if(smEl) smEl.value = p.stockMin || "";
-    // Stock
-    const stEl = document.getElementById("peStock");
-    if(stEl) stEl.value = p.stock || "";
-    // Description
-    const descEl = document.getElementById("peDesc");
-    if(descEl) descEl.value = p.desc || "";
-    // Image
-    if(p.img) {
-      const imgPrev = document.getElementById("peImgPrev");
-      if(imgPrev) { imgPrev.src = p.img; imgPrev.style.display = "block"; }
-      window._peImgUrl = p.img;
-    }
-    // Promos — copy promo config
-    if(p.promos && p.promos.length > 1) {
-      // Re-render promo rows with same values
-      try {
-        const promoContainer = document.getElementById("promoRows");
-        if(promoContainer) {
-          promoContainer.innerHTML = p.promos.slice(1).map((t,i) =>
-            `<div class="promo-row-item" style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
-              <input type="number" class="promo-q" value="${t[0]}" placeholder="Cant." style="width:70px;padding:6px;border:1.5px solid #d0e8d8;border-radius:8px;outline:none">
-              <span style="font-size:.8rem;color:var(--gr)">unids →</span>
-              <input type="number" class="promo-p" value="${t[1]}" placeholder="Precio" style="width:90px;padding:6px;border:1.5px solid #d0e8d8;border-radius:8px;outline:none">
-              <button onclick="this.parentElement.remove()" style="background:#ffebee;color:var(--ro);border:none;border-radius:8px;padding:4px 8px;cursor:pointer">✕</button>
-            </div>`
-          ).join("");
-          const promoActive = document.getElementById("pePromoActive");
-          if(promoActive) promoActive.checked = !!p.promoActive;
-        }
-      } catch(e) {}
-    }
-    showToast("📋 Producto duplicado — cambiá el nombre y guardá");
-    // Focus name field so admin edits it first
+    const nameEl = document.getElementById("pedNombre");
     if(nameEl) { nameEl.focus(); nameEl.select(); }
-  }, 150);
+    showToast("📋 Duplicado — cambiá el nombre y guardá");
+  }, 100);
 }
 
 function askDelete(id) {
