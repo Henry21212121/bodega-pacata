@@ -292,8 +292,7 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
       </div>
       <div class="prod-tabs">
         <button class="prod-tab-btn active-cat" id="catTabBtn" onclick="switchProdTab('catalogo')">📦 Catálogo</button>
-        <button class="prod-tab-btn inactive" id="tmpTabBtn" onclick="switchProdTab('temporal')">🌸 Mis productos</button>
-        <button class="btn btn-or" onclick="openAddTemp()" style="padding:6px 12px;font-size:.82rem;border-radius:50px;white-space:nowrap">+ Nuevo</button>
+        <button class="prod-tab-btn inactive" id="cqTabBtn" onclick="switchProdTab('coquette')">🥬 COQUETTE</button>
       </div>
       <div id="vendProdsWrap"></div>
     </div>
@@ -1419,7 +1418,8 @@ function showTab(name, btn) {
 function switchProdTab(tab) {
   currentProdTab = tab;
   document.getElementById("catTabBtn").className = tab==="catalogo" ? "prod-tab-btn active-cat" : "prod-tab-btn inactive";
-  document.getElementById("tmpTabBtn").className = tab==="temporal" ? "prod-tab-btn active-tmp" : "prod-tab-btn inactive";
+  const cqBtn = document.getElementById("cqTabBtn");
+  if(cqBtn) cqBtn.className = tab==="coquette" ? "prod-tab-btn active-tmp" : "prod-tab-btn inactive";
   renderVendProds();
 }
 
@@ -1433,7 +1433,7 @@ function onVendSearch() {
 
   const allProds = [
     ...Object.values(DB.products).filter(p=>p.estado!=="oculto").map(p=>({...p,_tipo:"catalogo"})),
-    ...DB.tempProds.map(p=>({...p,_tipo:"temporal"}))
+    ...cqProds.map(p=>({...p,_tipo:"coquette"}))
   ].filter(p=>p.nombre?.toLowerCase().includes(q));
 
   // Hide regular product grid, show search results in grid format
@@ -1451,7 +1451,7 @@ function onVendSearch() {
       ${allProds.length} resultado${allProds.length!==1?'s':''} para "<b>${q}</b>"
     </div>
     <div class="prod-grid">
-      ${allProds.map(p => makeProdCard(p, p._tipo)).join('')}
+      ${allProds.map(p => p._tipo==='coquette' ? makeCqCard(p) : makeProdCard(p, p._tipo)).join('')}
     </div>`;
 }
 
@@ -1492,13 +1492,31 @@ function renderVendProds() {
       <div class="prod-grid">
         ${prods.map(p=>makeProdCard(p,"catalogo")).join("")}
       </div>`).join("");
-  } else {
-    if(!DB.tempProds.length) {
-      wrap.innerHTML=`<div style="text-align:center;padding:30px;color:var(--gr);font-size:.82rem">Sin productos propios.<br>Tocá <b>+ Nuevo</b> para agregar.</div>`;
+
+  } else if(currentProdTab === "coquette") {
+    // Show COQUETTE products — tapping opens the quantity selector
+    if(!cqProds.length) {
+      wrap.innerHTML=`<div style="text-align:center;padding:30px;color:var(--gr);font-size:.82rem">Sin productos COQUETTE.<br>Andá a la pestaña <b>🥬 Productos</b> para agregar.</div>`;
       return;
     }
-    wrap.innerHTML = `<div class="section-title">🌸 Mis productos</div><div class="prod-grid">${DB.tempProds.map(p=>makeProdCard(p,"temporal")).join("")}</div>`;
+    wrap.innerHTML = `<div class="section-title">🥬 Productos COQUETTE</div><div class="prod-grid">${cqProds.map(p=>makeCqCard(p)).join("")}</div>`;
   }
+}
+
+// Card for COQUETTE product in Vender — opens selector on click
+function makeCqCard(p) {
+  const icon = p.img
+    ? `<img class="pcard-img" src="${p.img}" alt="${p.nombre}" loading="lazy">`
+    : `<div class="pcard-icon">${p.tipo==='libras'?'🥬':p.tipo==='kilos'?'🐔':'🔢'}</div>`;
+  return `<div class="pcard" onclick="window.openCqSelector('${p.id}')" style="cursor:pointer">
+    <div class="pcard-img-wrap">${icon}</div>
+    <div class="pcard-body">
+      <div class="pcard-name">${p.nombre}</div>
+      <div class="pcard-unit">por ${p.unidad||'unidad'}</div>
+      <div class="pcard-price">Bs. ${(p.precioVenta||0).toFixed(2)}</div>
+      <button class="abtn" style="margin-top:6px" onclick="event.stopPropagation();window.openCqSelector('${p.id}')">+ Agregar</button>
+    </div>
+  </div>`;
 }
 
 function makeProdCard(p, tipo) {
@@ -2406,6 +2424,7 @@ window.verDetalleFiado = verDetalleFiado;
 window.openPagoParc = openPagoParc;
 window.savePagoParc = savePagoParc;
 window.openAddProdCoquette = openAddProdCoquette;
+window.makeCqCard = makeCqCard;
 window.saveCoquetteProd = saveCoquetteProd;
 window.deleteCqProd = deleteCqProd;
 window.filterProdsCoquette = filterProdsCoquette;
