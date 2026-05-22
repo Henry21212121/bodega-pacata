@@ -72,14 +72,14 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 /* SELL LAYOUT */
 .sell-layout{display:flex;height:calc(100vh - 116px);overflow:hidden;}
 .sell-left{flex:1;overflow-y:auto;padding:10px 10px 10px 12px;border-right:2px solid var(--vbg);}
-.sell-right{width:280px;display:flex;flex-direction:column;background:#fff;}
+.sell-right{width:380px;display:flex;flex-direction:column;background:#fff;}
 /* Grid inside sell-left: always 3 cols on desktop */
 .sell-left .prod-grid{grid-template-columns:repeat(3,1fr);}
 @media(min-width:600px){.sell-left .prod-grid{grid-template-columns:repeat(4,1fr);}}
 @media(min-width:900px){.sell-left .prod-grid{grid-template-columns:repeat(5,1fr);}}
-.sell-right-header{background:var(--v);color:#fff;padding:10px 14px;font-weight:800;font-size:.88rem;display:flex;align-items:center;justify-content:space-between;}
-.sell-right-items{flex:1;overflow-y:auto;padding:8px;}
-.sell-right-footer{padding:10px 12px;border-top:2px solid var(--vbg);background:#fff;}
+.sell-right-header{background:var(--v);color:#fff;padding:13px 16px;font-weight:800;font-size:1rem;display:flex;align-items:center;justify-content:space-between;}
+.sell-right-items{flex:1;overflow-y:auto;padding:10px;}
+.sell-right-footer{padding:12px 14px;border-top:2px solid var(--vbg);background:#fff;}
 
 /* PRODUCT CARDS */
 .search-bar{background:#fff;border-radius:50px;padding:8px 14px;display:flex;align-items:center;gap:8px;box-shadow:var(--sh);margin-bottom:10px;position:relative;}
@@ -134,12 +134,12 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 .qnum{font-weight:800;font-size:.9rem;}
 
 /* CART ITEMS */
-.cart-item{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:10px;background:var(--vbg);margin-bottom:6px;}
-.ci-name{flex:1;font-size:.78rem;font-weight:700;}
-.ci-qty{display:flex;align-items:center;gap:4px;}
-.ci-btn{background:#fff;border:1.5px solid var(--v);color:var(--v);border-radius:50%;width:22px;height:22px;font-size:.85rem;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;}
-.ci-num{font-size:.82rem;font-weight:900;min-width:18px;text-align:center;}
-.ci-price{font-size:.78rem;font-weight:900;color:var(--v);white-space:nowrap;}
+.cart-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;background:var(--vbg);margin-bottom:7px;}
+.ci-name{flex:1;font-size:.93rem;font-weight:700;}
+.ci-qty{display:flex;align-items:center;gap:6px;}
+.ci-btn{background:#fff;border:1.5px solid var(--v);color:var(--v);border-radius:50%;width:27px;height:27px;font-size:.95rem;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;}
+.ci-num{font-size:.95rem;font-weight:900;min-width:22px;text-align:center;}
+.ci-price{font-size:.92rem;font-weight:900;color:var(--v);white-space:nowrap;}
 .ci-del{background:none;border:none;color:var(--ro);font-size:.85rem;cursor:pointer;padding:2px;}
 
 /* SELL BUTTON */
@@ -309,14 +309,14 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
       </div>
       <div class="sell-right-footer">
         <!-- Free product row — always visible, not stored in catalog -->
-        <div style="display:flex;gap:5px;align-items:center;margin-bottom:8px;padding:6px 8px;background:var(--gcl);border-radius:10px;">
-          <input type="text" id="freeItemName" placeholder="Producto libre..." style="flex:2;padding:5px 8px;border:1.5px solid #d0e8d8;border-radius:8px;font-size:.75rem;outline:none">
-          <input type="number" id="freeItemPrice" placeholder="Bs." step="0.5" min="0" onwheel="this.blur()" style="flex:1;padding:5px 6px;border:1.5px solid #d0e8d8;border-radius:8px;font-size:.75rem;outline:none;max-width:60px">
-          <button onclick="addFreeItem()" style="background:var(--or);color:#fff;border:none;border-radius:8px;padding:6px 8px;font-size:.78rem;font-weight:800;cursor:pointer;white-space:nowrap">+ Añadir</button>
+        <div style="display:flex;gap:5px;align-items:center;margin-bottom:10px;padding:7px 10px;background:var(--gcl);border-radius:10px;">
+          <input type="text" id="freeItemName" placeholder="Producto libre..." style="flex:2;padding:7px 10px;border:1.5px solid #d0e8d8;border-radius:8px;font-size:.88rem;outline:none">
+          <input type="number" id="freeItemPrice" placeholder="Bs." step="0.5" min="0" onwheel="this.blur()" style="flex:1;padding:7px 8px;border:1.5px solid #d0e8d8;border-radius:8px;font-size:.88rem;outline:none;max-width:70px">
+          <button onclick="addFreeItem()" style="background:var(--or);color:#fff;border:none;border-radius:8px;padding:8px 10px;font-size:.88rem;font-weight:800;cursor:pointer;white-space:nowrap">+ Añadir</button>
         </div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:.82rem">
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px;font-size:.95rem">
           <span style="color:var(--gr);font-weight:700">Total</span>
-          <span style="font-weight:900;color:var(--v);font-size:1rem" id="cartTotal">Bs. 0.00</span>
+          <span style="font-weight:900;color:var(--v);font-size:1.15rem" id="cartTotal">Bs. 0.00</span>
         </div>
         <div style="display:flex;gap:8px">
           <button class="sell-btn" id="sellBtn" onclick="openCheckout()" disabled style="flex:2">
@@ -1668,7 +1668,7 @@ function renderCart() {
   const cartTotalEl = document.getElementById("cartTotal");
 
   if(!items.length) {
-    ci.innerHTML=`<div style="text-align:center;padding:20px;color:var(--gr);font-size:.78rem">Seleccioná productos<br>de la izquierda</div>`;
+    ci.innerHTML=`<div style="text-align:center;padding:20px;color:var(--gr);font-size:.9rem">Seleccioná productos<br>de la izquierda</div>`;
     sellBtn.disabled=true;
     sellBtnItems.textContent="0 items";
     cartTotalEl.textContent="Bs. 0.00";
@@ -1680,7 +1680,7 @@ function renderCart() {
   const total = cartTotal();
   ci.innerHTML = items.map(([key,entry])=>`
     <div class="cart-item">
-      <div class="ci-name">${entry.prod.nombre.length>22?entry.prod.nombre.slice(0,22)+"…":entry.prod.nombre}</div>
+      <div class="ci-name">${entry.prod.nombre.length>28?entry.prod.nombre.slice(0,28)+"…":entry.prod.nombre}</div>
       <div class="ci-qty">
         <button class="ci-btn" onclick="changeCartQty('${key}',-1)">−</button>
         <span class="ci-num">${entry.qty}</span>
@@ -2022,7 +2022,7 @@ async function saveCompra(){
 // ════════════════════════════════════
 // VOICE SEARCH
 // ════════════════════════════════════
-let voiceRecog=null, voiceActive=false, pttActive=false;
+let voiceRecog=null, voiceActive=false;
 
 function toggleVoiceSearch(){
   if(voiceActive){ stopVoiceSearch(); return; }
@@ -2062,27 +2062,23 @@ function startVoiceSearch(){
 function stopVoiceSearch(){
   if(voiceRecog){try{voiceRecog.stop();}catch(e){}voiceRecog=null;}
   voiceActive=false;
-  pttActive=false;
   const mic=document.getElementById("micFab");
   if(mic){ mic.classList.remove("active"); mic.style.transform="scale(1.0)"; }
 }
 function closeVoicePanel(){ stopVoiceSearch(); }
 
-// ── Push-to-Talk: Espacio ──────────────────────────────────────
+// ── Push-to-Talk: Espacio (toggle) ────────────────────────────
 document.addEventListener("keydown", (e)=>{
   // Ignorar si el foco está en un input/textarea para no interferir con la escritura
   const tag = document.activeElement?.tagName;
   if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT") return;
-  if(e.code==="Space" && !pttActive){
+  if(e.code==="Space"){
     e.preventDefault();
-    pttActive=true;
-    startVoiceSearch();
-  }
-});
-document.addEventListener("keyup", (e)=>{
-  if(e.code==="Space" && pttActive){
-    e.preventDefault();
-    stopVoiceSearch();
+    if(voiceActive){
+      stopVoiceSearch();
+    } else {
+      startVoiceSearch();
+    }
   }
 });
 
