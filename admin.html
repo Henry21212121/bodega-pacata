@@ -581,7 +581,7 @@ input[type=file]{display:none;}
 </div><!-- adm-wrap -->
 
 <!-- MODAL EDITOR PRODUCTO -->
-<div class="mover" id="prodEditor">
+<div class="mover" id="prodEditor"><button onclick="close2('prodEditor')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
   <div class="mbox" style="width:min(520px,96vw)">
     <h3 id="pedTitle">Producto</h3>
     <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
@@ -691,7 +691,7 @@ input[type=file]{display:none;}
 </div>
 
 <!-- MODAL DETALLE PEDIDO -->
-<div class="mover" id="orderDetail">
+<div class="mover" id="orderDetail"><button onclick="close2('orderDetail')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
   <div class="mbox">
     <h3>📦 Pedido <span id="odCode"></span></h3>
     <div id="odContent"></div>
@@ -701,7 +701,7 @@ input[type=file]{display:none;}
 </div>
 
 <!-- MODAL DETALLE CLIENTE -->
-<div class="mover" id="clientDetail">
+<div class="mover" id="clientDetail"><button onclick="close2('clientDetail')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
   <div class="mbox">
     <h3>👤 <span id="cdName"></span></h3>
     <div id="cdContent"></div>
@@ -713,7 +713,7 @@ input[type=file]{display:none;}
 </div>
 
 <!-- MODAL NUEVA CATEGORÍA -->
-<div class="mover" id="newCatModal">
+<div class="mover" id="newCatModal"><button onclick="close2('newCatModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
   <div class="mbox" style="max-width:320px">
     <h3>🗂️ Nueva categoría</h3>
     <div class="fld"><label>Nombre *</label><input type="text" id="newCatName"></div>
@@ -726,7 +726,7 @@ input[type=file]{display:none;}
 </div>
 
 <!-- CONFIRM DELETE -->
-<div class="mover" id="confirmDel">
+<div class="mover" id="confirmDel"><button onclick="close2('confirmDel')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
   <div class="mbox" style="max-width:320px">
     <h3>🗑️ Eliminar producto</h3>
     <p id="delMsg" style="font-size:.88rem;margin-bottom:14px;color:var(--gr)"></p>
@@ -3617,7 +3617,7 @@ async function trackApiUsage(type, count=1) {
 </script>
 
 <!-- MODAL: ASIGNAR REPARTIDOR -->
-<div class="confirm-ov" id="assignRepModal">
+<div class="confirm-ov" id="assignRepModal"><button onclick="close2('assignRepModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
   <div class="confirm-box" style="max-width:380px">
     <h3>🚲 Asignar repartidor</h3>
     <p style="font-size:.78rem;color:var(--gr);margin-bottom:10px" id="assignOrderInfo"></p>
@@ -3637,7 +3637,7 @@ async function trackApiUsage(type, count=1) {
 </div>
 
 <!-- MODAL: CALIFICACION -->
-<div class="confirm-ov" id="calModal">
+<div class="confirm-ov" id="calModal"><button onclick="close2('calModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
   <div class="confirm-box" style="max-width:360px">
     <h3>⭐ Enviar calificación</h3>
     <p style="font-size:.78rem;color:var(--gr);margin-bottom:10px" id="calOrderInfo"></p>
