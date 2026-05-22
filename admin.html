@@ -141,13 +141,13 @@ input[type=file]{display:none;}
 .mover.open{display:flex;}
 .confirm-ov{display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.6);align-items:center;justify-content:center;}
 .confirm-ov.open{display:flex;}
-.confirm-box{background:#fff;border-radius:16px;padding:24px;width:100%;max-width:420px;margin:auto;}
+.confirm-box{position:relative;background:#fff;border-radius:16px;padding:24px;width:100%;max-width:420px;margin:auto;}
 .confirm-btns{display:flex;gap:10px;margin-top:16px;}
 .cbtn{flex:1;border:none;border-radius:10px;padding:11px;font-size:.88rem;font-weight:800;cursor:pointer;}
 .cbtn-v{background:var(--v);color:#fff;}
 .cbtn-s{background:#eee;color:var(--tx);}
 .cbtn-ro{background:var(--ro);color:#fff;}
-.mbox{background:#fff;border-radius:16px;padding:22px 18px;width:min(480px,100%);box-shadow:0 8px 48px rgba(0,0,0,.2);margin-bottom:20px;}
+.mbox{position:relative;background:#fff;border-radius:16px;padding:22px 18px;width:min(480px,100%);box-shadow:0 8px 48px rgba(0,0,0,.2);margin-bottom:20px;}
 .mbox h3{font-size:1rem;font-weight:800;margin-bottom:14px;color:var(--v);}
 
 /* REPORT */
@@ -581,8 +581,8 @@ input[type=file]{display:none;}
 </div><!-- adm-wrap -->
 
 <!-- MODAL EDITOR PRODUCTO -->
-<div class="mover" id="prodEditor"><button onclick="close2('prodEditor')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
-  <div class="mbox" style="width:min(520px,96vw)">
+<div class="mover" id="prodEditor">
+  <div class="mbox"<button onclick="close2('prodEditor')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button> style="width:min(520px,96vw)">
     <h3 id="pedTitle">Producto</h3>
     <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
       <div class="img-preview" id="pedImgPrev" onclick="document.getElementById('pedImgFile').click()">📷</div>
@@ -691,8 +691,8 @@ input[type=file]{display:none;}
 </div>
 
 <!-- MODAL DETALLE PEDIDO -->
-<div class="mover" id="orderDetail"><button onclick="close2('orderDetail')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
-  <div class="mbox">
+<div class="mover" id="orderDetail">
+  <div class="mbox"><button onclick="close2('orderDetail')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
     <h3>📦 Pedido <span id="odCode"></span></h3>
     <div id="odContent"></div>
     <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:14px" id="odActions"></div>
@@ -701,8 +701,8 @@ input[type=file]{display:none;}
 </div>
 
 <!-- MODAL DETALLE CLIENTE -->
-<div class="mover" id="clientDetail"><button onclick="close2('clientDetail')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
-  <div class="mbox">
+<div class="mover" id="clientDetail">
+  <div class="mbox"><button onclick="close2('clientDetail')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
     <h3>👤 <span id="cdName"></span></h3>
     <div id="cdContent"></div>
     <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:14px">
@@ -713,8 +713,8 @@ input[type=file]{display:none;}
 </div>
 
 <!-- MODAL NUEVA CATEGORÍA -->
-<div class="mover" id="newCatModal"><button onclick="close2('newCatModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
-  <div class="mbox" style="max-width:320px">
+<div class="mover" id="newCatModal">
+  <div class="mbox"<button onclick="close2('newCatModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button> style="max-width:320px">
     <h3>🗂️ Nueva categoría</h3>
     <div class="fld"><label>Nombre *</label><input type="text" id="newCatName"></div>
     <div class="fld"><label>Emoji</label><input type="text" id="newCatEmoji" maxlength="4" placeholder="📦"></div>
@@ -726,8 +726,8 @@ input[type=file]{display:none;}
 </div>
 
 <!-- CONFIRM DELETE -->
-<div class="mover" id="confirmDel"><button onclick="close2('confirmDel')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
-  <div class="mbox" style="max-width:320px">
+<div class="mover" id="confirmDel">
+  <div class="mbox"<button onclick="close2('confirmDel')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button> style="max-width:320px">
     <h3>🗑️ Eliminar producto</h3>
     <p id="delMsg" style="font-size:.88rem;margin-bottom:14px;color:var(--gr)"></p>
     <div style="display:flex;gap:8px">
@@ -3617,8 +3617,8 @@ async function trackApiUsage(type, count=1) {
 </script>
 
 <!-- MODAL: ASIGNAR REPARTIDOR -->
-<div class="confirm-ov" id="assignRepModal"><button onclick="close2('assignRepModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
-  <div class="confirm-box" style="max-width:380px">
+<div class="confirm-ov" id="assignRepModal">
+  <div class="confirm-box"<button onclick="close2('assignRepModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button> style="max-width:380px">
     <h3>🚲 Asignar repartidor</h3>
     <p style="font-size:.78rem;color:var(--gr);margin-bottom:10px" id="assignOrderInfo"></p>
     <div class="fld" style="margin-bottom:10px">
@@ -3637,8 +3637,8 @@ async function trackApiUsage(type, count=1) {
 </div>
 
 <!-- MODAL: CALIFICACION -->
-<div class="confirm-ov" id="calModal"><button onclick="close2('calModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
-  <div class="confirm-box" style="max-width:360px">
+<div class="confirm-ov" id="calModal">
+  <div class="confirm-box"<button onclick="close2('calModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button> style="max-width:360px">
     <h3>⭐ Enviar calificación</h3>
     <p style="font-size:.78rem;color:var(--gr);margin-bottom:10px" id="calOrderInfo"></p>
     <div style="background:var(--vbg);border-radius:10px;padding:12px;margin-bottom:12px;font-size:.78rem;line-height:1.7;color:var(--tx)">

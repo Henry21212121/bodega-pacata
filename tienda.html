@@ -200,7 +200,7 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 /* MODALS */
 .modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:flex-end;justify-content:center;}
 .modal-ov.open{display:flex;}
-.modal-box{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:500px;padding:18px 16px 28px;max-height:88vh;overflow-y:auto;animation:slideUp .22s ease;}
+.modal-box{position:relative;background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:500px;padding:18px 16px 28px;max-height:88vh;overflow-y:auto;animation:slideUp .22s ease;}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 .modal-title{font-family:'Fraunces',serif;font-size:1rem;font-weight:900;margin-bottom:12px;}
 .fld{margin-bottom:10px;}
@@ -351,8 +351,8 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 </div>
 
 <!-- MODAL: PRODUCTO COQUETTE -->
-<div class="modal-ov" id="coquetteProdModal"><button onclick="window.closeModal('coquetteProdModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
-  <div class="modal-box">
+<div class="modal-ov" id="coquetteProdModal">
+  <div class="modal-box"><button onclick="window.closeModal('coquetteProdModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
     <div class="modal-title" id="cqProdTitle">➕ Nuevo producto</div>
 
     <!-- Image upload -->
@@ -420,8 +420,8 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 </div>
 
 <!-- MODAL: SELECTOR CANTIDAD COQUETTE (al agregar al carrito) -->
-<div class="modal-ov" id="cqSelectorModal"><button onclick="window.closeModal('cqSelectorModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
-  <div class="modal-box">
+<div class="modal-ov" id="cqSelectorModal">
+  <div class="modal-box"><button onclick="window.closeModal('cqSelectorModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
     <div class="modal-title" id="cqSelTitle">Seleccionar cantidad</div>
     <div id="cqSelBody"></div>
     <div class="btn-row" style="margin-top:10px">
@@ -526,8 +526,8 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 </div>
 
 <!-- MODAL: DETALLE FIADO -->
-<div class="modal-ov" id="fiadoDetalleModal"><button onclick="closeModal('fiadoDetalleModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
-  <div class="modal-box">
+<div class="modal-ov" id="fiadoDetalleModal">
+  <div class="modal-box"><button onclick="closeModal('fiadoDetalleModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
     <div class="modal-title" id="fiadoDetalleTitle">📋 Detalle de fiado</div>
     <div id="fiadoDetalleContent"></div>
     <div class="btn-row" style="margin-top:10px">
@@ -539,7 +539,7 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 
 <!-- MODAL: PAGO PARCIAL -->
 <div class="modal-ov" id="pagoParcModal">
-  <div class="modal-box">
+  <div class="modal-box"><button onclick="closeModal('pagoParcModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
     <div class="modal-title">💰 Registrar pago parcial</div>
     <div class="fld"><label>Monto pagado (Bs.) *</label><input type="number" id="pagoParcMonto" step="0.5" min="0" onwheel="this.blur()" placeholder="0.00"></div>
     <div class="fld"><label>Nota (opcional)</label><input type="text" id="pagoParcNota" placeholder="Ej: Pagó con arroz..."></div>
@@ -551,8 +551,8 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 </div>
 
 <!-- MODAL: CATEGORÍA FÍSICA -->
-<div class="modal-ov" id="catFisicaModal"><button onclick="closeModal('catFisicaModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
-  <div class="modal-box">
+<div class="modal-ov" id="catFisicaModal">
+  <div class="modal-box"><button onclick="closeModal('catFisicaModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
     <div class="modal-title" id="catFisicaTitle">📂 Nueva categoría</div>
     <div class="fld"><label>Nombre de la categoría *</label><input type="text" id="catFisicaNombre" placeholder="Ej: Verduras, Frutas, Repostería..."></div>
     <div class="fld"><label>Emoji</label><input type="text" id="catFisicaEmoji" placeholder="🥬" maxlength="2"></div>
@@ -570,8 +570,8 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 </div>
 
 <!-- MODAL: PRODUCTO FÍSICA SIMPLE -->
-<div class="modal-ov" id="prodFisicaModal"><button onclick="closeModal('prodFisicaModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
-  <div class="modal-box">
+<div class="modal-ov" id="prodFisicaModal">
+  <div class="modal-box"><button onclick="closeModal('prodFisicaModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
     <div class="modal-title" id="prodFisicaTitle">📦 Agregar producto</div>
     <div class="fld"><label>Nombre del producto *</label><input type="text" id="pfNombre" placeholder="Ej: Tomate, Plátano..."></div>
     <div class="fld"><label>Categoría *</label>
@@ -648,8 +648,8 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 </div>
 
 <!-- MODAL: TEMP PRODUCT -->
-<div class="modal-ov" id="tempProdModal"><button onclick="closeModal('tempProdModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
-  <div class="modal-box">
+<div class="modal-ov" id="tempProdModal">
+  <div class="modal-box"><button onclick="closeModal('tempProdModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
     <div class="modal-title" id="tempProdTitle">🌸 Agregar producto propio</div>
     <div class="fld"><label>Nombre *</label><input type="text" id="tempNombre" placeholder="Ej: Pollo entero, Torta de chocolate..."></div>
     <div class="fld"><label>Categoría</label><input type="text" id="tempCat" placeholder="Ej: Carnes, Repostería, Verduras..."></div>
@@ -665,8 +665,8 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 </div>
 
 <!-- MODAL: FIADO -->
-<div class="modal-ov" id="fiadoModal"><button onclick="closeModal('fiadoModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
-  <div class="modal-box">
+<div class="modal-ov" id="fiadoModal">
+  <div class="modal-box"><button onclick="closeModal('fiadoModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
     <div class="modal-title">📋 Registrar fiado</div>
     <div class="fld"><label>Nombre del cliente *</label><input type="text" id="fiadoNombre" placeholder="¿A quién le fiaste?"></div>
     <div class="fld"><label>Monto (Bs.) *</label><input type="number" id="fiadoMonto" step="0.5" min="0" onwheel="this.blur()"></div>
@@ -680,7 +680,7 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 
 <!-- MODAL: GASTO -->
 <div class="modal-ov" id="gastoModal">
-  <div class="modal-box">
+  <div class="modal-box"><button onclick="closeModal('gastoModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
     <div class="modal-title">💸 Registrar gasto</div>
     <div class="fld"><label>Descripción *</label><input type="text" id="gastoDesc" placeholder="Ej: Compra de verduras"></div>
     <div class="fld"><label>Monto (Bs.) *</label><input type="number" id="gastoMonto" step="0.5" min="0" onwheel="this.blur()"></div>
@@ -692,8 +692,8 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 </div>
 
 <!-- MODAL: COMPRA -->
-<div class="modal-ov" id="compraModal"><button onclick="closeModal('compraModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
-  <div class="modal-box">
+<div class="modal-ov" id="compraModal">
+  <div class="modal-box"><button onclick="closeModal('compraModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
     <div class="modal-title">🛒 Registrar compra</div>
     <div class="fld"><label>Producto *</label><input type="text" id="compraNombre" placeholder="¿Qué compraste?"></div>
     <div class="fld"><label>Cantidad</label><input type="number" id="compraCant" step="0.5" min="0" onwheel="this.blur()"></div>
@@ -717,8 +717,8 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 </button>
 
 <!-- MODAL: FIAR DESDE CARRITO -->
-<div class="modal-ov" id="fiarModal"><button onclick="closeModal('fiarModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
-  <div class="modal-box">
+<div class="modal-ov" id="fiarModal">
+  <div class="modal-box"><button onclick="closeModal('fiarModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
     <div class="modal-title">📋 Registrar como fiado</div>
     <div id="fiarCartSummary" style="background:var(--vbg);border-radius:10px;padding:10px;margin-bottom:12px;font-size:.82rem"></div>
 
@@ -2520,10 +2520,7 @@ function closeModal(id) {
   const el = document.getElementById(id);
   if(el) el.classList.remove('open');
 }
-// Close modal-ov when clicking outside
-document.addEventListener('click', e => {
-  if(e.target.classList.contains('modal-ov')) e.target.classList.remove('open');
-});
+// modal-ov click-outside deshabilitado
 window.openModal = openModal;
 window.closeModal = closeModal;
 

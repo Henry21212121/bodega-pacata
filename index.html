@@ -201,7 +201,7 @@ header{background:var(--v);color:#fff;padding:0 14px;position:sticky;top:0;z-ind
 /* ── MODALES ── */
 .mover{display:none;position:fixed;inset:0;z-index:350;background:rgba(0,0,0,.55);align-items:flex-start;justify-content:center;padding:30px 12px 40px;overflow-y:auto;}
 .mover.open{display:flex;}
-.mbox{background:#fff;border-radius:18px;padding:22px 18px;width:min(400px,100%);box-shadow:0 8px 48px rgba(0,0,0,.2);margin-bottom:30px;}
+.mbox{position:relative;background:#fff;border-radius:18px;padding:22px 18px;width:min(400px,100%);box-shadow:0 8px 48px rgba(0,0,0,.2);margin-bottom:30px;}
 .mbox h3{font-size:1.05rem;font-weight:800;margin-bottom:13px;color:var(--v);}
 .mlbl{font-size:.8rem;font-weight:700;margin-bottom:3px;color:var(--gr);}
 .minp{width:100%;padding:9px 12px;border-radius:8px;border:2px solid #d0e8d8;font-size:.92rem;margin-bottom:10px;outline:none;transition:border-color .2s;}
@@ -239,7 +239,7 @@ header{background:var(--v);color:#fff;padding:0 14px;position:sticky;top:0;z-ind
 /* ── PRODUCT DETAIL MODAL ── */
 .prod-modal-ov{display:none;position:fixed;inset:0;z-index:350;background:rgba(0,0,0,.6);align-items:flex-end;justify-content:center;}
 .prod-modal-ov.open{display:flex;}
-.prod-modal-box{background:#fff;border-radius:20px 20px 0 0;width:min(480px,100vw);max-height:88vh;overflow-y:auto;padding-bottom:20px;animation:slideUp .25s ease;}
+.prod-modal-box{position:relative;background:#fff;border-radius:20px 20px 0 0;width:min(480px,100vw);max-height:88vh;overflow-y:auto;padding-bottom:20px;animation:slideUp .25s ease;}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 .prod-modal-img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:20px 20px 0 0;}
 .prod-modal-icon{width:100%;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;font-size:5rem;background:var(--vbg);border-radius:20px 20px 0 0;}
@@ -264,7 +264,7 @@ header{background:var(--v);color:#fff;padding:0 14px;position:sticky;top:0;z-ind
 /* ── CONFIRM MODAL ── */
 .confirm-ov{display:none;position:fixed;inset:0;z-index:450;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:20px;}
 .confirm-ov.open{display:flex;}
-.confirm-box{background:#fff;border-radius:16px;padding:24px 20px;width:min(320px,96vw);text-align:center;}
+.confirm-box{position:relative;background:#fff;border-radius:16px;padding:24px 20px;width:min(320px,96vw);text-align:center;}
 .confirm-box h3{font-size:1rem;font-weight:800;color:var(--tx);margin-bottom:8px;}
 .confirm-box p{font-size:.85rem;color:var(--gr);margin-bottom:18px;}
 .confirm-btns{display:flex;gap:10px;justify-content:center;}
@@ -473,8 +473,8 @@ header{background:var(--v);color:#fff;padding:0 14px;position:sticky;top:0;z-ind
 </div>
 
 <!-- MODAL SUGERENCIAS -->
-<div class="mover" id="sugModal"><button onclick="close2('sugModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
-  <div class="mbox">
+<div class="mover" id="sugModal">
+  <div class="mbox"><button onclick="close2('sugModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
     <h3>💡 Tu sugerencia</h3>
     <div class="mlbl">Tu nombre (opcional)</div>
     <input class="minp" type="text" id="sugName" placeholder="Ej: María">
@@ -486,8 +486,8 @@ header{background:var(--v);color:#fff;padding:0 14px;position:sticky;top:0;z-ind
 </div>
 
 <!-- MODAL CLIENTE (datos primer pedido) -->
-<div class="mover" id="clientModal"><button onclick="close2('clientModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
-  <div class="mbox">
+<div class="mover" id="clientModal">
+  <div class="mbox"><button onclick="close2('clientModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
     <h3>👋 Antes de tu primer pedido</h3>
     <p style="font-size:.8rem;color:var(--gr);margin-bottom:10px">Solo la primera vez, para poder entregarte tu pedido 😊</p>
     <div class="cli-steps">
@@ -3601,8 +3601,8 @@ function clearVoiceResults() {
 </div>
 
 <!-- CONFIRM PEDIDO MODAL -->
-<div class="confirm-ov" id="confirmOrderModal"><button onclick="close2('confirmOrderModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
-  <div class="confirm-box" style="width:min(360px,96vw)">
+<div class="confirm-ov" id="confirmOrderModal">
+  <div class="confirm-box"<button onclick="close2('confirmOrderModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button> style="width:min(360px,96vw)">
     <h3>¿Confirmás el pedido?</h3>
     <div class="delivery-summary" id="deliverySummary">
       <div class="items-line" id="dSumItems"></div>
@@ -3618,7 +3618,7 @@ function clearVoiceResults() {
 
 <!-- RETURNING CLIENT: CONFIRM LOCATION -->
 <div class="mover" id="confirmLocModal">
-  <div class="mbox" style="max-width:420px">
+  <div class="mbox"<button onclick="close2('confirmLocModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button> style="max-width:420px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
       <h3 style="margin:0">📍 Confirmar tu ubicación</h3>
       <button onclick="close2('confirmLocModal')" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--gr);line-height:1;padding:4px">✕</button>
@@ -3645,8 +3645,8 @@ function clearVoiceResults() {
 </div>
 
 <!-- SCHEDULED ORDER MODAL -->
-<div class="confirm-ov" id="scheduledOrderModal"><button onclick="close2('scheduledOrderModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
-  <div class="confirm-box" style="max-width:380px">
+<div class="confirm-ov" id="scheduledOrderModal">
+  <div class="confirm-box"<button onclick="close2('scheduledOrderModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button> style="max-width:380px">
     <div style="font-size:2rem;text-align:center;margin-bottom:8px">⏰</div>
     <h3 style="text-align:center;margin-bottom:6px">Pedido para mañana</h3>
     <p id="schedClosedMsg" style="font-size:.82rem;color:var(--gr);text-align:center;margin-bottom:14px"></p>
@@ -3666,8 +3666,8 @@ function clearVoiceResults() {
 <div id="orderConfirmScreen" style="display:none;position:fixed;inset:0;z-index:900;overflow-y:auto"></div>
 
 <!-- SET AS DEFAULT LOCATION MODAL -->
-<div class="confirm-ov" id="setDefaultLocModal"><button onclick="close2('setDefaultLocModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
-  <div class="confirm-box">
+<div class="confirm-ov" id="setDefaultLocModal">
+  <div class="confirm-box"<button onclick="close2('setDefaultLocModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>>
     <h3>¿Guardar como dirección principal?</h3>
     <p style="font-size:.82rem;color:var(--gr)">¿Querés que esta sea tu ubicación de entrega por defecto?</p>
     <div class="confirm-btns">
