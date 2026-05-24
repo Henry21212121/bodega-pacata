@@ -316,6 +316,9 @@ header{background:var(--v);color:#fff;padding:0 14px;position:sticky;top:0;z-ind
 .intro-video{width:100%;height:100%;object-fit:cover;}
 .intro-skip{position:absolute;bottom:24px;right:24px;background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:50px;padding:8px 18px;font-size:.8rem;font-weight:700;cursor:pointer;}
 .intro-counter{position:absolute;top:16px;right:20px;color:rgba(255,255,255,.7);font-size:.85rem;font-weight:700;}
+
+.modal-close-btn{position:absolute;top:12px;right:14px;background:rgba(0,0,0,.18);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1;flex-shrink:0;}
+.modal-close-btn:hover{background:rgba(0,0,0,.35);}
 </style>
 </head>
 <body>
@@ -474,7 +477,7 @@ header{background:var(--v);color:#fff;padding:0 14px;position:sticky;top:0;z-ind
 
 <!-- MODAL SUGERENCIAS -->
 <div class="mover" id="sugModal">
-  <div class="mbox"><button onclick="close2('sugModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
+  <div class="mbox"><button class="modal-close-btn" onclick="close2('sugModal')" title="Cerrar">✕</button>
     <h3>💡 Tu sugerencia</h3>
     <div class="mlbl">Tu nombre (opcional)</div>
     <input class="minp" type="text" id="sugName" placeholder="Ej: María">
@@ -487,7 +490,7 @@ header{background:var(--v);color:#fff;padding:0 14px;position:sticky;top:0;z-ind
 
 <!-- MODAL CLIENTE (datos primer pedido) -->
 <div class="mover" id="clientModal">
-  <div class="mbox"><button onclick="close2('clientModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
+  <div class="mbox"><button class="modal-close-btn" onclick="close2('clientModal')" title="Cerrar">✕</button>
     <h3>👋 Antes de tu primer pedido</h3>
     <p style="font-size:.8rem;color:var(--gr);margin-bottom:10px">Solo la primera vez, para poder entregarte tu pedido 😊</p>
     <div class="cli-steps">
@@ -3602,7 +3605,7 @@ function clearVoiceResults() {
 
 <!-- CONFIRM PEDIDO MODAL -->
 <div class="confirm-ov" id="confirmOrderModal">
-  <div class="confirm-box"<button onclick="close2('confirmOrderModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button> style="width:min(360px,96vw)">
+  <div class="confirm-box" style="width:min(360px,96vw)"><button class="modal-close-btn" onclick="close2('confirmOrderModal')" title="Cerrar">✕</button>
     <h3>¿Confirmás el pedido?</h3>
     <div class="delivery-summary" id="deliverySummary">
       <div class="items-line" id="dSumItems"></div>
@@ -3618,7 +3621,7 @@ function clearVoiceResults() {
 
 <!-- RETURNING CLIENT: CONFIRM LOCATION -->
 <div class="mover" id="confirmLocModal">
-  <div class="mbox"<button onclick="close2('confirmLocModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button> style="max-width:420px">
+  <div class="mbox" style="max-width:420px"><button class="modal-close-btn" onclick="close2('confirmLocModal')" title="Cerrar">✕</button>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
       <h3 style="margin:0">📍 Confirmar tu ubicación</h3>
       <button onclick="close2('confirmLocModal')" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--gr);line-height:1;padding:4px">✕</button>
@@ -3646,7 +3649,7 @@ function clearVoiceResults() {
 
 <!-- SCHEDULED ORDER MODAL -->
 <div class="confirm-ov" id="scheduledOrderModal">
-  <div class="confirm-box"<button onclick="close2('scheduledOrderModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button> style="max-width:380px">
+  <div class="confirm-box" style="max-width:380px"><button class="modal-close-btn" onclick="close2('scheduledOrderModal')" title="Cerrar">✕</button>
     <div style="font-size:2rem;text-align:center;margin-bottom:8px">⏰</div>
     <h3 style="text-align:center;margin-bottom:6px">Pedido para mañana</h3>
     <p id="schedClosedMsg" style="font-size:.82rem;color:var(--gr);text-align:center;margin-bottom:14px"></p>
@@ -3667,7 +3670,7 @@ function clearVoiceResults() {
 
 <!-- SET AS DEFAULT LOCATION MODAL -->
 <div class="confirm-ov" id="setDefaultLocModal">
-  <div class="confirm-box"<button onclick="close2('setDefaultLocModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>>
+  <div class="confirm-box"><button class="modal-close-btn" onclick="close2('setDefaultLocModal')" title="Cerrar">✕</button>
     <h3>¿Guardar como dirección principal?</h3>
     <p style="font-size:.82rem;color:var(--gr)">¿Querés que esta sea tu ubicación de entrega por defecto?</p>
     <div class="confirm-btns">
