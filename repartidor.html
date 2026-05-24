@@ -138,6 +138,9 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 .refresh-fab{position:fixed;bottom:20px;right:16px;background:var(--v);color:#fff;border:none;border-radius:50%;width:48px;height:48px;font-size:1.2rem;box-shadow:0 4px 16px rgba(45,122,69,.4);cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:200;}
 
 @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+
+.modal-close-btn{position:absolute;top:12px;right:14px;background:rgba(0,0,0,.18);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1;flex-shrink:0;}
+.modal-close-btn:hover{background:rgba(0,0,0,.35);}
 </style>
 </head>
 <body>
@@ -240,7 +243,7 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 
 <!-- MODAL: AJUSTAR UBICACIÓN -->
 <div class="modal-ov" id="adjustModal">
-  <div class="modal-box"><button onclick="closeModal('adjustModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
+  <div class="modal-box"><button class="modal-close-btn" onclick="closeModal('adjustModal')" title="Cerrar">✕</button>
     <div class="modal-title">📍 Ajustar ubicación exacta</div>
     <p style="font-size:.78rem;color:var(--gr);margin-bottom:10px">Mové el pin a la puerta exacta del cliente.</p>
     <div id="adjustMap" class="map-container"></div>
@@ -257,7 +260,7 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 
 <!-- MODAL: FOTO DE PUERTA -->
 <div class="modal-ov" id="photoModal">
-  <div class="modal-box"><button onclick="closeModal('photoModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
+  <div class="modal-box"><button class="modal-close-btn" onclick="closeModal('photoModal')" title="Cerrar">✕</button>
     <div class="modal-title">📸 Foto de la puerta</div>
     <p style="font-size:.78rem;color:var(--gr);margin-bottom:10px">Sacá una foto clara de la puerta o fachada para futuras entregas.</p>
     <div id="photoPreview" style="width:100%;height:180px;background:var(--vbg);border-radius:10px;margin-bottom:10px;display:flex;align-items:center;justify-content:center;font-size:2rem;overflow:hidden">📷</div>
@@ -272,7 +275,7 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 
 <!-- MODAL: CONFIRMAR ENTREGA -->
 <div class="modal-ov" id="deliverModal">
-  <div class="modal-box"><button onclick="closeModal('deliverModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
+  <div class="modal-box"><button class="modal-close-btn" onclick="closeModal('deliverModal')" title="Cerrar">✕</button>
     <div style="text-align:center;font-size:2.5rem;margin-bottom:8px">✅</div>
     <div class="modal-title" style="text-align:center">Confirmar entrega</div>
     <div id="deliverSummary" style="background:var(--vbg);border-radius:10px;padding:12px;margin-bottom:12px;font-size:.82rem"></div>
@@ -974,7 +977,7 @@ function updateHeader() {
 
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-// modal-ov click-outside deshabilitado
+}));
 
 let toastTimer;
 function showToast(msg, error=false) {
