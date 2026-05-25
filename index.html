@@ -1047,16 +1047,23 @@ async function loadAll() {
     const catSnap = await fs.getDocs(fs.collection(db,"categories"));
     catSnap.forEach(d => { DB.categories[d.id] = d.data(); });
 
-    // Load products (real-time) — usa docChanges para manejar borrados y cambios de categoría
+    // Load products (real-time) — usa docChanges para manejar borrados y cambios de categoria
+    let _firstSnapshot = true;
     fs.onSnapshot(fs.collection(db,"products"), snap => {
+      if(_firstSnapshot) {
+        // En el primer snapshot, comparar Firestore con DB local.
+        // Eliminar del DB local cualquier producto seed que ya no exista en Firestore.
+        const firestoreIds = new Set(snap.docs.map(d => d.id));
+        Object.keys(DB.products).forEach(id => {
+          if(!firestoreIds.has(id)) delete DB.products[id];
+        });
+        _firstSnapshot = false;
+      }
       snap.docChanges().forEach(change => {
         if(change.type === "removed") {
-          // Producto eliminado — sacarlo del DB local
           delete DB.products[change.doc.id];
         } else {
-          // added o modified
           const data = change.doc.data();
-          // Convert promos from Firestore objects back to arrays
           if(data.promos && data.promos.length > 0 && typeof data.promos[0] === 'object' && 'q' in data.promos[0]) {
             data.promos = data.promos.map(t => [t.q, t.p]);
           }
