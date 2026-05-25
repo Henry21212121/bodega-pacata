@@ -1806,6 +1806,10 @@ async function saveProd() {
   if(!editProdId) data.createdAt = fs.serverTimestamp();
 
   try {
+    // Si el código cambió, borrar el documento viejo ANTES de guardar el nuevo
+    if(editProdId && editProdId !== id) {
+      await fs.deleteDoc(fs.doc(db,"products", editProdId));
+    }
     await fs.setDoc(fs.doc(db,"products",id), data, {merge:true});
     close2("prodEditor");
     showToast("✅ Producto guardado");
