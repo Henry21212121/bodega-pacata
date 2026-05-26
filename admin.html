@@ -429,7 +429,8 @@ input[type=file]{display:none;}
           <div class="fld">
             <label id="offerProdsLabel">Productos en oferta</label>
             <div id="offerProds"></div>
-            <button class="btn btn-or btn-sm" style="margin-top:6px" onclick="addOfferProd()">+ Agregar producto</button>
+            <div id="offerTotalsRow"></div>
+            <button class="btn btn-or btn-sm" style="margin-top:8px" onclick="addOfferProd()">+ Agregar producto</button>
           </div>
           <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
             <button class="btn btn-v" onclick="saveOffer()">💾 Guardar oferta</button>
@@ -583,9 +584,18 @@ input[type=file]{display:none;}
   </div><!-- adm-main -->
 </div><!-- adm-wrap -->
 
+<!-- MODAL DETALLE OFERTA -->
+<div class="mover" id="offerDetailModal">
+  <div class="mbox" style="width:min(620px,96vw);max-height:85vh;overflow-y:auto;position:relative">
+    <button class="modal-close-btn" onclick="close2('offerDetailModal')" title="Cerrar">✕</button>
+    <h3 id="offerDetailTitle" style="margin-bottom:12px;padding-right:36px">Detalle de oferta</h3>
+    <div id="offerDetailBody"></div>
+  </div>
+</div>
+
 <!-- MODAL EDITOR PRODUCTO -->
 <div class="mover" id="prodEditor">
-  <div class="mbox" style="width:min(520px,96vw)"><button class="modal-close-btn" onclick="close2('prodEditor')" title="Cerrar">✕</button>
+  <div class="mbox" style="width:min(520px,96vw)"><button onclick="close2('prodEditor')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
     <h3 id="pedTitle">Producto</h3>
     <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
       <div class="img-preview" id="pedImgPrev" onclick="document.getElementById('pedImgFile').click()">📷</div>
@@ -695,7 +705,7 @@ input[type=file]{display:none;}
 
 <!-- MODAL DETALLE PEDIDO -->
 <div class="mover" id="orderDetail">
-  <div class="mbox"><button class="modal-close-btn" onclick="close2('orderDetail')" title="Cerrar">✕</button>
+  <div class="mbox"><button onclick="close2('orderDetail')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
     <h3>📦 Pedido <span id="odCode"></span></h3>
     <div id="odContent"></div>
     <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:14px" id="odActions"></div>
@@ -705,7 +715,7 @@ input[type=file]{display:none;}
 
 <!-- MODAL DETALLE CLIENTE -->
 <div class="mover" id="clientDetail">
-  <div class="mbox"><button class="modal-close-btn" onclick="close2('clientDetail')" title="Cerrar">✕</button>
+  <div class="mbox"><button onclick="close2('clientDetail')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
     <h3>👤 <span id="cdName"></span></h3>
     <div id="cdContent"></div>
     <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:14px">
@@ -717,7 +727,7 @@ input[type=file]{display:none;}
 
 <!-- MODAL NUEVA CATEGORÍA -->
 <div class="mover" id="newCatModal">
-  <div class="mbox" style="max-width:320px"><button class="modal-close-btn" onclick="close2('newCatModal')" title="Cerrar">✕</button>
+  <div class="mbox" style="max-width:320px"><button onclick="close2('newCatModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
     <h3>🗂️ Nueva categoría</h3>
     <div class="fld"><label>Nombre *</label><input type="text" id="newCatName"></div>
     <div class="fld"><label>Emoji</label><input type="text" id="newCatEmoji" maxlength="4" placeholder="📦"></div>
@@ -730,7 +740,7 @@ input[type=file]{display:none;}
 
 <!-- CONFIRM DELETE -->
 <div class="mover" id="confirmDel">
-  <div class="mbox" style="max-width:320px"><button class="modal-close-btn" onclick="close2('confirmDel')" title="Cerrar">✕</button>
+  <div class="mbox" style="max-width:320px"><button onclick="close2('confirmDel')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
     <h3>🗑️ Eliminar producto</h3>
     <p id="delMsg" style="font-size:.88rem;margin-bottom:14px;color:var(--gr)"></p>
     <div style="display:flex;gap:8px">
@@ -1806,10 +1816,6 @@ async function saveProd() {
   if(!editProdId) data.createdAt = fs.serverTimestamp();
 
   try {
-    // Si el código cambió, borrar el documento viejo ANTES de guardar el nuevo
-    if(editProdId && editProdId !== id) {
-      await fs.deleteDoc(fs.doc(db,"products", editProdId));
-    }
     await fs.setDoc(fs.doc(db,"products",id), data, {merge:true});
     close2("prodEditor");
     showToast("✅ Producto guardado");
@@ -2278,17 +2284,36 @@ async function saveOffer() {
   if(!from||!to) { showToast("⚠️ Completá las fechas", true); return; }
 
   const prods = [];
-  document.querySelectorAll("#offerProds > div").forEach(div => {
-    const sel = div.querySelector("select");
-    const inp = div.querySelector("input");
-    const qtyInp = div.querySelector(".qty-inp");
-    if(sel&&inp&&sel.value&&inp.value) {
-      const entry = {id:sel.value, precio:parseFloat(inp.value)||0};
-      if(qtyInp) entry.qty = parseInt(qtyInp.value)||1;
-      if(type==="combo") entry.comboPrice = parseFloat(inp.value)||0;
-      prods.push(entry);
-    }
+  document.querySelectorAll("#offerProds .offer-prod-row").forEach(row => {
+    const sel   = row.querySelector(".op-sel");
+    const opt   = sel?.selectedOptions[0];
+    const qty   = parseInt(row.querySelector(".qty-inp")?.value)||1;
+    const combo = parseFloat(row.querySelector(".combo-inp")?.value)||0;
+    if(!sel?.value) return;
+    prods.push({
+      id:        sel.value,
+      nombre:    opt?.text?.split(" (Bs.")[0] || sel.value,
+      precio:    parseFloat(opt?.dataset.precio)||0,
+      costoUnit: parseFloat(opt?.dataset.costo)||0,
+      qty,
+      comboPrice: combo,
+    });
   });
+
+  // Fallback para tipo single/qty (fila vieja)
+  if(!prods.length) {
+    document.querySelectorAll("#offerProds > div:not(.offer-prod-row)").forEach(div => {
+      const sel = div.querySelector("select");
+      const inp = div.querySelector("input");
+      const qtyInp = div.querySelector(".qty-inp");
+      if(sel&&inp&&sel.value&&inp.value) {
+        const entry = {id:sel.value, precio:parseFloat(inp.value)||0};
+        if(qtyInp) entry.qty = parseInt(qtyInp.value)||1;
+        if(type==="combo") entry.comboPrice = parseFloat(inp.value)||0;
+        prods.push(entry);
+      }
+    });
+  }
 
   const offerData = {
     title: document.getElementById("offerTitle").value || "Oferta de la semana",
@@ -2298,19 +2323,23 @@ async function saveOffer() {
     products: prods,
     img: offerImgTemp || "",
     active: true,
-    createdAt: fs.serverTimestamp()
+    createdAt: fs.serverTimestamp(),
+    soldCount: 0,
   };
 
   if(type==="combo") {
-    offerData.comboName = document.getElementById("offerComboName")?.value || "Pack especial";
+    offerData.comboName  = document.getElementById("offerComboName")?.value || "Pack especial";
     offerData.comboPrice = parseFloat(document.getElementById("offerComboPrice")?.value)||0;
   }
 
   await fs.addDoc(fs.collection(db,"offers"), offerData);
   offerImgTemp = "";
   document.getElementById("offerImgPreview").innerHTML = "🎉";
+  document.getElementById("offerProds").innerHTML = "";
+  document.getElementById("offerTotalsRow").innerHTML = "";
   showToast("✅ Oferta guardada y activa");
   loadOffersList();
+  loadOfferHistory();
 }
 
 async function deactivateAllOffers() {
@@ -2344,28 +2373,110 @@ async function deactivateOffer(id) {
   loadOffersList();
 }
 
-// ── IMPROVED ADD OFFER PROD ────────────────────────────
+// ── ADD OFFER PROD con columnas de rentabilidad ─────────
 function addOfferProd() {
   const type = document.getElementById("offerType")?.value || "single";
   const prods = Object.values(DB.products).sort((a,b)=>a.nombre.localeCompare(b.nombre));
-  const sel = `<select style="flex:2;min-width:120px;padding:6px;border:1.5px solid #fde19a;border-radius:6px;font-size:.75rem">` +
-    prods.map(p=>`<option value="${p.id}">${p.nombre} (Bs.${p.precio})</option>`).join("") + `</select>`;
+  const selHtml = `<select class="op-sel" onchange="recalcOfferRow(this)" style="width:100%;padding:6px 8px;border:1.5px solid #fde19a;border-radius:6px;font-size:.78rem;margin-bottom:4px">` +
+    prods.map(p=>`<option value="${p.id}" data-precio="${p.precio}" data-costo="${p.costoUnit||0}">${p.nombre} (Bs.${p.precio})</option>`).join("") + `</select>`;
+
   const div = document.createElement("div");
-  div.style = "display:flex;gap:5px;align-items:center;margin-bottom:6px;flex-wrap:wrap";
-  // Always show qty input
-  const qtyLabel = type==="combo" ? "Cant." : type==="qty" ? "Cant." : "Cant.";
-  const priceLabel = type==="combo" ? "P.combo" : "P.oferta";
-  div.innerHTML = `${sel}
-    <div style="display:flex;flex-direction:column;align-items:center;gap:1px">
-      <label style="font-size:.6rem;color:var(--gr)">${qtyLabel}</label>
-      <input type="number" class="qty-inp" value="1" min="1" style="width:50px;padding:4px 6px;border:1.5px solid #fde19a;border-radius:6px;font-size:.78rem;text-align:center">
+  div.className = "offer-prod-row";
+  div.style.cssText = "background:#fff8ec;border:1px solid #fde19a;border-radius:8px;padding:8px;margin-bottom:8px";
+  div.innerHTML = `
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+      <div style="flex:1">${selHtml}</div>
+      <button class="btn btn-ro btn-sm" style="flex-shrink:0" onclick="this.closest('.offer-prod-row').remove();recalcOfferTotals()">✕</button>
     </div>
-    <div style="display:flex;flex-direction:column;align-items:center;gap:1px">
-      <label style="font-size:.6rem;color:var(--gr)">${priceLabel} (Bs.)</label>
-      <input type="number" step="0.5" style="width:75px;padding:4px 6px;border:1.5px solid #fde19a;border-radius:6px;font-size:.78rem">
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;font-size:.72rem">
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <label style="color:var(--gr);font-weight:700">Cant.</label>
+        <input type="number" class="qty-inp" value="1" min="1"
+          oninput="recalcOfferRow(this)"
+          style="padding:4px 6px;border:1.5px solid #fde19a;border-radius:6px;text-align:center">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <label style="color:var(--gr);font-weight:700">P. unitario</label>
+        <input type="number" class="costo-inp" step="0.01" readonly tabindex="-1"
+          style="padding:4px 6px;border:1.5px solid #d0e8d8;border-radius:6px;background:#f5f5f5;text-align:right">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <label style="color:var(--gr);font-weight:700">P. venta</label>
+        <input type="number" class="pventa-inp" step="0.01" readonly tabindex="-1"
+          style="padding:4px 6px;border:1.5px solid #d0e8d8;border-radius:6px;background:#f5f5f5;text-align:right">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <label style="color:#e07b00;font-weight:700">P. combo</label>
+        <input type="number" class="combo-inp" step="0.5" placeholder="0.00"
+          oninput="recalcOfferRow(this)"
+          style="padding:4px 6px;border:1.5px solid #fde19a;border-radius:6px;text-align:right">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <label style="color:var(--gr);font-weight:700">Util. normal</label>
+        <input type="number" class="util-normal-inp" readonly tabindex="-1"
+          style="padding:4px 6px;border:1.5px solid #d0e8d8;border-radius:6px;background:#f0fff4;text-align:right">
+      </div>
     </div>
-    <button class="btn btn-ro btn-sm" onclick="this.parentElement.remove()">✕</button>`;
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:.72rem;margin-top:4px">
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <label style="color:#1565c0;font-weight:700">Util. con combo</label>
+        <input type="number" class="util-combo-inp" readonly tabindex="-1"
+          style="padding:4px 6px;border:1.5px solid #bbdefb;border-radius:6px;background:#e3f2fd;text-align:right">
+      </div>
+      <div></div>
+    </div>`;
+
   document.getElementById("offerProds").appendChild(div);
+  recalcOfferRow(div.querySelector(".op-sel"));
+}
+
+function recalcOfferRow(el) {
+  const row = el.closest(".offer-prod-row");
+  if(!row) return;
+  const sel    = row.querySelector(".op-sel");
+  const opt    = sel.selectedOptions[0];
+  const pventa = parseFloat(opt?.dataset.precio) || 0;
+  const pcosto = parseFloat(opt?.dataset.costo)  || 0;
+  const qty    = parseInt(row.querySelector(".qty-inp").value)    || 1;
+  const pcombo = parseFloat(row.querySelector(".combo-inp").value) || 0;
+
+  row.querySelector(".costo-inp").value      = (pcosto * qty).toFixed(2);
+  row.querySelector(".pventa-inp").value     = (pventa * qty).toFixed(2);
+  const uNormal = (pventa - pcosto) * qty;
+  const uCombo  = pcombo > 0 ? pcombo - (pcosto * qty) : 0;
+  row.querySelector(".util-normal-inp").value = uNormal.toFixed(2);
+  row.querySelector(".util-combo-inp").value  = uCombo.toFixed(2);
+
+  // Color util combo
+  const ucInp = row.querySelector(".util-combo-inp");
+  ucInp.style.background = uCombo < 0 ? "#ffebee" : uCombo === 0 ? "#f5f5f5" : "#e3f2fd";
+  ucInp.style.color = uCombo < 0 ? "#c62828" : "#1565c0";
+
+  recalcOfferTotals();
+}
+
+function recalcOfferTotals() {
+  const rows = document.querySelectorAll(".offer-prod-row");
+  let tCosto=0, tVenta=0, tCombo=0, tUN=0, tUC=0;
+  rows.forEach(row => {
+    tCosto += parseFloat(row.querySelector(".costo-inp").value)      || 0;
+    tVenta += parseFloat(row.querySelector(".pventa-inp").value)     || 0;
+    tCombo += parseFloat(row.querySelector(".combo-inp").value)      || 0;
+    tUN    += parseFloat(row.querySelector(".util-normal-inp").value)|| 0;
+    tUC    += parseFloat(row.querySelector(".util-combo-inp").value) || 0;
+  });
+  const el = document.getElementById("offerTotalsRow");
+  if(!el) return;
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(5,1fr) 2fr;gap:4px;font-size:.75rem;font-weight:900;
+      background:#fff3e0;border:1.5px solid #fde19a;border-radius:8px;padding:8px;margin-top:4px">
+      <div style="color:var(--gr)">TOTALES</div>
+      <div style="text-align:right;color:#555">Bs.${tCosto.toFixed(2)}</div>
+      <div style="text-align:right;color:#555">Bs.${tVenta.toFixed(2)}</div>
+      <div style="text-align:right;color:#e07b00">Bs.${tCombo.toFixed(2)}</div>
+      <div style="text-align:right;color:${tUN>=0?'#2d7a45':'#c62828'}">Bs.${tUN.toFixed(2)}</div>
+      <div style="text-align:right;color:${tUC>=0?'#1565c0':'#c62828'}">Bs.${tUC.toFixed(2)}</div>
+    </div>`;
 }
 
 // ── VISITS ─────────────────────────────────────────────
@@ -3047,37 +3158,233 @@ async function loadOfferHistory() {
     const snap = await fs.getDocs(fs.query(
       fs.collection(db,"offers"),
       fs.orderBy("createdAt","desc"),
-      fs.limit(50)
+      fs.limit(100)
     ));
     const offers = [];
     snap.forEach(d => offers.push({...d.data(), id:d.id}));
-    
+
     const el = document.getElementById("offerHistory");
     if(!offers.length) { el.innerHTML='<p style="color:var(--gr)">Sin ofertas registradas</p>'; return; }
-    
-    el.innerHTML = `<table class="tbl"><thead>
-      <tr><th>Nombre</th><th>Tipo</th><th>Productos</th><th>Precio</th><th>Período</th><th>Estado</th><th>Media</th></tr>
-    </thead><tbody>` +
-    offers.map(o => {
-      const prods = (o.products||[]).map(p => {
-        const prod = DB.products[p.id];
-        return `${p.qty||1}× ${prod?.nombre||p.id}`;
-      }).join(", ");
-      const precio = o.type==="combo" ? `Bs.${(o.comboPrice||0).toFixed(2)}` :
-        `Bs.${(o.products||[]).reduce((s,p)=>s+p.precio*(p.qty||1),0).toFixed(2)}`;
-      const estado = o.active ? '<span class="chip chip-ok">Activa</span>' : '<span class="chip chip-canc">Finalizada</span>';
-      const mediaBtn = o.img ? `<a href="${o.img}" download class="btn btn-sec btn-sm" target="_blank">⬇️</a>` : "—";
-      return `<tr>
-        <td>${o.title||"—"}</td>
-        <td>${o.type||"—"}</td>
-        <td style="font-size:.72rem">${prods}</td>
-        <td>${precio}</td>
-        <td style="font-size:.72rem">${(o.from||"").split("T")[0]} → ${(o.to||"").split("T")[0]}</td>
-        <td>${estado}</td>
-        <td>${mediaBtn}</td>
-      </tr>`;
-    }).join("") + `</tbody></table>`;
-  } catch(e) { document.getElementById("offerHistory").innerHTML = '<p style="color:var(--ro)">Error cargando historial</p>'; }
+
+    el.innerHTML = offers.map(o => {
+      const now    = new Date();
+      const dFrom  = o.from ? new Date(o.from) : null;
+      const dTo    = o.to   ? new Date(o.to)   : null;
+      const active = o.active;
+      const ended  = dTo && dTo < now;
+      const cut    = !active && !ended; // se cortó manualmente
+      const durDays= (dFrom && dTo) ? Math.round((dTo-dFrom)/(1000*60*60*24)) : "—";
+      const sold   = o.soldCount || 0;
+
+      let statusBadge, statusColor;
+      if(active) { statusBadge="🟢 Activa"; statusColor="#e8f5e9"; }
+      else if(ended) { statusBadge="✅ Finalizada"; statusColor="#f5f5f5"; }
+      else { statusBadge="⛔ Cortada"; statusColor="#fff3e0"; }
+
+      const priceStr = o.type==="combo"
+        ? `Bs.${(o.comboPrice||0).toFixed(2)}`
+        : `Bs.${(o.products||[]).reduce((s,p)=>s+(p.comboPrice||p.precio||0)*(p.qty||1),0).toFixed(2)}`;
+
+      return `
+      <div style="background:${statusColor};border:1.5px solid #e0e0e0;border-radius:10px;padding:12px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          ${o.img?`<img src="${o.img}" style="width:52px;height:44px;object-fit:cover;border-radius:6px;flex-shrink:0">`:'<span style="font-size:1.8rem;flex-shrink:0">🎉</span>'}
+          <div style="flex:1;min-width:160px">
+            <div style="font-weight:900;font-size:.9rem">${o.title||"—"}</div>
+            <div style="font-size:.75rem;color:var(--gr);margin-top:2px">
+              ${(o.from||"").split("T")[0]} → ${(o.to||"").split("T")[0]}
+              &nbsp;·&nbsp; ${durDays} días
+              &nbsp;·&nbsp; ${o.type||"—"}
+              &nbsp;·&nbsp; ${priceStr}
+            </div>
+            <div style="font-size:.75rem;margin-top:3px">
+              <span style="background:${active?'#c8e6c9':ended?'#e0e0e0':'#ffe0b2'};padding:2px 8px;border-radius:12px;font-weight:700">${statusBadge}</span>
+              &nbsp;
+              <span style="color:#1565c0;font-weight:700">🛒 ${sold} vendidos</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <button class="btn btn-sec btn-sm" onclick="showOfferDetail('${o.id}')">📋 Detalles</button>
+            ${active ? `<button class="btn btn-or btn-sm" onclick="editOffer('${o.id}')">✏️ Editar</button>
+                        <button class="btn btn-ro btn-sm" onclick="deactivateOffer('${o.id}')">⛔ Cortar</button>` : ""}
+          </div>
+        </div>
+      </div>`;
+    }).join("");
+
+  } catch(e) {
+    document.getElementById("offerHistory").innerHTML = '<p style="color:var(--ro)">Error cargando historial</p>';
+    console.error(e);
+  }
+}
+
+// ── MODAL DETALLE DE OFERTA ─────────────────────────────
+async function showOfferDetail(id) {
+  const snap = await fs.getDoc(fs.doc(db,"offers",id));
+  if(!snap.exists()) return;
+  const o = {...snap.data(), id};
+  const now = new Date();
+  const dFrom = o.from ? new Date(o.from) : null;
+  const dTo   = o.to   ? new Date(o.to)   : null;
+  const ended = dTo && dTo < now;
+  const durDays = (dFrom&&dTo) ? Math.round((dTo-dFrom)/(1000*60*60*24)) : "—";
+  const sold = o.soldCount||0;
+  let estado = o.active ? "🟢 Activa" : ended ? "✅ Finalizada" : "⛔ Cortada manualmente";
+
+  // Tabla de productos
+  let tCosto=0, tVenta=0, tCombo=0, tUN=0, tUC=0;
+  const prodsRows = (o.products||[]).map(p => {
+    const prod = DB.products[p.id];
+    const nombre   = p.nombre || prod?.nombre || p.id;
+    const pcosto   = p.costoUnit || prod?.costoUnit || 0;
+    const pventa   = p.precio   || prod?.precio    || 0;
+    const pcombo   = p.comboPrice || 0;
+    const qty      = p.qty || 1;
+    const uNormal  = (pventa - pcosto)*qty;
+    const uCombo   = pcombo>0 ? pcombo - pcosto*qty : 0;
+    tCosto += pcosto*qty; tVenta += pventa*qty; tCombo += pcombo;
+    tUN    += uNormal;    tUC    += uCombo;
+    return `<tr>
+      <td>${qty}× ${nombre}</td>
+      <td style="text-align:right">Bs.${(pcosto*qty).toFixed(2)}</td>
+      <td style="text-align:right">Bs.${(pventa*qty).toFixed(2)}</td>
+      <td style="text-align:right;color:#e07b00;font-weight:800">Bs.${pcombo.toFixed(2)}</td>
+      <td style="text-align:right;color:${uNormal>=0?'#2d7a45':'#c62828'}">Bs.${uNormal.toFixed(2)}</td>
+      <td style="text-align:right;color:${uCombo>=0?'#1565c0':'#c62828'}">Bs.${uCombo.toFixed(2)}</td>
+    </tr>`;
+  }).join("");
+
+  const html = `
+    <div style="font-size:.82rem;display:flex;flex-direction:column;gap:10px">
+      ${o.img?`<img src="${o.img}" style="height:80px;object-fit:contain;border-radius:8px;border:1px solid #eee">`:``}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <div><span style="color:var(--gr)">Título:</span> <b>${o.title||"—"}</b></div>
+        <div><span style="color:var(--gr)">Tipo:</span> ${o.type||"—"}</div>
+        <div><span style="color:var(--gr)">Período:</span> ${(o.from||"").split("T")[0]} → ${(o.to||"").split("T")[0]}</div>
+        <div><span style="color:var(--gr)">Duración:</span> ${durDays} días</div>
+        <div><span style="color:var(--gr)">Estado:</span> ${estado}</div>
+        <div><span style="color:var(--gr)">Vendidos:</span> <b style="color:#1565c0">🛒 ${sold} combos</b></div>
+        ${o.comboName?`<div><span style="color:var(--gr)">Nombre combo:</span> ${o.comboName}</div>`:""}
+        ${o.comboPrice?`<div><span style="color:var(--gr)">Precio combo:</span> <b>Bs.${(o.comboPrice).toFixed(2)}</b></div>`:""}
+      </div>
+      <div style="overflow-x:auto">
+        <table class="tbl" style="font-size:.75rem;width:100%">
+          <thead><tr>
+            <th>Producto</th><th>P. unitario</th><th>P. venta</th>
+            <th style="color:#e07b00">P. combo</th>
+            <th style="color:#2d7a45">Util. normal</th>
+            <th style="color:#1565c0">Util. combo</th>
+          </tr></thead>
+          <tbody>${prodsRows}</tbody>
+          <tfoot><tr style="font-weight:900;background:#fff3e0">
+            <td>TOTALES</td>
+            <td style="text-align:right">Bs.${tCosto.toFixed(2)}</td>
+            <td style="text-align:right">Bs.${tVenta.toFixed(2)}</td>
+            <td style="text-align:right;color:#e07b00">Bs.${tCombo.toFixed(2)}</td>
+            <td style="text-align:right;color:${tUN>=0?'#2d7a45':'#c62828'}">Bs.${tUN.toFixed(2)}</td>
+            <td style="text-align:right;color:${tUC>=0?'#1565c0':'#c62828'}">Bs.${tUC.toFixed(2)}</td>
+          </tr></tfoot>
+        </table>
+      </div>
+    </div>`;
+
+  // Mostrar en modal reutilizable
+  document.getElementById("offerDetailBody").innerHTML = html;
+  document.getElementById("offerDetailTitle").textContent = o.title || "Detalle de oferta";
+  open2("offerDetailModal");
+}
+
+// ── EDITAR OFERTA ACTIVA ─────────────────────────────────
+async function editOffer(id) {
+  const snap = await fs.getDoc(fs.doc(db,"offers",id));
+  if(!snap.exists()) return;
+  const o = {...snap.data(), id};
+
+  // Llenar formulario
+  document.getElementById("offerTitle").value     = o.title||"";
+  document.getElementById("offerFrom").value      = (o.from||"").split("T")[0];
+  document.getElementById("offerTo").value        = (o.to||"").split("T")[0];
+  if(o.comboName)  document.getElementById("offerComboName").value  = o.comboName;
+  if(o.comboPrice) document.getElementById("offerComboPrice").value = o.comboPrice;
+  if(o.img) {
+    offerImgTemp = o.img;
+    document.getElementById("offerImgPreview").innerHTML = `<img src="${o.img}" style="width:100%;height:100%;object-fit:cover">`;
+  }
+  const selType = document.getElementById("offerType");
+  if(selType && o.type) { selType.value = o.type; updateOfferTypeUI(o.type); }
+
+  // Cargar productos
+  document.getElementById("offerProds").innerHTML = "";
+  document.getElementById("offerTotalsRow").innerHTML = "";
+  for(const p of (o.products||[])) {
+    addOfferProd();
+    const rows = document.querySelectorAll(".offer-prod-row");
+    const row = rows[rows.length-1];
+    const sel = row.querySelector(".op-sel");
+    if(sel) {
+      sel.value = p.id;
+      row.querySelector(".qty-inp").value  = p.qty||1;
+      row.querySelector(".combo-inp").value = p.comboPrice||0;
+      recalcOfferRow(sel);
+    }
+  }
+
+  // Cambiar botón guardar a "actualizar"
+  window._editingOfferId = id;
+  const btn = document.querySelector('[onclick="saveOffer()"]');
+  if(btn) { btn.textContent = "💾 Actualizar oferta"; btn.setAttribute("onclick","updateOffer()"); }
+
+  showTab("ofertas", document.querySelector('[onclick*="ofertas"]'));
+  showToast("✏️ Editando oferta — modificá y guardá");
+}
+
+async function updateOffer() {
+  const id = window._editingOfferId;
+  if(!id) { saveOffer(); return; }
+
+  const from  = document.getElementById("offerFrom").value;
+  const to    = document.getElementById("offerTo").value;
+  const type  = document.getElementById("offerType")?.value||"single";
+  if(!from||!to) { showToast("⚠️ Completá las fechas",true); return; }
+
+  const prods = [];
+  document.querySelectorAll(".offer-prod-row").forEach(row => {
+    const sel  = row.querySelector(".op-sel");
+    const opt  = sel?.selectedOptions[0];
+    if(!sel?.value) return;
+    prods.push({
+      id:        sel.value,
+      nombre:    opt?.text?.split(" (Bs.")[0]||sel.value,
+      precio:    parseFloat(opt?.dataset.precio)||0,
+      costoUnit: parseFloat(opt?.dataset.costo)||0,
+      qty:       parseInt(row.querySelector(".qty-inp")?.value)||1,
+      comboPrice:parseFloat(row.querySelector(".combo-inp")?.value)||0,
+    });
+  });
+
+  const data = {
+    title: document.getElementById("offerTitle").value||"Oferta",
+    type, from:new Date(from).toISOString(),
+    to:new Date(to+"T23:59:59").toISOString(),
+    products:prods, img:offerImgTemp||"",
+  };
+  if(type==="combo") {
+    data.comboName  = document.getElementById("offerComboName")?.value||"Pack especial";
+    data.comboPrice = parseFloat(document.getElementById("offerComboPrice")?.value)||0;
+  }
+
+  await fs.updateDoc(fs.doc(db,"offers",id), data);
+  window._editingOfferId = null;
+  // Restaurar botón
+  const btn = document.querySelector('[onclick="updateOffer()"]');
+  if(btn) { btn.textContent="💾 Guardar oferta"; btn.setAttribute("onclick","saveOffer()"); }
+  document.getElementById("offerProds").innerHTML="";
+  document.getElementById("offerTotalsRow").innerHTML="";
+  offerImgTemp="";
+  document.getElementById("offerImgPreview").innerHTML="🎉";
+  showToast("✅ Oferta actualizada");
+  loadOffersList(); loadOfferHistory();
+}
 }
 
 // ══════════════════════════════════════════════════════════
@@ -3625,7 +3932,7 @@ async function trackApiUsage(type, count=1) {
 
 <!-- MODAL: ASIGNAR REPARTIDOR -->
 <div class="confirm-ov" id="assignRepModal">
-  <div class="confirm-box" style="max-width:380px"><button class="modal-close-btn" onclick="close2('assignRepModal')" title="Cerrar">✕</button>
+  <div class="confirm-box" style="max-width:380px"><button onclick="close2('assignRepModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
     <h3>🚲 Asignar repartidor</h3>
     <p style="font-size:.78rem;color:var(--gr);margin-bottom:10px" id="assignOrderInfo"></p>
     <div class="fld" style="margin-bottom:10px">
@@ -3645,7 +3952,7 @@ async function trackApiUsage(type, count=1) {
 
 <!-- MODAL: CALIFICACION -->
 <div class="confirm-ov" id="calModal">
-  <div class="confirm-box" style="max-width:360px"><button class="modal-close-btn" onclick="close2('calModal')" title="Cerrar">✕</button>
+  <div class="confirm-box" style="max-width:360px"><button onclick="close2('calModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;line-height:1" title="Cerrar">✕</button>
     <h3>⭐ Enviar calificación</h3>
     <p style="font-size:.78rem;color:var(--gr);margin-bottom:10px" id="calOrderInfo"></p>
     <div style="background:var(--vbg);border-radius:10px;padding:12px;margin-bottom:12px;font-size:.78rem;line-height:1.7;color:var(--tx)">
