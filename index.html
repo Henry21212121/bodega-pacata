@@ -107,11 +107,16 @@ header{background:var(--v);color:#fff;padding:0 14px;position:sticky;top:0;z-ind
 .hero p{font-size:.88rem;opacity:.85;}
 
 /* ── SEARCH FLOATING ── */
-.srch-fab{position:fixed;bottom:82px;right:16px;z-index:150;width:48px;height:48px;border-radius:50%;background:var(--v);color:#fff;border:none;font-size:1.25rem;box-shadow:0 4px 16px rgba(0,0,0,.22);display:flex;align-items:center;justify-content:center;transition:all .2s;cursor:pointer;}
-.srch-fab:hover{background:var(--vl);}
-.mic-fab{position:fixed;bottom:140px;right:16px;z-index:150;width:48px;height:48px;border-radius:50%;background:var(--v);color:#fff;border:none;font-size:1.2rem;box-shadow:0 4px 16px rgba(0,0,0,.22);display:flex;align-items:center;justify-content:center;transition:all .2s;cursor:pointer;}
-.mic-fab:hover{background:var(--vl);}
-.mic-fab.active{background:var(--ro);box-shadow:0 4px 20px rgba(229,57,53,.5);}
+@keyframes fab-pulse{0%,100%{transform:scale(1);box-shadow:0 4px 16px rgba(30,100,200,.30);}50%{transform:scale(1.10);box-shadow:0 6px 22px rgba(30,100,200,.55);}}
+@keyframes mic-glow{0%,100%{transform:scale(1);box-shadow:0 4px 16px rgba(229,140,0,.35);}50%{transform:scale(1.11);box-shadow:0 6px 24px rgba(229,140,0,.60);}}
+@keyframes mic-active-pulse{0%,100%{transform:scale(1);box-shadow:0 4px 20px rgba(229,57,53,.5);}50%{transform:scale(1.13);box-shadow:0 8px 28px rgba(229,57,53,.75);}}
+
+.srch-fab{position:fixed;bottom:82px;right:16px;z-index:150;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#1565c0,#2196f3);color:#fff;border:none;font-size:1.3rem;box-shadow:0 4px 16px rgba(30,100,200,.35);display:flex;align-items:center;justify-content:center;transition:all .2s;cursor:pointer;animation:fab-pulse 2.8s ease-in-out infinite;}
+.srch-fab:hover{animation:none;transform:scale(1.15);background:linear-gradient(135deg,#2196f3,#64b5f6);box-shadow:0 6px 22px rgba(30,100,200,.50);}
+
+.mic-fab{position:fixed;bottom:146px;right:16px;z-index:150;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#e07b00,#f5a623);color:#fff;border:none;font-size:1.25rem;box-shadow:0 4px 16px rgba(229,140,0,.35);display:flex;align-items:center;justify-content:center;transition:all .2s;cursor:pointer;animation:mic-glow 2.4s ease-in-out infinite;}
+.mic-fab:hover{animation:none;transform:scale(1.15);background:linear-gradient(135deg,#f5a623,#ffc04d);box-shadow:0 6px 22px rgba(229,140,0,.55);}
+.mic-fab.active{background:linear-gradient(135deg,#c0392b,#e74c3c);animation:mic-active-pulse 1s ease-in-out infinite;box-shadow:0 4px 20px rgba(229,57,53,.5);}
 .srch-popup{position:fixed;bottom:138px;right:14px;z-index:149;background:#fff;border-radius:50px;box-shadow:0 4px 24px rgba(0,0,0,.18);border:2px solid var(--vbg);display:flex;align-items:center;overflow:hidden;width:0;opacity:0;pointer-events:none;transition:width .28s cubic-bezier(.4,0,.2,1),opacity .22s;}
 .srch-popup.open{width:min(280px,78vw);opacity:1;pointer-events:all;}
 .srch-popup input{flex:1;padding:11px 16px;border:none;outline:none;font-size:.95rem;background:transparent;}
@@ -1047,23 +1052,16 @@ async function loadAll() {
     const catSnap = await fs.getDocs(fs.collection(db,"categories"));
     catSnap.forEach(d => { DB.categories[d.id] = d.data(); });
 
-    // Load products (real-time) — usa docChanges para manejar borrados y cambios de categoria
-    let _firstSnapshot = true;
+    // Load products (real-time) — usa docChanges para manejar borrados y cambios de categoría
     fs.onSnapshot(fs.collection(db,"products"), snap => {
-      if(_firstSnapshot) {
-        // En el primer snapshot, comparar Firestore con DB local.
-        // Eliminar del DB local cualquier producto seed que ya no exista en Firestore.
-        const firestoreIds = new Set(snap.docs.map(d => d.id));
-        Object.keys(DB.products).forEach(id => {
-          if(!firestoreIds.has(id)) delete DB.products[id];
-        });
-        _firstSnapshot = false;
-      }
       snap.docChanges().forEach(change => {
         if(change.type === "removed") {
+          // Producto eliminado — sacarlo del DB local
           delete DB.products[change.doc.id];
         } else {
+          // added o modified
           const data = change.doc.data();
+          // Convert promos from Firestore objects back to arrays
           if(data.promos && data.promos.length > 0 && typeof data.promos[0] === 'object' && 'q' in data.promos[0]) {
             data.promos = data.promos.map(t => [t.q, t.p]);
           }
@@ -1748,7 +1746,8 @@ function toggleSearch() {
   const fab = document.getElementById("srchFab");
   popup.classList.toggle("open", srchOpen);
   fab.textContent = srchOpen ? "✕" : "🔍";
-  fab.style.background = srchOpen ? "var(--ro)" : "var(--v)";
+  fab.style.background = srchOpen ? "var(--ro)" : "linear-gradient(135deg,#1565c0,#2196f3)";
+  fab.style.animation  = srchOpen ? "none" : "fab-pulse 2.8s ease-in-out infinite";
   if(srchOpen) setTimeout(()=>document.getElementById("searchInput").focus(), 200);
   else clearSearch();
 }
