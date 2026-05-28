@@ -1142,7 +1142,11 @@ function buscarDeudor() {
   if(!matches.length) { sug.style.display='none'; return; }
   sug.innerHTML = matches.map(f=>{
     const saldo = (f.monto||0)-(f.pagado||0);
-    return `<div onclick="seleccionarDeudor('${f.id}')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--vbg);font-size:.82rem"
+    return `<div onclick="seleccionarDeudor('${f.id}')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--vbg);font-size:.82rem">
+      <b>${f.nombre}</b> — Saldo: Bs.${saldo.toFixed(2)}
+    </div>`;
+  }).join('');
+  sug.style.display = 'block';
 }
 
 function seleccionarDeudor(id) {
@@ -1150,9 +1154,14 @@ function seleccionarDeudor(id) {
   if(!f) return;
   fiarDeudorSeleccionado = f;
   document.getElementById('fiarSugerencias').style.display = 'none';
-  documen → Saldo fiado: Bs.${saldo.toFixed(2)}`
-      : `Total a fiar: Bs.${total.toFixed(2)}`;
-  }
+  document.getElementById('fiarBuscar').value = f.nombre;
+  document.getElementById('fiarDeudorNombre').textContent = f.nombre;
+  const saldo = (f.monto||0)-(f.pagado||0);
+  const total = cartTotal();
+  document.getElementById('fiarDeudorSaldo').textContent = saldo > 0
+    ? `Saldo fiado: Bs.${saldo.toFixed(2)}`
+    : `Total a fiar: Bs.${total.toFixed(2)}`;
+  document.getElementById('fiarDeudorSelec').style.display = 'block';
 }
 
 async function confirmarFiar() {
