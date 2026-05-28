@@ -2225,8 +2225,8 @@ function processVoiceWithAI(text) {
     .filter(p => p.tipo !== "categoria_fisica")
     .map(p => ({...p, _tipo:"temporal"}));
 
-  // Productos Coquette
-  const prodsC = (DB.coquetteProds || [])
+  // Productos Coquette (verduras, frutas, etc.)
+  const prodsC = (typeof cqProds !== 'undefined' ? cqProds : [])
     .map(p => ({...p, _tipo:"coquette"}));
 
   const allProds = [...prodsB, ...prodsF, ...prodsC];
@@ -2317,7 +2317,7 @@ function selectVoiceChoice(id, qty, tipo) {
   const prod = tipo === "temporal"
     ? DB.tempProds.find(p => p.id === id)
     : tipo === "coquette"
-      ? (DB.coquetteProds||[]).find(p => p.id === id)
+      ? (typeof cqProds !== "undefined" ? cqProds : []).find(p => p.id === id)
       : DB.products[id];
   if(!prod) return;
   const key = tipo+"_"+id;
