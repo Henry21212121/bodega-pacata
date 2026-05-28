@@ -2171,18 +2171,38 @@ function processVoiceWithAI(text) {
     .replace(/\s+/g," ").trim();
 
   // ── 3. Scoring de similitud ──────────────────────────────
-  function similarity(a, b) {
-    a = a.toLowerCase(); b = b.toLowerCase();
-    if(b.includes(a) || a.includes(b)) return 1;
-    const wa = a.split(/\s+/), wb = b.split(/\s+/);
+  function similarity(query, productName) {
+    const q = query.toLowerCase().trim();
+    const p = productName.toLowerCase().trim();
+
+    // Coincidencia exacta
+    if(p === q) return 1;
+    // El nombre contiene la query completa
+    if(p.includes(q)) return 0.95;
+
+    const wq = q.split(/\s+/).filter(w => w.length > 2);
+    const wp = p.split(/\s+/);
+
+    if(!wq.length) return 0;
+
     let hits = 0;
-    wa.forEach(w => { if(w.length > 2 && wb.some(x => x.includes(w) || w.includes(x))) hits++; });
-    const score = hits / Math.max(wa.length, 1);
-    // Levenshtein parcial para palabras cortas
-    if(score === 0 && a.length > 3) {
-      const minDist = Math.min(...wb.map(w => levenshtein(a.slice(0,5), w.slice(0,5))));
-      return minDist <= 2 ? 0.4 : 0;
-    }
+    let exactHits = 0;
+    wq.forEach(w => {
+      // Coincidencia exacta de palabra
+      if(wp.some(x => x === w)) { hits++; exactHits++; return; }
+      // La palabra del producto empieza con la query word (prefijo)
+      if(wp.some(x => x.startsWith(w) && w.length >= 4)) { hits += 0.8; return; }
+      // Levenshtein solo para palabras largas (>= 5 chars) con max 1 error
+      if(w.length >= 5) {
+        const minDist = Math.min(...wp.map(x => levenshtein(w, x)));
+        if(minDist <= 1) { hits += 0.7; return; }
+        if(minDist <= 2 && w.length >= 7) { hits += 0.4; return; }
+      }
+    });
+
+    const score = hits / wq.length;
+    // Penalizar si la query es muy corta (1 palabra) y no hubo exactMatch
+    if(wq.length === 1 && exactHits === 0 && score < 0.8) return score * 0.5;
     return score;
   }
 
@@ -2199,7 +2219,7 @@ function processVoiceWithAI(text) {
   const scored = prods.map(p => ({
     prod: p,
     score: similarity(cleanText, p.nombre)
-  })).filter(x => x.score > 0.25).sort((a,b) => b.score - a.score);
+  })).filter(x => x.score >= 0.5).sort((a,b) => b.score - a.score);
 
   if(!scored.length) {
     showToast("❌ No encontré: \""+cleanText+"\"", true);
