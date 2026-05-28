@@ -2117,106 +2117,124 @@ document.addEventListener("keydown",(e)=>{
   if(e.code==="Space"){e.preventDefault(); voiceActive?stopVoiceSearch():startVoiceSearch();}
 });
 
-// ── Procesar texto con Claude ────────────────────────────────
-async function processVoiceWithAI(text) {
+// ── Procesar texto de voz localmente ────────────────────────
+function processVoiceWithAI(text) {
   const vp = document.getElementById("voiceTranscriptPanel");
-  if(vp) { vp.style.display="block"; vp.textContent="🤖 Interpretando: \""+text+"\"..."; }
+  if(vp) { vp.style.display="block"; vp.textContent = "🔍 Buscando: \""+text+"\"..."; }
 
-  // Armar catálogo resumido para Claude (solo nombre, precio, unidad, stock)
-  const catalogo = Object.values(DB.products)
-    .filter(p=>p.estado!=="agotado")
-    .map(p=>({
-      id: p.id,
-      nombre: p.nombre,
-      precio: p.precio,
-      unidad: p.unidad||"unidad",
-      stock: p.stock||null,
-      cat: p.cat||""
-    }));
+  const lower = text.toLowerCase().trim();
 
-  const prompt = `Sos el asistente de venta de una bodega en Cochabamba, Bolivia.
-El vendedor dijo por voz: "${text}"
-
-Tu tarea es identificar qué producto(s) quiere agregar al carrito y en qué cantidad.
-
-CATÁLOGO DISPONIBLE (JSON):
-${JSON.stringify(catalogo, null, 0).slice(0, 6000)}
-
-REGLAS:
-- Buscá coincidencia por nombre, marca, peso, tipo de producto
-- "cuartilla" = 0.25 kg/lb, "media cuartilla" = 0.125, "media libra" = 0.5, "kilo" = 1 kg
-- "5 Bs de tomate" → buscá el producto tomate y calculá qty = round(5 / precio)
-- Si hay 2+ productos muy similares, devolvé ambos para que el usuario elija
-- Si no encontrás nada, devolvé matches vacío
-- qty debe ser número (puede ser decimal para productos por peso: 1.5 libras)
-
-Respondé SOLO con JSON válido, sin markdown, sin explicación:
-{
-  "entendido": "lo que interpretaste en lenguaje natural",
-  "matches": [
-    {"id": "AB-00100", "nombre": "Nombre del producto", "qty": 2, "precio": 20, "unidad": "botella"}
-  ],
-  "ambiguo": false,
-  "mensaje": "mensaje opcional para mostrar al usuario"
-}`;
-
-  try {
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 600,
-        messages: [{role:"user", content: prompt}]
-      })
-    });
-    const data = await resp.json();
-    const raw = data.content?.[0]?.text || "{}";
-    const result = JSON.parse(raw.replace(/```json|```/g,"").trim());
-
-    if(vp) vp.textContent = "🤖 " + (result.entendido || text);
-
-    if(!result.matches || result.matches.length === 0) {
-      showToast("❌ No encontré ese producto: \""+text+"\"", true);
-      if(vp) setTimeout(()=>{ vp.style.display="none"; },3000);
-      return;
-    }
-
-    if(result.ambiguo && result.matches.length > 1) {
-      // Mostrar opciones para elegir
-      showVoiceChoices(result.matches, result.entendido);
-      return;
-    }
-
-    // Agregar directamente
-    let agregados = 0;
-    result.matches.forEach(m => {
-      const prod = DB.products[m.id];
-      if(!prod) return;
-      const key = "catalogo_"+m.id;
-      const qty = Math.max(1, Math.round(m.qty || 1));
-      const stockMax = (prod.stock != null && prod.stock > 0) ? prod.stock : Infinity;
-      const actual = cart[key]?.qty || 0;
-      const toAdd = Math.min(qty, stockMax - actual);
-      if(toAdd <= 0) { showToast("⚠️ Sin stock disponible para "+prod.nombre, true); return; }
-      if(cart[key]) cart[key].qty += toAdd;
-      else cart[key] = {prod, qty:toAdd, tipo:"catalogo"};
-      agregados++;
-      if(toAdd < qty) showToast("⚠️ Solo "+toAdd+" de "+qty+" disponibles para "+prod.nombre, true);
-    });
-
-    renderCart();
-    if(agregados > 0) {
-      showToast("✅ "+result.entendido);
-      if(vp) setTimeout(()=>{ vp.style.display="none"; },2500);
-    }
-    if(result.mensaje) showToast(result.mensaje, false);
-
-  } catch(err) {
-    console.error("Voice AI error:", err);
-    showToast("❌ Error al interpretar, intentá de nuevo", true);
-    if(vp) vp.style.display="none";
+  // ── 1. Extraer cantidad ──────────────────────────────────
+  let qty = 1;
+  const numMap = {
+    "un ":1,"una ":1,"dos ":2,"tres ":3,"cuatro ":4,"cinco ":5,
+    "seis ":6,"siete ":7,"ocho ":8,"nueve ":9,"diez ":10,
+    "media libra":0.5,"media lb":0.5,"cuartilla y media":0.375,
+    "cuartilla":0.25,"media cuartilla":0.125,
+    "kilo":1,"kilogramo":1,"medio kilo":0.5
+  };
+  let cleanText = lower;
+  for(const [word, val] of Object.entries(numMap)) {
+    if(cleanText.includes(word)) { qty = val; cleanText = cleanText.replace(word,"").trim(); break; }
   }
+  // número al final o al inicio: "2 fideos", "fideos 3"
+  const numMatch = cleanText.match(/^(\d+(?:\.\d+)?)\s+(.+)$/) || cleanText.match(/^(.+)\s+(\d+(?:\.\d+)?)$/);
+  if(numMatch) {
+    const n = parseFloat(numMatch[1]), rest = numMatch[2];
+    const n2 = parseFloat(numMatch[2]), rest2 = numMatch[1];
+    if(!isNaN(n) && n > 0 && n < 100) { qty = n; cleanText = rest; }
+    else if(!isNaN(n2) && n2 > 0 && n2 < 100) { qty = n2; cleanText = rest2; }
+  }
+
+  // ── 2. Detectar "X Bs de producto" ──────────────────────
+  const bsMatch = lower.match(/(\d+(?:\.\d+)?)\s*bs(?:ilivian[ao]s?)?\s+(?:de\s+)?(.+)/i) ||
+                  lower.match(/(.+)\s+(\d+(?:\.\d+)?)\s*bs/i);
+  let bsAmount = null;
+  if(bsMatch) {
+    bsAmount = parseFloat(bsMatch[1]);
+    cleanText = bsMatch[2].trim();
+    qty = null; // se calculará por precio
+  }
+
+  cleanText = cleanText
+    .replace(/\b(de|el|la|los|las|un|una|unos|unas|por|para)\b/g," ")
+    .replace(/\s+/g," ").trim();
+
+  // ── 3. Scoring de similitud ──────────────────────────────
+  function similarity(a, b) {
+    a = a.toLowerCase(); b = b.toLowerCase();
+    if(b.includes(a) || a.includes(b)) return 1;
+    const wa = a.split(/\s+/), wb = b.split(/\s+/);
+    let hits = 0;
+    wa.forEach(w => { if(w.length > 2 && wb.some(x => x.includes(w) || w.includes(x))) hits++; });
+    const score = hits / Math.max(wa.length, 1);
+    // Levenshtein parcial para palabras cortas
+    if(score === 0 && a.length > 3) {
+      const minDist = Math.min(...wb.map(w => levenshtein(a.slice(0,5), w.slice(0,5))));
+      return minDist <= 2 ? 0.4 : 0;
+    }
+    return score;
+  }
+
+  function levenshtein(a, b) {
+    const m = a.length, n = b.length;
+    const dp = Array.from({length:m+1}, (_,i) => Array.from({length:n+1}, (_,j) => i===0?j:j===0?i:0));
+    for(let i=1;i<=m;i++) for(let j=1;j<=n;j++)
+      dp[i][j] = a[i-1]===b[j-1] ? dp[i-1][j-1] : 1+Math.min(dp[i-1][j],dp[i][j-1],dp[i-1][j-1]);
+    return dp[m][n];
+  }
+
+  // ── 4. Buscar en catálogo ────────────────────────────────
+  const prods = Object.values(DB.products).filter(p => p.stock !== 0);
+  const scored = prods.map(p => ({
+    prod: p,
+    score: similarity(cleanText, p.nombre)
+  })).filter(x => x.score > 0.25).sort((a,b) => b.score - a.score);
+
+  if(!scored.length) {
+    showToast("❌ No encontré: \""+cleanText+"\"", true);
+    if(vp) { vp.textContent = "❌ No encontrado: \""+text+"\""; setTimeout(()=>vp.style.display="none",3000); }
+    return;
+  }
+
+  // ── 5. Ambigüedad si hay 2+ con score similar ───────────
+  const top = scored[0];
+  const similar = scored.filter(x => x.score >= top.score * 0.85 && x.prod.id !== top.prod.id).slice(0,3);
+
+  if(similar.length > 0 && top.score < 0.9) {
+    const choices = [top, ...similar].map(x => ({
+      id: x.prod.id,
+      nombre: x.prod.nombre,
+      qty: bsAmount ? Math.max(1, Math.round(bsAmount / (x.prod.precio||1))) : qty,
+      precio: x.prod.precio,
+      unidad: x.prod.unidad||"unidad"
+    }));
+    if(vp) vp.textContent = "🤔 Encontré varios similares, elegí uno:";
+    showVoiceChoices(choices, text);
+    return;
+  }
+
+  // ── 6. Agregar directamente ──────────────────────────────
+  const prod = top.prod;
+  const finalQty = bsAmount ? Math.max(1, Math.round(bsAmount / (prod.precio||1))) : Math.max(1, Math.round(qty||1));
+  const key = "catalogo_"+prod.id;
+  const stockMax = (prod.stock != null && prod.stock > 0) ? prod.stock : Infinity;
+  const actual = cart[key]?.qty || 0;
+  const toAdd = Math.min(finalQty, stockMax - actual);
+
+  if(toAdd <= 0) {
+    showToast("⚠️ Sin stock para "+prod.nombre, true);
+    if(vp) { vp.style.display="none"; }
+    return;
+  }
+  if(cart[key]) cart[key].qty += toAdd;
+  else cart[key] = {prod, qty:toAdd, tipo:"catalogo"};
+  renderCart();
+
+  const label = bsAmount ? "Bs."+bsAmount+" de "+prod.nombre : toAdd+"× "+prod.nombre;
+  showToast("✅ "+label+" agregado");
+  if(toAdd < finalQty) showToast("⚠️ Solo "+toAdd+" disponibles",true);
+  if(vp) { vp.textContent = "✅ "+label; setTimeout(()=>vp.style.display="none",2000); }
 }
 
 // ── Panel de elección cuando hay ambigüedad ──────────────────
