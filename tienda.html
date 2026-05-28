@@ -2214,11 +2214,26 @@ function processVoiceWithAI(text) {
     return dp[m][n];
   }
 
-  // ── 4. Buscar en catálogo ────────────────────────────────
-  const prods = Object.values(DB.products).filter(p => p.stock !== 0);
-  const scored = prods.map(p => ({
+  // ── 4. Buscar en TODOS los catálogos ────────────────────
+  // Catálogo bodega
+  const prodsB = Object.values(DB.products)
+    .filter(p => p.stock !== 0)
+    .map(p => ({...p, _tipo:"catalogo"}));
+
+  // Productos físicos tienda (verduras, frutas, etc.)
+  const prodsF = (DB.tempProds || [])
+    .filter(p => p.tipo !== "categoria_fisica")
+    .map(p => ({...p, _tipo:"temporal"}));
+
+  // Productos Coquette
+  const prodsC = (DB.coquetteProds || [])
+    .map(p => ({...p, _tipo:"coquette"}));
+
+  const allProds = [...prodsB, ...prodsF, ...prodsC];
+
+  const scored = allProds.map(p => ({
     prod: p,
-    score: similarity(cleanText, p.nombre)
+    score: similarity(cleanText, p.nombre || "")
   })).filter(x => x.score >= 0.5).sort((a,b) => b.score - a.score);
 
   if(!scored.length) {
@@ -2227,38 +2242,45 @@ function processVoiceWithAI(text) {
     return;
   }
 
-  // ── 5. Ambigüedad si hay 2+ con score similar ───────────
+  // ── 5. Mostrar opciones si hay variantes del mismo producto ──
+  // Siempre mostrar opciones si hay 2+ resultados con score alto
   const top = scored[0];
-  const similar = scored.filter(x => x.score >= top.score * 0.85 && x.prod.id !== top.prod.id).slice(0,3);
+  const topScore = top.score;
 
-  if(similar.length > 0 && top.score < 0.9) {
-    const choices = [top, ...similar].map(x => ({
+  // Agrupar resultados similares — mostrar si hay más de 1 con score >= 60% del top
+  const candidates = scored.filter(x => x.score >= Math.max(0.5, topScore * 0.6)).slice(0, 6);
+
+  if(candidates.length > 1) {
+    // Siempre mostrar opciones cuando hay más de un candidato
+    const choices = candidates.map(x => ({
       id: x.prod.id,
       nombre: x.prod.nombre,
       qty: bsAmount ? Math.max(1, Math.round(bsAmount / (x.prod.precio||1))) : qty,
       precio: x.prod.precio,
-      unidad: x.prod.unidad||"unidad"
+      unidad: x.prod.unidad||"unidad",
+      _tipo: x.prod._tipo
     }));
-    if(vp) vp.textContent = "🤔 Encontré varios similares, elegí uno:";
+    if(vp) vp.textContent = "🤔 Encontré varias opciones, elegí una:";
     showVoiceChoices(choices, text);
     return;
   }
 
-  // ── 6. Agregar directamente ──────────────────────────────
+  // ── 6. Agregar directamente (único resultado) ────────────
   const prod = top.prod;
+  const tipo = prod._tipo || "catalogo";
   const finalQty = bsAmount ? Math.max(1, Math.round(bsAmount / (prod.precio||1))) : Math.max(1, Math.round(qty||1));
-  const key = "catalogo_"+prod.id;
+  const key = tipo+"_"+prod.id;
   const stockMax = (prod.stock != null && prod.stock > 0) ? prod.stock : Infinity;
   const actual = cart[key]?.qty || 0;
   const toAdd = Math.min(finalQty, stockMax - actual);
 
   if(toAdd <= 0) {
     showToast("⚠️ Sin stock para "+prod.nombre, true);
-    if(vp) { vp.style.display="none"; }
+    if(vp) vp.style.display="none";
     return;
   }
   if(cart[key]) cart[key].qty += toAdd;
-  else cart[key] = {prod, qty:toAdd, tipo:"catalogo"};
+  else cart[key] = {prod, qty:toAdd, tipo};
   renderCart();
 
   const label = bsAmount ? "Bs."+bsAmount+" de "+prod.nombre : toAdd+"× "+prod.nombre;
@@ -2277,10 +2299,12 @@ function showVoiceChoices(matches, entendido) {
       🎤 "${entendido}" — ¿Cuál querés?
     </div>
     ${matches.map(m=>`
-      <button onclick="selectVoiceChoice('${m.id}',${m.qty||1})"
+      <button onclick="selectVoiceChoice('${m.id}',${m.qty||1},'${m._tipo||'catalogo'}')"
         style="display:block;width:100%;text-align:left;background:#f0fff4;border:1.5px solid var(--vbg);
                border-radius:8px;padding:8px 10px;margin-bottom:5px;cursor:pointer;font-size:.82rem">
         <b>${m.nombre}</b> — Bs.${m.precio} · ${m.qty||1} ${m.unidad||""}
+        ${m._tipo==='temporal'?'<span style="font-size:.7rem;color:#e07b00"> 🏪 Tienda</span>':''}
+        ${m._tipo==='coquette'?'<span style="font-size:.7rem;color:var(--v)"> 🌸 COQUETTE</span>':''}
       </button>`).join("")}
     <button onclick="document.getElementById('voiceChoicesPanel').style.display='none'"
       style="font-size:.75rem;color:var(--gr);background:none;border:none;cursor:pointer;margin-top:2px">
@@ -2288,19 +2312,24 @@ function showVoiceChoices(matches, entendido) {
     </button>`;
 }
 
-function selectVoiceChoice(id, qty) {
-  const prod = DB.products[id];
+function selectVoiceChoice(id, qty, tipo) {
+  tipo = tipo || "catalogo";
+  const prod = tipo === "temporal"
+    ? DB.tempProds.find(p => p.id === id)
+    : tipo === "coquette"
+      ? (DB.coquetteProds||[]).find(p => p.id === id)
+      : DB.products[id];
   if(!prod) return;
-  const key = "catalogo_"+id;
+  const key = tipo+"_"+id;
   const stockMax = (prod.stock != null && prod.stock > 0) ? prod.stock : Infinity;
   const actual = cart[key]?.qty || 0;
-  const toAdd = Math.min(Math.max(1,Math.round(qty)), stockMax - actual);
+  const toAdd = Math.min(Math.max(1,Math.round(qty||1)), stockMax - actual);
   if(toAdd <= 0) { showToast("⚠️ Sin stock para "+prod.nombre, true); }
   else {
     if(cart[key]) cart[key].qty += toAdd;
-    else cart[key] = {prod, qty:toAdd, tipo:"catalogo"};
+    else cart[key] = {prod, qty:toAdd, tipo};
     renderCart();
-    showToast("✅ "+prod.nombre+" x"+toAdd+" agregado");
+    showToast("✅ "+prod.nombre+" ×"+toAdd+" agregado");
   }
   document.getElementById("voiceChoicesPanel").style.display="none";
   const vp = document.getElementById("voiceTranscriptPanel");
