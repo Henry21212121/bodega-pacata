@@ -26,69 +26,6 @@
                  onSnapshot, collection, query, where, orderBy, limit,
                  serverTimestamp, increment, writeBatch };
   window._dbReady = true;
-// Exponer al scope global
-window.addFreeItem = addFreeItem;
-window.addToCart = addToCart;
-window.buscarDeudor = buscarDeudor;
-window.calcCheckoutVuelto = calcCheckoutVuelto;
-window.calcCqPrecioUnit = calcCqPrecioUnit;
-window.calcFiarSaldo = calcFiarSaldo;
-window.calcPFPrecioUnit = calcPFPrecioUnit;
-window.calcPesoEquiv = calcPesoEquiv;
-window.cambiarPin = cambiarPin;
-window.changeCartQty = changeCartQty;
-window.checkPesoCategory = checkPesoCategory;
-window.clearCart = clearCart;
-window.clearFiarDeudor = clearFiarDeudor;
-window.clearVendSearch = clearVendSearch;
-window.closeCheckout = closeCheckout;
-window.closeModal = closeModal;
-window.cobrarFiado = cobrarFiado;
-window.confirmCqAdd = confirmCqAdd;
-window.confirmSale = confirmSale;
-window.confirmarFiar = confirmarFiar;
-window.cqAdjustQty = cqAdjustQty;
-window.cqCalcFromMonto = cqCalcFromMonto;
-window.cqCalcFromUnids = cqCalcFromUnids;
-window.cqCalcTotal = cqCalcTotal;
-window.deleteCatFisica = deleteCatFisica;
-window.deleteCqProd = deleteCqProd;
-window.deleteProdFisica = deleteProdFisica;
-window.downloadDayReportDialog = downloadDayReportDialog;
-window.filterProdsCoquette = filterProdsCoquette;
-window.logout = logout;
-window.onCqImgSelected = onCqImgSelected;
-window.onVendSearch = onVendSearch;
-window.openAddCatFisica = openAddCatFisica;
-window.openAddCompra = openAddCompra;
-window.openAddFiado = openAddFiado;
-window.openAddGasto = openAddGasto;
-window.openAddProdCoquette = openAddProdCoquette;
-window.openAddProdFisica = openAddProdFisica;
-window.openCheckout = openCheckout;
-window.openCqSelector = openCqSelector;
-window.openFiarCheckout = openFiarCheckout;
-window.openPagoParc = openPagoParc;
-window.removeCqImg = removeCqImg;
-window.removeFromCart = removeFromCart;
-window.renderDayStats = renderDayStats;
-window.saveCatFisica = saveCatFisica;
-window.saveCompra = saveCompra;
-window.saveCoquetteProd = saveCoquetteProd;
-window.saveFiado = saveFiado;
-window.saveGasto = saveGasto;
-window.savePagoParc = savePagoParc;
-window.saveProdFisica = saveProdFisica;
-window.saveTempProd = saveTempProd;
-window.seleccionarDeudor = seleccionarDeudor;
-window.selectPayMethod = selectPayMethod;
-window.setPesoUnit = setPesoUnit;
-window.showTab = showTab;
-window.switchProdTab = switchProdTab;
-window.togglePFDetalle = togglePFDetalle;
-window.toggleVoiceSearch = toggleVoiceSearch;
-window.updateCqFields = updateCqFields;
-
 </script>
 <style>
 :root{
@@ -356,6 +293,8 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
         <button onclick="clearVendSearch()" style="background:none;border:none;color:var(--gr);cursor:pointer;padding:0 2px">✕</button>
         <div class="search-suggestions" id="searchSuggestions" style="display:none"></div>
       </div>
+      <div id="voiceTranscriptPanel" style="display:none;background:#f0fff4;border:1.5px solid var(--vbg);border-radius:10px;padding:10px 12px;font-size:.82rem;color:var(--v);margin:6px 0 2px;font-style:italic"></div>
+      <div id="voiceChoicesPanel" style="display:none;background:#fff;border:2px solid var(--vbg);border-radius:12px;padding:12px;margin:4px 0;box-shadow:0 4px 16px rgba(0,0,0,.12)"></div>
       <div class="prod-tabs">
         <button class="prod-tab-btn active-cat" id="catTabBtn" onclick="switchProdTab('catalogo')">📦 Catálogo</button>
         <button class="prod-tab-btn inactive" id="cqTabBtn" onclick="switchProdTab('coquette')">🥬 COQUETTE</button>
@@ -1694,8 +1633,14 @@ function makeProdCard(p, tipo) {
 function addToCart(id, tipo) {
   const prod = tipo==="temporal" ? DB.tempProds.find(p=>p.id===id) : DB.products[id];
   if(!prod) return;
-  if(tipo==="catalogo" && prod.stock===0) { showToast("Sin stock",true); return; }
+  if(tipo==="catalogo" && prod.stock===0) { showToast("⚠️ Producto agotado",true); return; }
   const key = tipo+"_"+id;
+  const stockMax = (prod.stock != null && prod.stock > 0) ? prod.stock : Infinity;
+  const actual = cart[key]?.qty || 0;
+  if(actual >= stockMax) {
+    showToast("⚠️ Máximo disponible: "+stockMax+" unidad"+(stockMax!==1?"es":""),true);
+    return;
+  }
   if(cart[key]) { cart[key].qty++; }
   else { cart[key] = {prod, qty:1, tipo}; }
   renderCart();
@@ -1705,8 +1650,16 @@ function addToCart(id, tipo) {
 
 function changeCartQty(key, delta) {
   if(!cart[key]) return;
-  cart[key].qty += delta;
-  if(cart[key].qty <= 0) { delete cart[key]; }
+  const entry = cart[key];
+  const prod = entry.prod;
+  const stockMax = (prod.stock != null && prod.stock > 0) ? prod.stock : Infinity;
+  const nuevaQty = entry.qty + delta;
+  if(nuevaQty <= 0) { delete cart[key]; renderCart(); return; }
+  if(delta > 0 && nuevaQty > stockMax) {
+    showToast("⚠️ Máximo disponible: "+stockMax+" unidad"+(stockMax!==1?"es":""),true);
+    return;
+  }
+  cart[key].qty = nuevaQty;
   renderCart();
 }
 
@@ -1742,17 +1695,22 @@ function renderCart() {
   }
 
   const total = cartTotal();
-  ci.innerHTML = items.map(([key,entry])=>`
+  ci.innerHTML = items.map(([key,entry])=>{
+    const stockMax = (entry.prod.stock != null && entry.prod.stock > 0) ? entry.prod.stock : Infinity;
+    const atMax = entry.qty >= stockMax;
+    const stockLabel = stockMax !== Infinity ? `<span style="font-size:.7rem;color:${atMax?'var(--ro)':'var(--gr)'}"> (${entry.qty}/${stockMax})</span>` : '';
+    return `
     <div class="cart-item">
-      <div class="ci-name">${entry.prod.nombre.length>28?entry.prod.nombre.slice(0,28)+"…":entry.prod.nombre}</div>
+      <div class="ci-name">${entry.prod.nombre.length>28?entry.prod.nombre.slice(0,28)+"…":entry.prod.nombre}${stockLabel}</div>
       <div class="ci-qty">
         <button class="ci-btn" onclick="changeCartQty('${key}',-1)">−</button>
         <span class="ci-num">${entry.qty}</span>
-        <button class="ci-btn" onclick="changeCartQty('${key}',+1)">+</button>
+        <button class="ci-btn" onclick="changeCartQty('${key}',+1)" ${atMax?'disabled style="opacity:.4;cursor:not-allowed"':''}>+</button>
       </div>
       <div class="ci-price">Bs.${((entry.prod.precio||0)*entry.qty).toFixed(2)}</div>
       <button class="ci-del" onclick="removeFromCart('${key}')">✕</button>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 
   const totalQty = items.reduce((s,[,e])=>s+e.qty,0);
   cartTotalEl.textContent = "Bs. "+total.toFixed(2);
@@ -2086,6 +2044,9 @@ async function saveCompra(){
 // ════════════════════════════════════
 // VOICE SEARCH
 // ════════════════════════════════════
+// ════════════════════════════════════════════════════
+// VOZ INTELIGENTE CON CLAUDE
+// ════════════════════════════════════════════════════
 let voiceRecog=null, voiceActive=false;
 
 function toggleVoiceSearch(){
@@ -2096,29 +2057,47 @@ function toggleVoiceSearch(){
 function startVoiceSearch(){
   if(voiceActive) return;
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){ showToast("Reconocimiento de voz no disponible. Usa Chrome.",true); return; }
+  if(!SR){ showToast("Reconocimiento de voz no disponible",true); return; }
   if(window.speechSynthesis) window.speechSynthesis.cancel();
   const mic=document.getElementById("micFab");
   voiceRecog=new SR();
   voiceRecog.lang="es-BO"; voiceRecog.interimResults=true; voiceRecog.continuous=true;
+  let finalTranscript = "";
+
   voiceRecog.onstart=()=>{
     voiceActive=true;
+    finalTranscript = "";
     if(mic){ mic.classList.add("active"); mic.style.transform="scale(1.2)"; }
-    showToast("🔴 Escuchando... di el producto", false);
+    showToast("🔴 Escuchando... decí el producto y cantidad", false);
+    // Mostrar panel de transcripción
+    const vp = document.getElementById("voiceTranscriptPanel");
+    if(vp) { vp.style.display="block"; vp.textContent="🎤 Escuchando..."; }
   };
+
   voiceRecog.onresult=(e)=>{
-    let text="";
-    for(let i=e.resultIndex;i<e.results.length;i++) text+=e.results[i][0].transcript;
-    document.getElementById("vendSearch").value=text;
-    onVendSearch();
+    let interim = "";
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      if(e.results[i].isFinal) finalTranscript += e.results[i][0].transcript + " ";
+      else interim += e.results[i][0].transcript;
+    }
+    const vp = document.getElementById("voiceTranscriptPanel");
+    if(vp) vp.textContent = "🎤 " + (finalTranscript + interim).trim();
   };
+
   voiceRecog.onerror=(e)=>{
     stopVoiceSearch();
     if(e.error==="not-allowed") showToast("Permiso de micrófono denegado",true);
   };
+
   voiceRecog.onend=()=>{
     voiceActive=false;
     if(mic){ mic.classList.remove("active"); mic.style.transform="scale(1.0)"; }
+    const text = finalTranscript.trim();
+    if(text) processVoiceWithAI(text);
+    else {
+      const vp = document.getElementById("voiceTranscriptPanel");
+      if(vp) vp.style.display="none";
+    }
   };
   voiceRecog.start();
 }
@@ -2130,6 +2109,155 @@ function stopVoiceSearch(){
   if(mic){ mic.classList.remove("active"); mic.style.transform="scale(1.0)"; }
 }
 function closeVoicePanel(){ stopVoiceSearch(); }
+
+// PTT toggle con Espacio
+document.addEventListener("keydown",(e)=>{
+  const tag=document.activeElement?.tagName;
+  if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT") return;
+  if(e.code==="Space"){e.preventDefault(); voiceActive?stopVoiceSearch():startVoiceSearch();}
+});
+
+// ── Procesar texto con Claude ────────────────────────────────
+async function processVoiceWithAI(text) {
+  const vp = document.getElementById("voiceTranscriptPanel");
+  if(vp) { vp.style.display="block"; vp.textContent="🤖 Interpretando: \""+text+"\"..."; }
+
+  // Armar catálogo resumido para Claude (solo nombre, precio, unidad, stock)
+  const catalogo = Object.values(DB.products)
+    .filter(p=>p.estado!=="agotado")
+    .map(p=>({
+      id: p.id,
+      nombre: p.nombre,
+      precio: p.precio,
+      unidad: p.unidad||"unidad",
+      stock: p.stock||null,
+      cat: p.cat||""
+    }));
+
+  const prompt = `Sos el asistente de venta de una bodega en Cochabamba, Bolivia.
+El vendedor dijo por voz: "${text}"
+
+Tu tarea es identificar qué producto(s) quiere agregar al carrito y en qué cantidad.
+
+CATÁLOGO DISPONIBLE (JSON):
+${JSON.stringify(catalogo, null, 0).slice(0, 6000)}
+
+REGLAS:
+- Buscá coincidencia por nombre, marca, peso, tipo de producto
+- "cuartilla" = 0.25 kg/lb, "media cuartilla" = 0.125, "media libra" = 0.5, "kilo" = 1 kg
+- "5 Bs de tomate" → buscá el producto tomate y calculá qty = round(5 / precio)
+- Si hay 2+ productos muy similares, devolvé ambos para que el usuario elija
+- Si no encontrás nada, devolvé matches vacío
+- qty debe ser número (puede ser decimal para productos por peso: 1.5 libras)
+
+Respondé SOLO con JSON válido, sin markdown, sin explicación:
+{
+  "entendido": "lo que interpretaste en lenguaje natural",
+  "matches": [
+    {"id": "AB-00100", "nombre": "Nombre del producto", "qty": 2, "precio": 20, "unidad": "botella"}
+  ],
+  "ambiguo": false,
+  "mensaje": "mensaje opcional para mostrar al usuario"
+}`;
+
+  try {
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 600,
+        messages: [{role:"user", content: prompt}]
+      })
+    });
+    const data = await resp.json();
+    const raw = data.content?.[0]?.text || "{}";
+    const result = JSON.parse(raw.replace(/```json|```/g,"").trim());
+
+    if(vp) vp.textContent = "🤖 " + (result.entendido || text);
+
+    if(!result.matches || result.matches.length === 0) {
+      showToast("❌ No encontré ese producto: \""+text+"\"", true);
+      if(vp) setTimeout(()=>{ vp.style.display="none"; },3000);
+      return;
+    }
+
+    if(result.ambiguo && result.matches.length > 1) {
+      // Mostrar opciones para elegir
+      showVoiceChoices(result.matches, result.entendido);
+      return;
+    }
+
+    // Agregar directamente
+    let agregados = 0;
+    result.matches.forEach(m => {
+      const prod = DB.products[m.id];
+      if(!prod) return;
+      const key = "catalogo_"+m.id;
+      const qty = Math.max(1, Math.round(m.qty || 1));
+      const stockMax = (prod.stock != null && prod.stock > 0) ? prod.stock : Infinity;
+      const actual = cart[key]?.qty || 0;
+      const toAdd = Math.min(qty, stockMax - actual);
+      if(toAdd <= 0) { showToast("⚠️ Sin stock disponible para "+prod.nombre, true); return; }
+      if(cart[key]) cart[key].qty += toAdd;
+      else cart[key] = {prod, qty:toAdd, tipo:"catalogo"};
+      agregados++;
+      if(toAdd < qty) showToast("⚠️ Solo "+toAdd+" de "+qty+" disponibles para "+prod.nombre, true);
+    });
+
+    renderCart();
+    if(agregados > 0) {
+      showToast("✅ "+result.entendido);
+      if(vp) setTimeout(()=>{ vp.style.display="none"; },2500);
+    }
+    if(result.mensaje) showToast(result.mensaje, false);
+
+  } catch(err) {
+    console.error("Voice AI error:", err);
+    showToast("❌ Error al interpretar, intentá de nuevo", true);
+    if(vp) vp.style.display="none";
+  }
+}
+
+// ── Panel de elección cuando hay ambigüedad ──────────────────
+function showVoiceChoices(matches, entendido) {
+  const panel = document.getElementById("voiceChoicesPanel");
+  if(!panel) return;
+  panel.style.display="block";
+  panel.innerHTML = `
+    <div style="font-size:.8rem;font-weight:800;color:var(--v);margin-bottom:8px">
+      🎤 "${entendido}" — ¿Cuál querés?
+    </div>
+    ${matches.map(m=>`
+      <button onclick="selectVoiceChoice('${m.id}',${m.qty||1})"
+        style="display:block;width:100%;text-align:left;background:#f0fff4;border:1.5px solid var(--vbg);
+               border-radius:8px;padding:8px 10px;margin-bottom:5px;cursor:pointer;font-size:.82rem">
+        <b>${m.nombre}</b> — Bs.${m.precio} · ${m.qty||1} ${m.unidad||""}
+      </button>`).join("")}
+    <button onclick="document.getElementById('voiceChoicesPanel').style.display='none'"
+      style="font-size:.75rem;color:var(--gr);background:none;border:none;cursor:pointer;margin-top:2px">
+      Cancelar
+    </button>`;
+}
+
+function selectVoiceChoice(id, qty) {
+  const prod = DB.products[id];
+  if(!prod) return;
+  const key = "catalogo_"+id;
+  const stockMax = (prod.stock != null && prod.stock > 0) ? prod.stock : Infinity;
+  const actual = cart[key]?.qty || 0;
+  const toAdd = Math.min(Math.max(1,Math.round(qty)), stockMax - actual);
+  if(toAdd <= 0) { showToast("⚠️ Sin stock para "+prod.nombre, true); }
+  else {
+    if(cart[key]) cart[key].qty += toAdd;
+    else cart[key] = {prod, qty:toAdd, tipo:"catalogo"};
+    renderCart();
+    showToast("✅ "+prod.nombre+" x"+toAdd+" agregado");
+  }
+  document.getElementById("voiceChoicesPanel").style.display="none";
+  const vp = document.getElementById("voiceTranscriptPanel");
+  if(vp) setTimeout(()=>{ vp.style.display="none"; },1500);
+}
 
 // ── Push-to-Talk: Espacio (toggle) ────────────────────────────
 document.addEventListener("keydown", (e)=>{
