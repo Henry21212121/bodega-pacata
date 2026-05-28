@@ -244,8 +244,8 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 .btn-ro{background:var(--ro);color:#fff;}
 
 /* MIC FAB */
-.mic-fab{position:relative;background:linear-gradient(135deg,#e07b00,#f5a623);color:#fff;border:none;border-radius:50%;width:44px;height:44px;min-width:44px;box-shadow:0 4px 16px rgba(229,140,0,.35);cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;-webkit-tap-highlight-color:transparent;animation:mic-glow 2.4s ease-in-out infinite;flex-shrink:0;}
-.mic-fab.active{background:linear-gradient(135deg,#c0392b,#e74c3c);animation:mic-active-pulse 1s ease-in-out infinite;}
+.mic-fab{background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.35);color:#fff;border-radius:50%;width:36px;height:36px;min-width:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .2s;}
+.mic-fab.active{background:var(--ro)!important;border-color:var(--ro)!important;animation:mic-active-pulse 1s ease-in-out infinite;}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08);}}
 .voice-panel{display:none;position:fixed;bottom:84px;right:14px;width:min(300px,88vw);background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.22);z-index:299;padding:14px;border:2px solid var(--vbg);}
 
@@ -333,6 +333,15 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
       <div id="sellRightResizer"></div>
       <div class="sell-right-header">
         <span>🛒 Selección</span>
+        <button id="micFab" onclick="toggleVoiceSearch()" title="Búsqueda por voz"
+          style="background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.35);color:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .2s">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="2" width="6" height="11" rx="3"/>
+            <path d="M5 10a7 7 0 0 0 14 0"/>
+            <line x1="12" y1="17" x2="12" y2="21"/>
+            <line x1="8" y1="21" x2="16" y2="21"/>
+          </svg>
+        </button>
         <button onclick="clearCart()" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:50px;padding:3px 10px;font-size:.7rem;cursor:pointer">Vaciar</button>
       </div>
       <div class="sell-right-items" id="cartItems">
@@ -344,14 +353,6 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
           <input type="text" id="freeItemName" placeholder="Producto libre..." style="flex:2;padding:7px 10px;border:1.5px solid #d0e8d8;border-radius:8px;font-size:.88rem;outline:none">
           <input type="number" id="freeItemPrice" placeholder="Bs." step="0.5" min="0" onwheel="this.blur()" style="flex:1;padding:7px 8px;border:1.5px solid #d0e8d8;border-radius:8px;font-size:.88rem;outline:none;max-width:70px">
           <button onclick="addFreeItem()" style="background:var(--or);color:#fff;border:none;border-radius:8px;padding:8px 10px;font-size:.88rem;font-weight:800;cursor:pointer;white-space:nowrap">+ Añadir</button>
-          <button class="mic-fab" id="micFab" onclick="toggleVoiceSearch()" title="Buscar por voz (Espacio)">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="9" y="2" width="6" height="11" rx="3"/>
-              <path d="M5 10a7 7 0 0 0 14 0"/>
-              <line x1="12" y1="17" x2="12" y2="21"/>
-              <line x1="8" y1="21" x2="16" y2="21"/>
-            </svg>
-          </button>
         </div>
         <div style="display:flex;justify-content:space-between;margin-bottom:10px;font-size:.95rem">
           <span style="color:var(--gr);font-weight:700">Total</span>
