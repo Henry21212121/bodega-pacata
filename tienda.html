@@ -1112,6 +1112,14 @@ async function savePagoParc() {
 }
 
 // ── FIAR DESDE CARRITO ──────────────────────────────────
+function calcFiarSaldo() {
+  const total = cartTotal();
+  const aCuenta = parseFloat(document.getElementById('fiarACuenta')?.value)||0;
+  const saldo = Math.max(0, total - aCuenta);
+  const el = document.getElementById('fiarSaldoDisplay');
+  if(el) el.textContent = saldo > 0 ? `Total a fiar: Bs.${saldo.toFixed(2)}` : '✅ Saldado al contado';
+}
+
 function openFiarCheckout() {
   if(!Object.keys(cart).length) return;
   fiarDeudorSeleccionado = null;
@@ -1528,7 +1536,8 @@ function makeProdCard(p, tipo) {
   const agotado = p.stock === 0;
   const isTmp = tipo === "temporal";
   const low = p.stockMin > 0 && p.stock <= p.stockMin && p.stock > 0;
-  const conPromo = p.promoActive && p.promos && p.promos.length > 1;
+  // Promos solo para catálogo bodega, no para productos físicos de tienda
+  const conPromo = !isTmp && p.promoActive && p.promos && p.promos.length > 1;
   const inCart = cart[tipo + "_" + p.id];
 
   // Image wrap — exact same as virtual store
