@@ -1262,6 +1262,7 @@ let cart = {};        // id -> {prod, qty, tipo}
 let currentProdTab = "catalogo";
 let payMethod = "efectivo";
 let editTempId = null;
+let toastTimer;
 let allSales = [], allGastos = [], fiados = [], compras = [];
 
 // ════════════════════════════════════
@@ -2982,7 +2983,6 @@ function closeModal(id) {
 window.openModal = openModal;
 window.closeModal = closeModal;
 
-let toastTimer;
 function showToast(msg,error=false){
   const t=document.getElementById("toast");
   t.textContent=msg; t.className="toast show"+(error?" error":"");
