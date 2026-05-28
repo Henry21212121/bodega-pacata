@@ -26,6 +26,30 @@
                  onSnapshot, collection, query, where, orderBy, limit,
                  serverTimestamp, increment, writeBatch };
   window._dbReady = true;
+function openAddFiado(){
+  openModal("fiadoModal");
+  ["fiadoNombre","fiadoMonto","fiadoDetalle"].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value="";
+  });
+}
+async function saveFiado(){
+  const nombre=document.getElementById("fiadoNombre").value.trim();
+  const monto=parseFloat(document.getElementById("fiadoMonto").value)||0;
+  if(!nombre||!monto){showToast("Completá nombre y monto",true);return;}
+  await fs.addDoc(fs.collection(db,"fiados"),{
+    nombre, monto,
+    detalle: document.getElementById("fiadoDetalle").value.trim(),
+    cobrado: false, pagado: 0,
+    createdAt: fs.serverTimestamp()
+  });
+  closeModal("fiadoModal");
+  showToast("📋 Fiado registrado");
+}
+
+window.verDetalleCliente = verDetalleCliente;
+window.openPagoParcCliente = openPagoParcCliente;
+window.pagoTotalCliente = pagoTotalCliente;
+window.fmtFecha = fmtFecha;
 </script>
 <style>
 :root{
@@ -1051,57 +1075,7 @@ async function deleteProdFisica(id) {
 
 // ── FIADOS MEJORADOS ─────────────────────────────────────
 
-async function verDetalleFiado(id) {
-  window._fiadoDetalleId = id;
-  const f = fiados.find(x=>x.id===id);
-  if(!f) return;
-  const saldo = (f.monto||0) - (f.pagado||0);
-  document.getElementById('fiadoDetalleTitle').textContent = `📋 ${f.nombre}`;
 
-  // Load pagos parciales
-  let pagosHtml = '<div style="font-size:.78rem;color:var(--gr);margin-top:8px">Sin pagos parciales registrados</div>';
-  try {
-    const pagosSnap = await fs.getDocs(fs.query(
-      fs.collection(db,'pagos_fiado'),
-      fs.where('fiadoId','==',id),
-      fs.orderBy('createdAt','desc')
-    ));
-    const pagos = pagosSnap.docs.map(d=>({...d.data(),id:d.id}));
-    if(pagos.length) {
-      pagosHtml = `<div style="font-size:.8rem;font-weight:800;margin:10px 0 6px;color:var(--v)">💰 Pagos parciales:</div>` +
-        pagos.map(p=>{
-          const t = p.createdAt?.seconds ? new Date(p.createdAt.seconds*1000) : new Date();
-          return `<div style="display:flex;justify-content:space-between;padding:5px 8px;background:var(--vbg);border-radius:8px;margin-bottom:4px;font-size:.78rem">
-            <span>${t.toLocaleDateString('es',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${p.nota?' · '+p.nota:''}</span>
-            <span style="font-weight:800;color:var(--v)">+Bs.${(p.monto||0).toFixed(2)}</span>
-          </div>`;
-        }).join('');
-    }
-  } catch(e) {}
-
-  // Load deudas (fiado items)
-  const t = f.createdAt?.seconds ? new Date(f.createdAt.seconds*1000) : new Date();
-  document.getElementById('fiadoDetalleContent').innerHTML = `
-    <div style="background:var(--vbg);border-radius:10px;padding:10px;margin-bottom:8px">
-      <div style="font-size:.78rem;color:var(--gr)">${t.toLocaleDateString('es',{day:'numeric',month:'long',year:'numeric'})}</div>
-      ${f.detalle?`<div style="font-size:.82rem;margin-top:4px">${f.detalle}</div>`:''}
-      ${f.aCuenta?`<div style="font-size:.8rem;color:var(--v);margin-top:4px">A cuenta: Bs.${(f.aCuenta||0).toFixed(2)}</div>`:''}
-    </div>
-    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--vbg);font-size:.82rem">
-      <span>Deuda total</span><span style="font-weight:800">Bs.${(f.monto||0).toFixed(2)}</span>
-    </div>
-    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--vbg);font-size:.82rem">
-      <span style="color:var(--v)">Total pagado</span><span style="font-weight:800;color:var(--v)">Bs.${(f.pagado||0).toFixed(2)}</span>
-    </div>
-    <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:.95rem">
-      <span style="font-weight:900;color:${saldo>0?'var(--ro)':'var(--v)'}">Saldo ${saldo>0?'pendiente':'saldado'}</span>
-      <span style="font-weight:900;color:${saldo>0?'var(--ro)':'var(--v)'}">Bs.${saldo.toFixed(2)}</span>
-    </div>
-    ${pagosHtml}`;
-
-  document.getElementById('btnPagoParc').style.display = saldo > 0 ? 'block' : 'none';
-  openModal('fiadoDetalleModal');
-}
 
 function openPagoParc(id) {
   window._fiadoDetalleId = id;
@@ -1168,12 +1142,7 @@ function buscarDeudor() {
   if(!matches.length) { sug.style.display='none'; return; }
   sug.innerHTML = matches.map(f=>{
     const saldo = (f.monto||0)-(f.pagado||0);
-    return `<div onclick="seleccionarDeudor('${f.id}')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--vbg);font-size:.82rem">
-      <div style="font-weight:700">${f.nombre}</div>
-      <div style="font-size:.72rem;color:var(--ro)">Debe: Bs.${saldo.toFixed(2)}</div>
-    </div>`;
-  }).join('');
-  sug.style.display = 'block';
+    return `<div onclick="seleccionarDeudor('${f.id}')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--vbg);font-size:.82rem"
 }
 
 function seleccionarDeudor(id) {
@@ -1181,29 +1150,7 @@ function seleccionarDeudor(id) {
   if(!f) return;
   fiarDeudorSeleccionado = f;
   document.getElementById('fiarSugerencias').style.display = 'none';
-  document.getElementById('fiarBuscar').value = '';
-  document.getElementById('fiarDeudorNombre').textContent = f.nombre;
-  const saldo = (f.monto||0)-(f.pagado||0);
-  document.getElementById('fiarDeudorSaldo').textContent = `Saldo actual: Bs.${saldo.toFixed(2)}`;
-  document.getElementById('fiarDeudorSelec').style.display = 'block';
-  document.getElementById('fiarNuevoForm').style.display = 'none';
-  calcFiarSaldo();
-}
-
-function clearFiarDeudor() {
-  fiarDeudorSeleccionado = null;
-  document.getElementById('fiarDeudorSelec').style.display = 'none';
-  document.getElementById('fiarNuevoForm').style.display = 'block';
-}
-
-function calcFiarSaldo() {
-  const total = cartTotal();
-  const aCuenta = parseFloat(document.getElementById('fiarACuenta').value)||0;
-  const saldo = total - aCuenta;
-  const el = document.getElementById('fiarSaldoDisplay');
-  if(el && total > 0) {
-    el.textContent = aCuenta > 0
-      ? `A cuenta: Bs.${aCuenta.toFixed(2)} → Saldo fiado: Bs.${saldo.toFixed(2)}`
+  documen → Saldo fiado: Bs.${saldo.toFixed(2)}`
       : `Total a fiar: Bs.${total.toFixed(2)}`;
   }
 }
@@ -1983,38 +1930,230 @@ async function saveGasto() {
 // ════════════════════════════════════
 // FIADOS
 // ════════════════════════════════════
+function fmtFecha(ts) {
+  const d = ts?.seconds ? new Date(ts.seconds*1000) : (ts instanceof Date ? ts : new Date());
+  const dias = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const h = d.getHours(), m = d.getMinutes();
+  const ampm = h>=12?'PM':'AM', hh = h%12||12, mm = m.toString().padStart(2,'0');
+  return `${dias[d.getDay()]}, ${d.getDate()} de ${meses[d.getMonth()]} de ${d.getFullYear()}, ${hh}:${mm} ${ampm}`;
+}
+
 function renderFiados() {
-  const el=document.getElementById("fiadoList");
-  const total=fiados.reduce((s,f)=>s+(f.monto||0),0);
-  document.getElementById("fiadoTotal").textContent="Total pendiente: Bs. "+total.toFixed(2);
-  if(!fiados.length){el.innerHTML=`<div style="text-align:center;padding:20px;color:var(--gr);font-size:.82rem">Sin fiados pendientes 🎉</div>`;return;}
-  el.innerHTML=fiados.map(f=>{
-    const t=f.createdAt?.seconds?new Date(f.createdAt.seconds*1000):new Date();
-    return `<div class="fiado-card">
-      <div style="flex:1">
-        <div class="fiado-name">${f.nombre}</div>
-        ${f.detalle?`<div style="font-size:.72rem;color:var(--gr)">${f.detalle}</div>`:""}
-        <div style="font-size:.7rem;color:var(--gr)">${t.toLocaleDateString("es",{day:"numeric",month:"short"})}</div>
-      </div>
-      <div style="text-align:right">
-        <div class="fiado-amount">Bs.${(f.monto||0).toFixed(2)}</div>
-        <button onclick="cobrarFiado('${f.id}',${f.monto})" style="background:var(--v);color:#fff;border:none;border-radius:8px;padding:4px 10px;font-size:.7rem;font-weight:800;cursor:pointer;margin-top:4px">Cobrado ✓</button>
+  const tbody = document.getElementById("fiadoTableBody");
+  const list  = document.getElementById("fiadoList");
+
+  // Agrupar fiados por nombre (normalizado)
+  const grupos = {};
+  fiados.forEach(f => {
+    const key = (f.nombre||"").trim().toLowerCase();
+    if(!grupos[key]) grupos[key] = { nombre: f.nombre, items: [] };
+    grupos[key].items.push(f);
+  });
+
+  const totalPendiente = fiados.reduce((s,f) => s + Math.max(0,(f.monto||0)-(f.pagado||0)), 0);
+  document.getElementById("fiadoTotal").textContent = "Total pendiente: Bs. "+totalPendiente.toFixed(2);
+
+  if(!Object.keys(grupos).length) {
+    list.innerHTML = `<div style="text-align:center;padding:20px;color:var(--gr);font-size:.82rem">Sin fiados pendientes 🎉</div>`;
+    tbody.innerHTML = "";
+    return;
+  }
+
+  // ── Tabla resumen ──
+  tbody.innerHTML = Object.values(grupos).map(g => {
+    const total   = g.items.reduce((s,f)=>s+(f.monto||0),0);
+    const pagado  = g.items.reduce((s,f)=>s+(f.pagado||0),0);
+    const saldo   = total - pagado;
+    const ultPago = g.items.reduce((latest,f)=>{
+      if(!f.lastPagoAt) return latest;
+      const t = f.lastPagoAt.seconds*1000;
+      return t > latest ? t : latest;
+    }, 0);
+    const ultPagoStr = ultPago
+      ? new Date(ultPago).toLocaleDateString('es',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})
+      : '—';
+    return `<tr style="border-bottom:1px solid var(--vbg)">
+      <td style="padding:7px 8px;font-weight:800">${g.nombre}
+        ${g.items.length>1?`<span style="font-size:.68rem;color:var(--v);font-weight:700"> (${g.items.length} fiados)</span>`:''}
+      </td>
+      <td style="padding:7px 4px;text-align:right">Bs.${total.toFixed(2)}</td>
+      <td style="padding:7px 4px;text-align:right;color:var(--v)">Bs.${pagado.toFixed(2)}</td>
+      <td style="padding:7px 4px;text-align:right;font-weight:900;color:${saldo>0?'var(--ro)':'var(--v)'}">Bs.${saldo.toFixed(2)}</td>
+      <td style="padding:7px 4px;text-align:center;font-size:.7rem;color:var(--gr)">${ultPagoStr}</td>
+      <td style="padding:4px">
+        <button onclick="verDetalleCliente('${encodeURIComponent(g.nombre)}')"
+          style="background:var(--v);color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:.7rem;font-weight:800;cursor:pointer">
+          📋 Ver
+        </button>
+      </td>
+    </tr>`;
+  }).join("");
+
+  list.innerHTML = "";
+}
+
+// ── Ver detalle completo del cliente (todos sus fiados) ──────
+async function verDetalleCliente(nombreEnc) {
+  const nombre = decodeURIComponent(nombreEnc);
+  const items  = fiados.filter(f => (f.nombre||"").trim().toLowerCase() === nombre.trim().toLowerCase());
+  if(!items.length) return;
+
+  const total  = items.reduce((s,f)=>s+(f.monto||0),0);
+  const pagado = items.reduce((s,f)=>s+(f.pagado||0),0);
+  const saldo  = total - pagado;
+
+  // Guardar IDs para pagos
+  window._fiadoClienteNombre = nombre;
+  window._fiadoClienteIds    = items.map(f=>f.id);
+
+  // Cargar historial de pagos de TODOS sus fiados
+  let pagosHtml = '';
+  try {
+    const allPagos = [];
+    for(const f of items) {
+      const snap = await fs.getDocs(fs.query(
+        fs.collection(db,'pagos_fiado'),
+        fs.where('fiadoId','==',f.id),
+        fs.orderBy('createdAt','desc')
+      ));
+      snap.docs.forEach(d => allPagos.push({...d.data(),id:d.id}));
+    }
+    allPagos.sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+    if(allPagos.length) {
+      pagosHtml = `<div style="font-size:.8rem;font-weight:800;margin:12px 0 6px;color:var(--v)">💰 Historial de pagos</div>` +
+        allPagos.map(p => `
+          <div style="display:flex;justify-content:space-between;align-items:center;
+            padding:6px 10px;background:var(--vbg);border-radius:8px;margin-bottom:4px">
+            <div>
+              <div style="font-size:.75rem;color:var(--gr)">${fmtFecha(p.createdAt)}</div>
+              ${p.nota?`<div style="font-size:.72rem;color:#555">${p.nota}</div>`:''}
+            </div>
+            <span style="font-weight:900;color:var(--v);font-size:.85rem">+Bs.${(p.monto||0).toFixed(2)}</span>
+          </div>`).join('');
+    } else {
+      pagosHtml = `<div style="font-size:.78rem;color:var(--gr);margin-top:8px">Sin pagos registrados aún</div>`;
+    }
+  } catch(e) {}
+
+  // Fiados individuales
+  const fiadosHtml = items.map(f => {
+    const fsaldo = (f.monto||0)-(f.pagado||0);
+    return `<div style="background:#f9fef9;border:1.5px solid var(--vbg);border-radius:8px;padding:8px 10px;margin-bottom:6px">
+      <div style="font-size:.72rem;color:var(--gr)">${fmtFecha(f.createdAt)}</div>
+      ${f.detalle?`<div style="font-size:.8rem;margin-top:3px">${f.detalle}</div>`:''}
+      <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:.8rem">
+        <span>Deuda: <b>Bs.${(f.monto||0).toFixed(2)}</b></span>
+        <span>Pagado: <b style="color:var(--v)">Bs.${(f.pagado||0).toFixed(2)}</b></span>
+        <span>Saldo: <b style="color:${fsaldo>0?'var(--ro)':'var(--v)'}">Bs.${fsaldo.toFixed(2)}</b></span>
       </div>
     </div>`;
-  }).join("");
+  }).join('');
+
+  document.getElementById('fiadoDetalleTitle').textContent = `📋 ${nombre}`;
+  document.getElementById('fiadoDetalleContent').innerHTML = `
+    <!-- Resumen total -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
+      <div style="background:var(--vbg);border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:.7rem;color:var(--gr)">Total fiado</div>
+        <div style="font-weight:900;font-size:1rem">Bs.${total.toFixed(2)}</div>
+      </div>
+      <div style="background:#e8f5e9;border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:.7rem;color:var(--gr)">Pagado</div>
+        <div style="font-weight:900;font-size:1rem;color:var(--v)">Bs.${pagado.toFixed(2)}</div>
+      </div>
+      <div style="background:${saldo>0?'#ffebee':'#e8f5e9'};border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:.7rem;color:var(--gr)">Saldo</div>
+        <div style="font-weight:900;font-size:1rem;color:${saldo>0?'var(--ro)':'var(--v)'}">Bs.${saldo.toFixed(2)}</div>
+      </div>
+    </div>
+
+    <!-- Botones de acción -->
+    ${saldo > 0 ? `
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button onclick="openPagoParcCliente()" class="btn btn-or" style="flex:1">
+        💵 Pago parcial
+      </button>
+      <button onclick="pagoTotalCliente()" class="btn btn-v" style="flex:1">
+        ✅ Saldar todo (Bs.${saldo.toFixed(2)})
+      </button>
+    </div>` : `<div style="text-align:center;color:var(--v);font-weight:800;margin-bottom:12px">✅ Deuda saldada</div>`}
+
+    <!-- Fiados individuales -->
+    <div style="font-size:.8rem;font-weight:800;margin-bottom:6px;color:var(--v)">📝 Fiados registrados</div>
+    ${fiadosHtml}
+
+    <!-- Historial pagos -->
+    ${pagosHtml}`;
+
+  document.getElementById('btnPagoParc').style.display = 'none'; // ocultamos el botón viejo
+  openModal('fiadoDetalleModal');
 }
-function openAddFiado(){openModal("fiadoModal");["fiadoNombre","fiadoMonto","fiadoDetalle"].forEach(id=>document.getElementById(id).value="");}
-async function saveFiado(){
-  const nombre=document.getElementById("fiadoNombre").value.trim();
-  const monto=parseFloat(document.getElementById("fiadoMonto").value)||0;
-  if(!nombre||!monto){showToast("Completá nombre y monto",true);return;}
-  await fs.addDoc(fs.collection(db,"fiados"),{nombre,monto,detalle:document.getElementById("fiadoDetalle").value.trim(),cobrado:false,createdAt:fs.serverTimestamp()});
-  closeModal("fiadoModal");showToast("📋 Fiado registrado");
+
+function openPagoParcCliente() {
+  document.getElementById('pagoParcMonto').value = '';
+  document.getElementById('pagoParcNota').value  = '';
+  openModal('pagoParcModal');
 }
-async function cobrarFiado(id,monto){
-  if(!confirm(`¿Marcar como cobrado Bs.${monto}?`))return;
-  await fs.updateDoc(fs.doc(db,"fiados",id),{cobrado:true,cobradoAt:fs.serverTimestamp()});
-  showToast("✅ Fiado cobrado");
+
+async function pagoTotalCliente() {
+  const nombre = window._fiadoClienteNombre;
+  const ids    = window._fiadoClienteIds || [];
+  if(!ids.length) return;
+  if(!confirm(`¿Saldar toda la deuda de ${nombre}?`)) return;
+  try {
+    for(const id of ids) {
+      const f = fiados.find(x=>x.id===id);
+      if(!f) continue;
+      const saldo = (f.monto||0)-(f.pagado||0);
+      if(saldo <= 0) continue;
+      await fs.addDoc(fs.collection(db,'pagos_fiado'), {
+        fiadoId: id, monto: saldo, nota: 'Pago total',
+        createdAt: fs.serverTimestamp()
+      });
+      await fs.updateDoc(fs.doc(db,'fiados',id), {
+        pagado: f.monto, cobrado: true, lastPagoAt: fs.serverTimestamp()
+      });
+    }
+    closeModal('fiadoDetalleModal');
+    showToast(`✅ Deuda de ${nombre} saldada`);
+  } catch(e) { showToast('Error: '+e.message, true); }
+}
+
+async function savePagoParc() {
+  const monto = parseFloat(document.getElementById('pagoParcMonto').value)||0;
+  const nota  = document.getElementById('pagoParcNota').value.trim();
+  if(!monto) { showToast('Ingresá el monto', true); return; }
+
+  // Modo cliente agrupado
+  const ids = window._fiadoClienteIds || (window._fiadoDetalleId ? [window._fiadoDetalleId] : []);
+  if(!ids.length) return;
+
+  try {
+    let restante = monto;
+    for(const id of ids) {
+      if(restante <= 0) break;
+      const f = fiados.find(x=>x.id===id);
+      if(!f) continue;
+      const saldo = (f.monto||0)-(f.pagado||0);
+      if(saldo <= 0) continue;
+      const aplicar = Math.min(restante, saldo);
+      await fs.addDoc(fs.collection(db,'pagos_fiado'), {
+        fiadoId: id, monto: aplicar, nota,
+        createdAt: fs.serverTimestamp()
+      });
+      const newPagado = (f.pagado||0) + aplicar;
+      await fs.updateDoc(fs.doc(db,'fiados',id), {
+        pagado: newPagado,
+        cobrado: newPagado >= f.monto,
+        lastPagoAt: fs.serverTimestamp()
+      });
+      restante -= aplicar;
+    }
+    closeModal('pagoParcModal');
+    closeModal('fiadoDetalleModal');
+    showToast(`✅ Pago de Bs.${monto.toFixed(2)} registrado`);
+  } catch(e) { showToast('Error: '+e.message, true); }
 }
 
 // ════════════════════════════════════
