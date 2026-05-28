@@ -2061,7 +2061,8 @@ function startVoiceSearch(){
   if(window.speechSynthesis) window.speechSynthesis.cancel();
   const mic=document.getElementById("micFab");
   voiceRecog=new SR();
-  voiceRecog.lang="es-BO"; voiceRecog.interimResults=true; voiceRecog.continuous=true;
+  voiceRecog.lang="es-BO"; voiceRecog.interimResults=true; voiceRecog.continuous=false;
+  voiceRecog.maxAlternatives=1;
   let finalTranscript = "";
 
   voiceRecog.onstart=()=>{
@@ -2077,11 +2078,20 @@ function startVoiceSearch(){
   voiceRecog.onresult=(e)=>{
     let interim = "";
     for(let i=e.resultIndex;i<e.results.length;i++){
-      if(e.results[i].isFinal) finalTranscript += e.results[i][0].transcript + " ";
-      else interim += e.results[i][0].transcript;
+      if(e.results[i].isFinal) {
+        const text = e.results[i][0].transcript.trim();
+        if(text) {
+          stopVoiceSearch();
+          processVoiceWithAI(text);
+          return;
+        }
+      } else {
+        interim += e.results[i][0].transcript;
+      }
     }
+    // Mostrar transcripción interina
     const vp = document.getElementById("voiceTranscriptPanel");
-    if(vp) vp.textContent = "🎤 " + (finalTranscript + interim).trim();
+    if(vp && interim) { vp.style.display="block"; vp.textContent = "🎤 " + interim; }
   };
 
   voiceRecog.onerror=(e)=>{
