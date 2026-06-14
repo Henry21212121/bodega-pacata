@@ -522,6 +522,17 @@ input[type=file]{display:none;}
           <div class="fld"><label>🕐 Hora cierre delivery (pedidos presenciales)</label><input type="time" id="cfgDeliveryClose" value="16:00"></div>
           <div class="fld"><label>⏰ Duración franja programada (min)</label><input type="number" id="cfgDeliverySlotMins" min="15" step="15" value="30" placeholder="30"></div>
         </div>
+        <div style="background:#fff8ec;border:1.5px solid #fde19a;border-radius:10px;padding:12px;margin-bottom:12px">
+          <div style="font-size:.82rem;font-weight:800;color:#e07b00;margin-bottom:6px">⏰ Pedido programado</div>
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+            <div class="tog-wrap" onclick="togCfg('cfgScheduledEnabled')" id="cfgScheduledEnabled-wrap" style="width:44px;height:24px;border-radius:12px;background:#ccc;position:relative;transition:background .2s;flex-shrink:0">
+              <div id="cfgScheduledEnabled-knob" style="position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s"></div>
+            </div>
+            <input type="checkbox" id="cfgScheduledEnabled" style="display:none">
+            <span style="font-size:.82rem">Permitir que clientes programen pedidos para otro horario</span>
+          </label>
+          <p style="font-size:.75rem;color:#888;margin:6px 0 0 54px">Cuando está desactivado, la opción de "programar pedido" no aparece en la tienda online aunque esté cerrada.</p>
+        </div>
         <div style="background:#f9fef9;border:1px solid #c8e6c9;border-radius:10px;padding:12px;margin-bottom:12px">
           <div style="font-size:.8rem;font-weight:800;color:var(--v);margin-bottom:8px">🚚 Tarifas de delivery por distancia</div>
           <div class="form-row">
@@ -2203,6 +2214,15 @@ function loadConfig() {
   set("cfgDeliveryClose", c.deliveryClose||"16:00");
   set("cfgDeliverySlotMins", c.deliverySlotMins||30);
   set("cfgPin", "");
+  // Toggle pedido programado
+  const schedCb = document.getElementById("cfgScheduledEnabled");
+  if(schedCb) {
+    schedCb.checked = c.scheduledEnabled === true; // default OFF
+    const wrap = document.getElementById("cfgScheduledEnabled-wrap");
+    const knob = document.getElementById("cfgScheduledEnabled-knob");
+    if(wrap) wrap.style.background = schedCb.checked ? 'var(--v)' : '#ccc';
+    if(knob) knob.style.left = schedCb.checked ? '23px' : '3px';
+  }
   // Voice toggle
   const voiceCb = document.getElementById("cfgVoiceEnabled");
   if(voiceCb) {
@@ -2276,6 +2296,7 @@ async function saveConfig() {
     storeLat: window._storeLat || DB.config.storeLat || -17.3895,
     storeLng: window._storeLng || DB.config.storeLng || -66.1568,
     voiceEnabled: document.getElementById("cfgVoiceEnabled")?.checked !== false,
+    scheduledEnabled: document.getElementById("cfgScheduledEnabled")?.checked === true,
     pwdSet: true
   };
   if(pin && pin.length>=4) data.pin = pin;
