@@ -26,30 +26,8 @@
                  onSnapshot, collection, query, where, orderBy, limit,
                  serverTimestamp, increment, writeBatch };
   window._dbReady = true;
-function openAddFiado(){
-  openModal("fiadoModal");
-  ["fiadoNombre","fiadoMonto","fiadoDetalle"].forEach(id=>{
-    const el=document.getElementById(id); if(el) el.value="";
-  });
-}
-async function saveFiado(){
-  const nombre=document.getElementById("fiadoNombre").value.trim();
-  const monto=parseFloat(document.getElementById("fiadoMonto").value)||0;
-  if(!nombre||!monto){showToast("Completá nombre y monto",true);return;}
-  await fs.addDoc(fs.collection(db,"fiados"),{
-    nombre, monto,
-    detalle: document.getElementById("fiadoDetalle").value.trim(),
-    cobrado: false, pagado: 0,
-    createdAt: fs.serverTimestamp()
-  });
-  closeModal("fiadoModal");
-  showToast("📋 Fiado registrado");
-}
-
-window.verDetalleCliente = verDetalleCliente;
-window.openPagoParcCliente = openPagoParcCliente;
-window.pagoTotalCliente = pagoTotalCliente;
-window.fmtFecha = fmtFecha;
+window.toggleModoCalc = toggleModoCalc;
+window.actualizarUIModCalc = actualizarUIModCalc;
 </script>
 <style>
 :root{
@@ -97,10 +75,9 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 /* SELL LAYOUT */
 .sell-layout{display:flex;height:calc(100vh - 116px);overflow:hidden;}
 .sell-left{flex:1;overflow-y:auto;padding:10px 10px 10px 12px;border-right:2px solid var(--vbg);}
-.sell-right{width:380px;display:flex;flex-direction:column;background:#fff;min-width:220px;max-width:600px;position:relative;}
-#sellRightResizer{position:absolute;left:0;top:0;width:6px;height:100%;cursor:col-resize;z-index:50;background:transparent;transition:background .15s;}
-#sellRightResizer:hover,#sellRightResizer.dragging{background:var(--vbg);}
-#sellRightResizer::after{content:'';position:absolute;left:2px;top:50%;transform:translateY(-50%);height:40px;width:2px;border-radius:2px;background:var(--vbg);opacity:.7;}
+.sell-right{width:380px;display:flex;flex-direction:column;background:#fff;}
+.modo-calc-banner{background:linear-gradient(135deg,#e65100,#ff6d00);color:#fff;text-align:center;padding:6px 12px;font-size:.75rem;font-weight:800;letter-spacing:.3px;}
+.modo-calc-banner b{font-size:.82rem;}
 /* Grid inside sell-left: always 3 cols on desktop */
 .sell-left .prod-grid{grid-template-columns:repeat(3,1fr);}
 @media(min-width:600px){.sell-left .prod-grid{grid-template-columns:repeat(4,1fr);}}
@@ -244,8 +221,8 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 .btn-ro{background:var(--ro);color:#fff;}
 
 /* MIC FAB */
-.mic-fab{background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.35);color:#fff;border-radius:50%;width:36px;height:36px;min-width:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .2s;}
-.mic-fab.active{background:var(--ro)!important;border-color:var(--ro)!important;animation:mic-active-pulse 1s ease-in-out infinite;}
+.mic-fab{position:fixed;bottom:82px;right:16px;background:var(--v);color:#fff;border:none;border-radius:50%;width:52px;height:52px;box-shadow:0 4px 20px rgba(45,122,69,.4);cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:300;-webkit-tap-highlight-color:transparent;}
+.mic-fab.active{background:var(--ro);box-shadow:0 4px 20px rgba(229,57,53,.5);animation:pulse .8s infinite;}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08);}}
 .voice-panel{display:none;position:fixed;bottom:84px;right:14px;width:min(300px,88vw);background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.22);z-index:299;padding:14px;border:2px solid var(--vbg);}
 
@@ -297,6 +274,10 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
     </div>
     <button class="logout-btn" onclick="logout()">Salir</button>
   </div>
+  <!-- Banner modo calculadora -->
+  <div id="modoCalcBanner" class="modo-calc-banner" style="display:none">
+    🧮 <b>MODO CALCULADORA</b> — Las ventas no modifican el stock ni se guardan en la base de datos
+  </div>
 </header>
 
 <!-- TABS -->
@@ -320,8 +301,6 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
         <button onclick="clearVendSearch()" style="background:none;border:none;color:var(--gr);cursor:pointer;padding:0 2px">✕</button>
         <div class="search-suggestions" id="searchSuggestions" style="display:none"></div>
       </div>
-      <div id="voiceTranscriptPanel" style="display:none;background:#f0fff4;border:1.5px solid var(--vbg);border-radius:10px;padding:10px 12px;font-size:.82rem;color:var(--v);margin:6px 0 2px;font-style:italic"></div>
-      <div id="voiceChoicesPanel" style="display:none;background:#fff;border:2px solid var(--vbg);border-radius:12px;padding:12px;margin:4px 0;box-shadow:0 4px 16px rgba(0,0,0,.12)"></div>
       <div class="prod-tabs">
         <button class="prod-tab-btn active-cat" id="catTabBtn" onclick="switchProdTab('catalogo')">📦 Catálogo</button>
         <button class="prod-tab-btn inactive" id="cqTabBtn" onclick="switchProdTab('coquette')">🥬 COQUETTE</button>
@@ -329,19 +308,9 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
       <div id="vendProdsWrap"></div>
     </div>
     <!-- RIGHT: cart -->
-    <div class="sell-right" id="sellRight">
-      <div id="sellRightResizer"></div>
+    <div class="sell-right">
       <div class="sell-right-header">
         <span>🛒 Selección</span>
-        <button id="micFab" onclick="toggleVoiceSearch()" title="Búsqueda por voz"
-          style="background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.35);color:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .2s">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="9" y="2" width="6" height="11" rx="3"/>
-            <path d="M5 10a7 7 0 0 0 14 0"/>
-            <line x1="12" y1="17" x2="12" y2="21"/>
-            <line x1="8" y1="21" x2="16" y2="21"/>
-          </svg>
-        </button>
         <button onclick="clearCart()" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:50px;padding:3px 10px;font-size:.7rem;cursor:pointer">Vaciar</button>
       </div>
       <div class="sell-right-items" id="cartItems">
@@ -539,7 +508,21 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 <div class="tab-content" id="tab-configuracion">
   <div class="inner">
 
-    <!-- Cambiar PIN -->
+    <!-- MODO CALCULADORA -->
+    <div style="background:#fff;border-radius:var(--rd);padding:14px;box-shadow:var(--sh);margin-top:10px;margin-bottom:12px;border:2px solid #ff6d00">
+      <div class="section-title" style="margin-bottom:8px;color:#e65100">🧮 Modo Calculadora</div>
+      <p style="font-size:.82rem;color:#666;margin:0 0 12px">Cuando está activo, las ventas calculan el total normalmente pero <b>no descuentan stock</b> ni <b>se guardan en la base de datos</b>. Útil mientras se carga el inventario inicial.</p>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div>
+          <div style="font-weight:800;font-size:.9rem" id="modoCalcLabel">Desactivado</div>
+          <div style="font-size:.75rem;color:#aaa">Las ventas se registran normalmente</div>
+        </div>
+        <button id="btnModoCalc" onclick="toggleModoCalc()"
+          style="padding:10px 20px;border:none;border-radius:10px;font-weight:800;font-size:.9rem;cursor:pointer;background:#eee;color:#555;min-width:120px;transition:all .2s">
+          Activar
+        </button>
+      </div>
+    </div>
     <div style="background:#fff;border-radius:var(--rd);padding:14px;box-shadow:var(--sh);margin-top:10px;margin-bottom:12px">
       <div class="section-title" style="margin-bottom:10px">🔐 Cambiar PIN de acceso</div>
       <div class="fld"><label>PIN actual</label><input type="password" id="cfgPinActual" maxlength="4" placeholder="••••" style="letter-spacing:4px"></div>
@@ -746,7 +729,15 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
   </div>
 </div>
 
-<!-- MIC FAB movido al footer del panel derecho -->
+<!-- MIC FAB — graba directo sin burbuja -->
+<button class="mic-fab" id="micFab" onclick="toggleVoiceSearch()">
+  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="9" y="2" width="6" height="11" rx="3"/>
+    <path d="M5 10a7 7 0 0 0 14 0"/>
+    <line x1="12" y1="17" x2="12" y2="21"/>
+    <line x1="8" y1="21" x2="16" y2="21"/>
+  </svg>
+</button>
 
 <!-- MODAL: FIAR DESDE CARRITO -->
 <div class="modal-ov" id="fiarModal"><button onclick="closeModal('fiarModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
@@ -1076,7 +1067,57 @@ async function deleteProdFisica(id) {
 
 // ── FIADOS MEJORADOS ─────────────────────────────────────
 
+async function verDetalleFiado(id) {
+  window._fiadoDetalleId = id;
+  const f = fiados.find(x=>x.id===id);
+  if(!f) return;
+  const saldo = (f.monto||0) - (f.pagado||0);
+  document.getElementById('fiadoDetalleTitle').textContent = `📋 ${f.nombre}`;
 
+  // Load pagos parciales
+  let pagosHtml = '<div style="font-size:.78rem;color:var(--gr);margin-top:8px">Sin pagos parciales registrados</div>';
+  try {
+    const pagosSnap = await fs.getDocs(fs.query(
+      fs.collection(db,'pagos_fiado'),
+      fs.where('fiadoId','==',id),
+      fs.orderBy('createdAt','desc')
+    ));
+    const pagos = pagosSnap.docs.map(d=>({...d.data(),id:d.id}));
+    if(pagos.length) {
+      pagosHtml = `<div style="font-size:.8rem;font-weight:800;margin:10px 0 6px;color:var(--v)">💰 Pagos parciales:</div>` +
+        pagos.map(p=>{
+          const t = p.createdAt?.seconds ? new Date(p.createdAt.seconds*1000) : new Date();
+          return `<div style="display:flex;justify-content:space-between;padding:5px 8px;background:var(--vbg);border-radius:8px;margin-bottom:4px;font-size:.78rem">
+            <span>${t.toLocaleDateString('es',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${p.nota?' · '+p.nota:''}</span>
+            <span style="font-weight:800;color:var(--v)">+Bs.${(p.monto||0).toFixed(2)}</span>
+          </div>`;
+        }).join('');
+    }
+  } catch(e) {}
+
+  // Load deudas (fiado items)
+  const t = f.createdAt?.seconds ? new Date(f.createdAt.seconds*1000) : new Date();
+  document.getElementById('fiadoDetalleContent').innerHTML = `
+    <div style="background:var(--vbg);border-radius:10px;padding:10px;margin-bottom:8px">
+      <div style="font-size:.78rem;color:var(--gr)">${t.toLocaleDateString('es',{day:'numeric',month:'long',year:'numeric'})}</div>
+      ${f.detalle?`<div style="font-size:.82rem;margin-top:4px">${f.detalle}</div>`:''}
+      ${f.aCuenta?`<div style="font-size:.8rem;color:var(--v);margin-top:4px">A cuenta: Bs.${(f.aCuenta||0).toFixed(2)}</div>`:''}
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--vbg);font-size:.82rem">
+      <span>Deuda total</span><span style="font-weight:800">Bs.${(f.monto||0).toFixed(2)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--vbg);font-size:.82rem">
+      <span style="color:var(--v)">Total pagado</span><span style="font-weight:800;color:var(--v)">Bs.${(f.pagado||0).toFixed(2)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:.95rem">
+      <span style="font-weight:900;color:${saldo>0?'var(--ro)':'var(--v)'}">Saldo ${saldo>0?'pendiente':'saldado'}</span>
+      <span style="font-weight:900;color:${saldo>0?'var(--ro)':'var(--v)'}">Bs.${saldo.toFixed(2)}</span>
+    </div>
+    ${pagosHtml}`;
+
+  document.getElementById('btnPagoParc').style.display = saldo > 0 ? 'block' : 'none';
+  openModal('fiadoDetalleModal');
+}
 
 function openPagoParc(id) {
   window._fiadoDetalleId = id;
@@ -1113,14 +1154,6 @@ async function savePagoParc() {
 }
 
 // ── FIAR DESDE CARRITO ──────────────────────────────────
-function calcFiarSaldo() {
-  const total = cartTotal();
-  const aCuenta = parseFloat(document.getElementById('fiarACuenta')?.value)||0;
-  const saldo = Math.max(0, total - aCuenta);
-  const el = document.getElementById('fiarSaldoDisplay');
-  if(el) el.textContent = saldo > 0 ? `Total a fiar: Bs.${saldo.toFixed(2)}` : '✅ Saldado al contado';
-}
-
 function openFiarCheckout() {
   if(!Object.keys(cart).length) return;
   fiarDeudorSeleccionado = null;
@@ -1152,7 +1185,8 @@ function buscarDeudor() {
   sug.innerHTML = matches.map(f=>{
     const saldo = (f.monto||0)-(f.pagado||0);
     return `<div onclick="seleccionarDeudor('${f.id}')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--vbg);font-size:.82rem">
-      <b>${f.nombre}</b> — Saldo: Bs.${saldo.toFixed(2)}
+      <div style="font-weight:700">${f.nombre}</div>
+      <div style="font-size:.72rem;color:var(--ro)">Debe: Bs.${saldo.toFixed(2)}</div>
     </div>`;
   }).join('');
   sug.style.display = 'block';
@@ -1163,14 +1197,31 @@ function seleccionarDeudor(id) {
   if(!f) return;
   fiarDeudorSeleccionado = f;
   document.getElementById('fiarSugerencias').style.display = 'none';
-  document.getElementById('fiarBuscar').value = f.nombre;
+  document.getElementById('fiarBuscar').value = '';
   document.getElementById('fiarDeudorNombre').textContent = f.nombre;
   const saldo = (f.monto||0)-(f.pagado||0);
-  const total = cartTotal();
-  document.getElementById('fiarDeudorSaldo').textContent = saldo > 0
-    ? `Saldo fiado: Bs.${saldo.toFixed(2)}`
-    : `Total a fiar: Bs.${total.toFixed(2)}`;
+  document.getElementById('fiarDeudorSaldo').textContent = `Saldo actual: Bs.${saldo.toFixed(2)}`;
   document.getElementById('fiarDeudorSelec').style.display = 'block';
+  document.getElementById('fiarNuevoForm').style.display = 'none';
+  calcFiarSaldo();
+}
+
+function clearFiarDeudor() {
+  fiarDeudorSeleccionado = null;
+  document.getElementById('fiarDeudorSelec').style.display = 'none';
+  document.getElementById('fiarNuevoForm').style.display = 'block';
+}
+
+function calcFiarSaldo() {
+  const total = cartTotal();
+  const aCuenta = parseFloat(document.getElementById('fiarACuenta').value)||0;
+  const saldo = total - aCuenta;
+  const el = document.getElementById('fiarSaldoDisplay');
+  if(el && total > 0) {
+    el.textContent = aCuenta > 0
+      ? `A cuenta: Bs.${aCuenta.toFixed(2)} → Saldo fiado: Bs.${saldo.toFixed(2)}`
+      : `Total a fiar: Bs.${total.toFixed(2)}`;
+  }
 }
 
 async function confirmarFiar() {
@@ -1268,10 +1319,38 @@ let db, fs;
 let DB = { products:{}, config:{}, tempProds:[] };
 let pinInput = "";
 let cart = {};        // id -> {prod, qty, tipo}
+let modoCalculadora = localStorage.getItem('modoCalc') === 'true';
+
+function toggleModoCalc() {
+  modoCalculadora = !modoCalculadora;
+  localStorage.setItem('modoCalc', modoCalculadora);
+  actualizarUIModCalc();
+}
+
+function actualizarUIModCalc() {
+  const banner = document.getElementById('modoCalcBanner');
+  const btn    = document.getElementById('btnModoCalc');
+  const label  = document.getElementById('modoCalcLabel');
+  if(modoCalculadora) {
+    if(banner) banner.style.display = 'block';
+    if(btn)  { btn.textContent = 'Desactivar'; btn.style.background = '#ff6d00'; btn.style.color = '#fff'; }
+    if(label) { label.textContent = '🧮 Activado'; label.style.color = '#e65100'; }
+    document.getElementById('modoCalcLabel')?.nextElementSibling && 
+      (document.getElementById('modoCalcLabel').nextElementSibling.textContent = 'Las ventas solo calculan, no modifican stock');
+  } else {
+    if(banner) banner.style.display = 'none';
+    if(btn)  { btn.textContent = 'Activar'; btn.style.background = '#eee'; btn.style.color = '#555'; }
+    if(label) { label.textContent = 'Desactivado'; label.style.color = '#555'; }
+    document.getElementById('modoCalcLabel')?.nextElementSibling &&
+      (document.getElementById('modoCalcLabel').nextElementSibling.textContent = 'Las ventas se registran normalmente');
+  }
+}
+
+// Aplicar al cargar
+document.addEventListener('DOMContentLoaded', () => actualizarUIModCalc());
 let currentProdTab = "catalogo";
 let payMethod = "efectivo";
 let editTempId = null;
-let toastTimer;
 let allSales = [], allGastos = [], fiados = [], compras = [];
 
 // ════════════════════════════════════
@@ -1537,8 +1616,7 @@ function makeProdCard(p, tipo) {
   const agotado = p.stock === 0;
   const isTmp = tipo === "temporal";
   const low = p.stockMin > 0 && p.stock <= p.stockMin && p.stock > 0;
-  // Promos solo para catálogo bodega, no para productos físicos de tienda
-  const conPromo = !isTmp && p.promoActive && p.promos && p.promos.length > 1;
+  const conPromo = p.promoActive && p.promos && p.promos.length > 1;
   const inCart = cart[tipo + "_" + p.id];
 
   // Image wrap — exact same as virtual store
@@ -1568,9 +1646,9 @@ function makeProdCard(p, tipo) {
   }
 
   // Cart control — same as virtual store
-  const atMax = inCart && inCart.qty >= p.stock && p.stock > 0;
+  const atMax = !modoCalculadora && inCart && inCart.qty >= p.stock && p.stock > 0;
   let ctrlHtml = "";
-  if(agotado) {
+  if(agotado && !modoCalculadora) {
     ctrlHtml = `<button class="abtn" disabled>Sin stock</button>`;
   } else if(inCart) {
     ctrlHtml = `<div class="qctrl">
@@ -1604,13 +1682,12 @@ function makeProdCard(p, tipo) {
 function addToCart(id, tipo) {
   const prod = tipo==="temporal" ? DB.tempProds.find(p=>p.id===id) : DB.products[id];
   if(!prod) return;
-  if(tipo==="catalogo" && prod.stock===0) { showToast("⚠️ Producto agotado",true); return; }
+  if(!modoCalculadora && tipo==="catalogo" && prod.stock===0) { showToast("Sin stock",true); return; }
   const key = tipo+"_"+id;
-  const stockMax = (prod.stock != null && prod.stock > 0) ? prod.stock : Infinity;
+  const stockMax = (!modoCalculadora && prod.stock != null && prod.stock > 0) ? prod.stock : Infinity;
   const actual = cart[key]?.qty || 0;
-  if(actual >= stockMax) {
-    showToast("⚠️ Máximo disponible: "+stockMax+" unidad"+(stockMax!==1?"es":""),true);
-    return;
+  if(!modoCalculadora && actual >= stockMax) {
+    showToast("⚠️ Máximo disponible: "+stockMax, true); return;
   }
   if(cart[key]) { cart[key].qty++; }
   else { cart[key] = {prod, qty:1, tipo}; }
@@ -1622,13 +1699,11 @@ function addToCart(id, tipo) {
 function changeCartQty(key, delta) {
   if(!cart[key]) return;
   const entry = cart[key];
-  const prod = entry.prod;
-  const stockMax = (prod.stock != null && prod.stock > 0) ? prod.stock : Infinity;
+  const stockMax = (!modoCalculadora && entry.prod.stock != null && entry.prod.stock > 0) ? entry.prod.stock : Infinity;
   const nuevaQty = entry.qty + delta;
   if(nuevaQty <= 0) { delete cart[key]; renderCart(); return; }
-  if(delta > 0 && nuevaQty > stockMax) {
-    showToast("⚠️ Máximo disponible: "+stockMax+" unidad"+(stockMax!==1?"es":""),true);
-    return;
+  if(!modoCalculadora && delta > 0 && nuevaQty > stockMax) {
+    showToast("⚠️ Máximo disponible: "+stockMax, true); return;
   }
   cart[key].qty = nuevaQty;
   renderCart();
@@ -1666,22 +1741,17 @@ function renderCart() {
   }
 
   const total = cartTotal();
-  ci.innerHTML = items.map(([key,entry])=>{
-    const stockMax = (entry.prod.stock != null && entry.prod.stock > 0) ? entry.prod.stock : Infinity;
-    const atMax = entry.qty >= stockMax;
-    const stockLabel = stockMax !== Infinity ? `<span style="font-size:.7rem;color:${atMax?'var(--ro)':'var(--gr)'}"> (${entry.qty}/${stockMax})</span>` : '';
-    return `
+  ci.innerHTML = items.map(([key,entry])=>`
     <div class="cart-item">
-      <div class="ci-name">${entry.prod.nombre.length>28?entry.prod.nombre.slice(0,28)+"…":entry.prod.nombre}${stockLabel}</div>
+      <div class="ci-name">${entry.prod.nombre.length>28?entry.prod.nombre.slice(0,28)+"…":entry.prod.nombre}</div>
       <div class="ci-qty">
         <button class="ci-btn" onclick="changeCartQty('${key}',-1)">−</button>
         <span class="ci-num">${entry.qty}</span>
-        <button class="ci-btn" onclick="changeCartQty('${key}',+1)" ${atMax?'disabled style="opacity:.4;cursor:not-allowed"':''}>+</button>
+        <button class="ci-btn" onclick="changeCartQty('${key}',+1)">+</button>
       </div>
       <div class="ci-price">Bs.${((entry.prod.precio||0)*entry.qty).toFixed(2)}</div>
       <button class="ci-del" onclick="removeFromCart('${key}')">✕</button>
-    </div>`;
-  }).join("");
+    </div>`).join("");
 
   const totalQty = items.reduce((s,[,e])=>s+e.qty,0);
   cartTotalEl.textContent = "Bs. "+total.toFixed(2);
@@ -1753,21 +1823,29 @@ async function confirmSale() {
   };
 
   try {
-    await fs.addDoc(fs.collection(db,"sales_physical"), sale);
-    // Decrement stock
-    for(const [,entry] of items) {
-      if(entry.tipo==="catalogo" && DB.products[entry.prod.id]?.stock>0) {
-        await fs.updateDoc(fs.doc(db,"products",entry.prod.id), {stock:fs.increment(-Math.ceil(entry.qty))});
+    if(modoCalculadora) {
+      // MODO CALCULADORA: solo mostrar total, no guardar ni descontar
+      closeCheckout();
+      cart = {};
+      renderCart();
+      showToast("🧮 Total: Bs."+total.toFixed(2)+" (modo calculadora — no guardado)");
+    } else {
+      await fs.addDoc(fs.collection(db,"sales_physical"), sale);
+      // Decrement stock
+      for(const [,entry] of items) {
+        if(entry.tipo==="catalogo" && DB.products[entry.prod.id]?.stock>0) {
+          await fs.updateDoc(fs.doc(db,"products",entry.prod.id), {stock:fs.increment(-Math.ceil(entry.qty))});
+        }
+        if(entry.tipo==="temporal" && entry.prod.stock!=null) {
+          const ns = Math.max(0,(entry.prod.stock||0)-entry.qty);
+          await fs.updateDoc(fs.doc(db,"tempProducts",entry.prod.id), {stock:ns});
+        }
       }
-      if(entry.tipo==="temporal" && entry.prod.stock!=null) {
-        const ns = Math.max(0,(entry.prod.stock||0)-entry.qty);
-        await fs.updateDoc(fs.doc(db,"tempProducts",entry.prod.id), {stock:ns});
-      }
+      closeCheckout();
+      cart = {};
+      renderCart();
+      showToast("✅ Venta registrada — Bs."+total.toFixed(2));
     }
-    closeCheckout();
-    cart = {};
-    renderCart();
-    showToast("✅ Venta registrada — Bs."+total.toFixed(2));
   } catch(e) { showToast("Error: "+e.message,true); }
 }
 
@@ -1950,230 +2028,38 @@ async function saveGasto() {
 // ════════════════════════════════════
 // FIADOS
 // ════════════════════════════════════
-function fmtFecha(ts) {
-  const d = ts?.seconds ? new Date(ts.seconds*1000) : (ts instanceof Date ? ts : new Date());
-  const dias = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-  const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-  const h = d.getHours(), m = d.getMinutes();
-  const ampm = h>=12?'PM':'AM', hh = h%12||12, mm = m.toString().padStart(2,'0');
-  return `${dias[d.getDay()]}, ${d.getDate()} de ${meses[d.getMonth()]} de ${d.getFullYear()}, ${hh}:${mm} ${ampm}`;
-}
-
 function renderFiados() {
-  const tbody = document.getElementById("fiadoTableBody");
-  const list  = document.getElementById("fiadoList");
-
-  // Agrupar fiados por nombre (normalizado)
-  const grupos = {};
-  fiados.forEach(f => {
-    const key = (f.nombre||"").trim().toLowerCase();
-    if(!grupos[key]) grupos[key] = { nombre: f.nombre, items: [] };
-    grupos[key].items.push(f);
-  });
-
-  const totalPendiente = fiados.reduce((s,f) => s + Math.max(0,(f.monto||0)-(f.pagado||0)), 0);
-  document.getElementById("fiadoTotal").textContent = "Total pendiente: Bs. "+totalPendiente.toFixed(2);
-
-  if(!Object.keys(grupos).length) {
-    list.innerHTML = `<div style="text-align:center;padding:20px;color:var(--gr);font-size:.82rem">Sin fiados pendientes 🎉</div>`;
-    tbody.innerHTML = "";
-    return;
-  }
-
-  // ── Tabla resumen ──
-  tbody.innerHTML = Object.values(grupos).map(g => {
-    const total   = g.items.reduce((s,f)=>s+(f.monto||0),0);
-    const pagado  = g.items.reduce((s,f)=>s+(f.pagado||0),0);
-    const saldo   = total - pagado;
-    const ultPago = g.items.reduce((latest,f)=>{
-      if(!f.lastPagoAt) return latest;
-      const t = f.lastPagoAt.seconds*1000;
-      return t > latest ? t : latest;
-    }, 0);
-    const ultPagoStr = ultPago
-      ? new Date(ultPago).toLocaleDateString('es',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})
-      : '—';
-    return `<tr style="border-bottom:1px solid var(--vbg)">
-      <td style="padding:7px 8px;font-weight:800">${g.nombre}
-        ${g.items.length>1?`<span style="font-size:.68rem;color:var(--v);font-weight:700"> (${g.items.length} fiados)</span>`:''}
-      </td>
-      <td style="padding:7px 4px;text-align:right">Bs.${total.toFixed(2)}</td>
-      <td style="padding:7px 4px;text-align:right;color:var(--v)">Bs.${pagado.toFixed(2)}</td>
-      <td style="padding:7px 4px;text-align:right;font-weight:900;color:${saldo>0?'var(--ro)':'var(--v)'}">Bs.${saldo.toFixed(2)}</td>
-      <td style="padding:7px 4px;text-align:center;font-size:.7rem;color:var(--gr)">${ultPagoStr}</td>
-      <td style="padding:4px">
-        <button onclick="verDetalleCliente('${encodeURIComponent(g.nombre)}')"
-          style="background:var(--v);color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:.7rem;font-weight:800;cursor:pointer">
-          📋 Ver
-        </button>
-      </td>
-    </tr>`;
-  }).join("");
-
-  list.innerHTML = "";
-}
-
-// ── Ver detalle completo del cliente (todos sus fiados) ──────
-async function verDetalleCliente(nombreEnc) {
-  const nombre = decodeURIComponent(nombreEnc);
-  const items  = fiados.filter(f => (f.nombre||"").trim().toLowerCase() === nombre.trim().toLowerCase());
-  if(!items.length) return;
-
-  const total  = items.reduce((s,f)=>s+(f.monto||0),0);
-  const pagado = items.reduce((s,f)=>s+(f.pagado||0),0);
-  const saldo  = total - pagado;
-
-  // Guardar IDs para pagos
-  window._fiadoClienteNombre = nombre;
-  window._fiadoClienteIds    = items.map(f=>f.id);
-
-  // Cargar historial de pagos de TODOS sus fiados
-  let pagosHtml = '';
-  try {
-    const allPagos = [];
-    for(const f of items) {
-      const snap = await fs.getDocs(fs.query(
-        fs.collection(db,'pagos_fiado'),
-        fs.where('fiadoId','==',f.id),
-        fs.orderBy('createdAt','desc')
-      ));
-      snap.docs.forEach(d => allPagos.push({...d.data(),id:d.id}));
-    }
-    allPagos.sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
-    if(allPagos.length) {
-      pagosHtml = `<div style="font-size:.8rem;font-weight:800;margin:12px 0 6px;color:var(--v)">💰 Historial de pagos</div>` +
-        allPagos.map(p => `
-          <div style="display:flex;justify-content:space-between;align-items:center;
-            padding:6px 10px;background:var(--vbg);border-radius:8px;margin-bottom:4px">
-            <div>
-              <div style="font-size:.75rem;color:var(--gr)">${fmtFecha(p.createdAt)}</div>
-              ${p.nota?`<div style="font-size:.72rem;color:#555">${p.nota}</div>`:''}
-            </div>
-            <span style="font-weight:900;color:var(--v);font-size:.85rem">+Bs.${(p.monto||0).toFixed(2)}</span>
-          </div>`).join('');
-    } else {
-      pagosHtml = `<div style="font-size:.78rem;color:var(--gr);margin-top:8px">Sin pagos registrados aún</div>`;
-    }
-  } catch(e) {}
-
-  // Fiados individuales
-  const fiadosHtml = items.map(f => {
-    const fsaldo = (f.monto||0)-(f.pagado||0);
-    return `<div style="background:#f9fef9;border:1.5px solid var(--vbg);border-radius:8px;padding:8px 10px;margin-bottom:6px">
-      <div style="font-size:.72rem;color:var(--gr)">${fmtFecha(f.createdAt)}</div>
-      ${f.detalle?`<div style="font-size:.8rem;margin-top:3px">${f.detalle}</div>`:''}
-      <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:.8rem">
-        <span>Deuda: <b>Bs.${(f.monto||0).toFixed(2)}</b></span>
-        <span>Pagado: <b style="color:var(--v)">Bs.${(f.pagado||0).toFixed(2)}</b></span>
-        <span>Saldo: <b style="color:${fsaldo>0?'var(--ro)':'var(--v)'}">Bs.${fsaldo.toFixed(2)}</b></span>
+  const el=document.getElementById("fiadoList");
+  const total=fiados.reduce((s,f)=>s+(f.monto||0),0);
+  document.getElementById("fiadoTotal").textContent="Total pendiente: Bs. "+total.toFixed(2);
+  if(!fiados.length){el.innerHTML=`<div style="text-align:center;padding:20px;color:var(--gr);font-size:.82rem">Sin fiados pendientes 🎉</div>`;return;}
+  el.innerHTML=fiados.map(f=>{
+    const t=f.createdAt?.seconds?new Date(f.createdAt.seconds*1000):new Date();
+    return `<div class="fiado-card">
+      <div style="flex:1">
+        <div class="fiado-name">${f.nombre}</div>
+        ${f.detalle?`<div style="font-size:.72rem;color:var(--gr)">${f.detalle}</div>`:""}
+        <div style="font-size:.7rem;color:var(--gr)">${t.toLocaleDateString("es",{day:"numeric",month:"short"})}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="fiado-amount">Bs.${(f.monto||0).toFixed(2)}</div>
+        <button onclick="cobrarFiado('${f.id}',${f.monto})" style="background:var(--v);color:#fff;border:none;border-radius:8px;padding:4px 10px;font-size:.7rem;font-weight:800;cursor:pointer;margin-top:4px">Cobrado ✓</button>
       </div>
     </div>`;
-  }).join('');
-
-  document.getElementById('fiadoDetalleTitle').textContent = `📋 ${nombre}`;
-  document.getElementById('fiadoDetalleContent').innerHTML = `
-    <!-- Resumen total -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
-      <div style="background:var(--vbg);border-radius:10px;padding:10px;text-align:center">
-        <div style="font-size:.7rem;color:var(--gr)">Total fiado</div>
-        <div style="font-weight:900;font-size:1rem">Bs.${total.toFixed(2)}</div>
-      </div>
-      <div style="background:#e8f5e9;border-radius:10px;padding:10px;text-align:center">
-        <div style="font-size:.7rem;color:var(--gr)">Pagado</div>
-        <div style="font-weight:900;font-size:1rem;color:var(--v)">Bs.${pagado.toFixed(2)}</div>
-      </div>
-      <div style="background:${saldo>0?'#ffebee':'#e8f5e9'};border-radius:10px;padding:10px;text-align:center">
-        <div style="font-size:.7rem;color:var(--gr)">Saldo</div>
-        <div style="font-weight:900;font-size:1rem;color:${saldo>0?'var(--ro)':'var(--v)'}">Bs.${saldo.toFixed(2)}</div>
-      </div>
-    </div>
-
-    <!-- Botones de acción -->
-    ${saldo > 0 ? `
-    <div style="display:flex;gap:8px;margin-bottom:12px">
-      <button onclick="openPagoParcCliente()" class="btn btn-or" style="flex:1">
-        💵 Pago parcial
-      </button>
-      <button onclick="pagoTotalCliente()" class="btn btn-v" style="flex:1">
-        ✅ Saldar todo (Bs.${saldo.toFixed(2)})
-      </button>
-    </div>` : `<div style="text-align:center;color:var(--v);font-weight:800;margin-bottom:12px">✅ Deuda saldada</div>`}
-
-    <!-- Fiados individuales -->
-    <div style="font-size:.8rem;font-weight:800;margin-bottom:6px;color:var(--v)">📝 Fiados registrados</div>
-    ${fiadosHtml}
-
-    <!-- Historial pagos -->
-    ${pagosHtml}`;
-
-  document.getElementById('btnPagoParc').style.display = 'none'; // ocultamos el botón viejo
-  openModal('fiadoDetalleModal');
+  }).join("");
 }
-
-function openPagoParcCliente() {
-  document.getElementById('pagoParcMonto').value = '';
-  document.getElementById('pagoParcNota').value  = '';
-  openModal('pagoParcModal');
+function openAddFiado(){openModal("fiadoModal");["fiadoNombre","fiadoMonto","fiadoDetalle"].forEach(id=>document.getElementById(id).value="");}
+async function saveFiado(){
+  const nombre=document.getElementById("fiadoNombre").value.trim();
+  const monto=parseFloat(document.getElementById("fiadoMonto").value)||0;
+  if(!nombre||!monto){showToast("Completá nombre y monto",true);return;}
+  await fs.addDoc(fs.collection(db,"fiados"),{nombre,monto,detalle:document.getElementById("fiadoDetalle").value.trim(),cobrado:false,createdAt:fs.serverTimestamp()});
+  closeModal("fiadoModal");showToast("📋 Fiado registrado");
 }
-
-async function pagoTotalCliente() {
-  const nombre = window._fiadoClienteNombre;
-  const ids    = window._fiadoClienteIds || [];
-  if(!ids.length) return;
-  if(!confirm(`¿Saldar toda la deuda de ${nombre}?`)) return;
-  try {
-    for(const id of ids) {
-      const f = fiados.find(x=>x.id===id);
-      if(!f) continue;
-      const saldo = (f.monto||0)-(f.pagado||0);
-      if(saldo <= 0) continue;
-      await fs.addDoc(fs.collection(db,'pagos_fiado'), {
-        fiadoId: id, monto: saldo, nota: 'Pago total',
-        createdAt: fs.serverTimestamp()
-      });
-      await fs.updateDoc(fs.doc(db,'fiados',id), {
-        pagado: f.monto, cobrado: true, lastPagoAt: fs.serverTimestamp()
-      });
-    }
-    closeModal('fiadoDetalleModal');
-    showToast(`✅ Deuda de ${nombre} saldada`);
-  } catch(e) { showToast('Error: '+e.message, true); }
-}
-
-async function savePagoParc() {
-  const monto = parseFloat(document.getElementById('pagoParcMonto').value)||0;
-  const nota  = document.getElementById('pagoParcNota').value.trim();
-  if(!monto) { showToast('Ingresá el monto', true); return; }
-
-  // Modo cliente agrupado
-  const ids = window._fiadoClienteIds || (window._fiadoDetalleId ? [window._fiadoDetalleId] : []);
-  if(!ids.length) return;
-
-  try {
-    let restante = monto;
-    for(const id of ids) {
-      if(restante <= 0) break;
-      const f = fiados.find(x=>x.id===id);
-      if(!f) continue;
-      const saldo = (f.monto||0)-(f.pagado||0);
-      if(saldo <= 0) continue;
-      const aplicar = Math.min(restante, saldo);
-      await fs.addDoc(fs.collection(db,'pagos_fiado'), {
-        fiadoId: id, monto: aplicar, nota,
-        createdAt: fs.serverTimestamp()
-      });
-      const newPagado = (f.pagado||0) + aplicar;
-      await fs.updateDoc(fs.doc(db,'fiados',id), {
-        pagado: newPagado,
-        cobrado: newPagado >= f.monto,
-        lastPagoAt: fs.serverTimestamp()
-      });
-      restante -= aplicar;
-    }
-    closeModal('pagoParcModal');
-    closeModal('fiadoDetalleModal');
-    showToast(`✅ Pago de Bs.${monto.toFixed(2)} registrado`);
-  } catch(e) { showToast('Error: '+e.message, true); }
+async function cobrarFiado(id,monto){
+  if(!confirm(`¿Marcar como cobrado Bs.${monto}?`))return;
+  await fs.updateDoc(fs.doc(db,"fiados",id),{cobrado:true,cobradoAt:fs.serverTimestamp()});
+  showToast("✅ Fiado cobrado");
 }
 
 // ════════════════════════════════════
@@ -2207,9 +2093,6 @@ async function saveCompra(){
 // ════════════════════════════════════
 // VOICE SEARCH
 // ════════════════════════════════════
-// ════════════════════════════════════════════════════
-// VOZ INTELIGENTE CON CLAUDE
-// ════════════════════════════════════════════════════
 let voiceRecog=null, voiceActive=false;
 
 function toggleVoiceSearch(){
@@ -2220,57 +2103,29 @@ function toggleVoiceSearch(){
 function startVoiceSearch(){
   if(voiceActive) return;
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){ showToast("Reconocimiento de voz no disponible",true); return; }
+  if(!SR){ showToast("Reconocimiento de voz no disponible. Usa Chrome.",true); return; }
   if(window.speechSynthesis) window.speechSynthesis.cancel();
   const mic=document.getElementById("micFab");
   voiceRecog=new SR();
-  voiceRecog.lang="es-BO"; voiceRecog.interimResults=true; voiceRecog.continuous=false;
-  voiceRecog.maxAlternatives=1;
-  let finalTranscript = "";
-
+  voiceRecog.lang="es-BO"; voiceRecog.interimResults=true; voiceRecog.continuous=true;
   voiceRecog.onstart=()=>{
     voiceActive=true;
-    finalTranscript = "";
     if(mic){ mic.classList.add("active"); mic.style.transform="scale(1.2)"; }
-    showToast("🔴 Escuchando... decí el producto y cantidad", false);
-    // Mostrar panel de transcripción
-    const vp = document.getElementById("voiceTranscriptPanel");
-    if(vp) { vp.style.display="block"; vp.textContent="🎤 Escuchando..."; }
+    showToast("🔴 Escuchando... di el producto", false);
   };
-
   voiceRecog.onresult=(e)=>{
-    let interim = "";
-    for(let i=e.resultIndex;i<e.results.length;i++){
-      if(e.results[i].isFinal) {
-        const text = e.results[i][0].transcript.trim();
-        if(text) {
-          stopVoiceSearch();
-          processVoiceWithAI(text);
-          return;
-        }
-      } else {
-        interim += e.results[i][0].transcript;
-      }
-    }
-    // Mostrar transcripción interina
-    const vp = document.getElementById("voiceTranscriptPanel");
-    if(vp && interim) { vp.style.display="block"; vp.textContent = "🎤 " + interim; }
+    let text="";
+    for(let i=e.resultIndex;i<e.results.length;i++) text+=e.results[i][0].transcript;
+    document.getElementById("vendSearch").value=text;
+    onVendSearch();
   };
-
   voiceRecog.onerror=(e)=>{
     stopVoiceSearch();
     if(e.error==="not-allowed") showToast("Permiso de micrófono denegado",true);
   };
-
   voiceRecog.onend=()=>{
     voiceActive=false;
     if(mic){ mic.classList.remove("active"); mic.style.transform="scale(1.0)"; }
-    const text = finalTranscript.trim();
-    if(text) processVoiceWithAI(text);
-    else {
-      const vp = document.getElementById("voiceTranscriptPanel");
-      if(vp) vp.style.display="none";
-    }
   };
   voiceRecog.start();
 }
@@ -2282,259 +2137,6 @@ function stopVoiceSearch(){
   if(mic){ mic.classList.remove("active"); mic.style.transform="scale(1.0)"; }
 }
 function closeVoicePanel(){ stopVoiceSearch(); }
-
-// PTT toggle con Espacio
-document.addEventListener("keydown",(e)=>{
-  const tag=document.activeElement?.tagName;
-  if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT") return;
-  if(e.code==="Space"){e.preventDefault(); voiceActive?stopVoiceSearch():startVoiceSearch();}
-});
-
-// ── Procesar texto de voz localmente ────────────────────────
-function processVoiceWithAI(text) {
-  const vp = document.getElementById("voiceTranscriptPanel");
-  if(vp) { vp.style.display="block"; vp.textContent = "🔍 Buscando: \""+text+"\"..."; }
-
-  const lower = text.toLowerCase().trim();
-
-  // ── 1. Extraer cantidad ──────────────────────────────────
-  let qty = 1;
-  const numMap = {
-    "un ":1,"una ":1,"dos ":2,"tres ":3,"cuatro ":4,"cinco ":5,
-    "seis ":6,"siete ":7,"ocho ":8,"nueve ":9,"diez ":10,
-    "media libra":0.5,"media lb":0.5,"cuartilla y media":0.375,
-    "cuartilla":0.25,"media cuartilla":0.125,
-    "kilo":1,"kilogramo":1,"medio kilo":0.5
-  };
-  let cleanText = lower;
-  for(const [word, val] of Object.entries(numMap)) {
-    if(cleanText.includes(word)) { qty = val; cleanText = cleanText.replace(word,"").trim(); break; }
-  }
-  // número al final o al inicio: "2 fideos", "fideos 3"
-  const numMatch = cleanText.match(/^(\d+(?:\.\d+)?)\s+(.+)$/) || cleanText.match(/^(.+)\s+(\d+(?:\.\d+)?)$/);
-  if(numMatch) {
-    const n = parseFloat(numMatch[1]), rest = numMatch[2];
-    const n2 = parseFloat(numMatch[2]), rest2 = numMatch[1];
-    if(!isNaN(n) && n > 0 && n < 100) { qty = n; cleanText = rest; }
-    else if(!isNaN(n2) && n2 > 0 && n2 < 100) { qty = n2; cleanText = rest2; }
-  }
-
-  // ── 2. Detectar "X Bs de producto" ──────────────────────
-  const bsMatch = lower.match(/(\d+(?:\.\d+)?)\s*bs(?:ilivian[ao]s?)?\s+(?:de\s+)?(.+)/i) ||
-                  lower.match(/(.+)\s+(\d+(?:\.\d+)?)\s*bs/i);
-  let bsAmount = null;
-  if(bsMatch) {
-    bsAmount = parseFloat(bsMatch[1]);
-    cleanText = bsMatch[2].trim();
-    qty = null; // se calculará por precio
-  }
-
-  cleanText = cleanText
-    .replace(/\b(de|el|la|los|las|un|una|unos|unas|por|para)\b/g," ")
-    .replace(/\s+/g," ").trim();
-
-  // ── 3. Scoring de similitud ──────────────────────────────
-  function similarity(query, productName) {
-    const q = query.toLowerCase().trim();
-    const p = productName.toLowerCase().trim();
-
-    // Coincidencia exacta
-    if(p === q) return 1;
-    // El nombre contiene la query completa
-    if(p.includes(q)) return 0.95;
-
-    const wq = q.split(/\s+/).filter(w => w.length > 2);
-    const wp = p.split(/\s+/);
-
-    if(!wq.length) return 0;
-
-    let hits = 0;
-    let exactHits = 0;
-    wq.forEach(w => {
-      // Coincidencia exacta de palabra
-      if(wp.some(x => x === w)) { hits++; exactHits++; return; }
-      // La palabra del producto empieza con la query word (prefijo)
-      if(wp.some(x => x.startsWith(w) && w.length >= 4)) { hits += 0.8; return; }
-      // Levenshtein solo para palabras largas (>= 5 chars) con max 1 error
-      if(w.length >= 5) {
-        const minDist = Math.min(...wp.map(x => levenshtein(w, x)));
-        if(minDist <= 1) { hits += 0.7; return; }
-        if(minDist <= 2 && w.length >= 7) { hits += 0.4; return; }
-      }
-    });
-
-    const score = hits / wq.length;
-    // Penalizar si la query es muy corta (1 palabra) y no hubo exactMatch
-    if(wq.length === 1 && exactHits === 0 && score < 0.8) return score * 0.5;
-    return score;
-  }
-
-  function levenshtein(a, b) {
-    const m = a.length, n = b.length;
-    const dp = Array.from({length:m+1}, (_,i) => Array.from({length:n+1}, (_,j) => i===0?j:j===0?i:0));
-    for(let i=1;i<=m;i++) for(let j=1;j<=n;j++)
-      dp[i][j] = a[i-1]===b[j-1] ? dp[i-1][j-1] : 1+Math.min(dp[i-1][j],dp[i][j-1],dp[i-1][j-1]);
-    return dp[m][n];
-  }
-
-  // ── 4. Buscar en TODOS los catálogos ────────────────────
-  // Catálogo bodega
-  const prodsB = Object.values(DB.products)
-    .filter(p => p.stock !== 0)
-    .map(p => ({...p, _tipo:"catalogo"}));
-
-  // Productos físicos tienda (verduras, frutas, etc.)
-  const prodsF = (DB.tempProds || [])
-    .filter(p => p.tipo !== "categoria_fisica")
-    .map(p => ({...p, _tipo:"temporal"}));
-
-  // Productos Coquette (verduras, frutas, etc.) — usan precioVenta
-  const prodsC = (typeof cqProds !== 'undefined' ? cqProds : [])
-    .map(p => ({...p, precio: p.precioVenta||0, _tipo:"coquette"}));
-
-  const allProds = [...prodsB, ...prodsF, ...prodsC];
-
-  const scored = allProds.map(p => ({
-    prod: p,
-    score: similarity(cleanText, p.nombre || "")
-  })).filter(x => x.score >= 0.5).sort((a,b) => b.score - a.score);
-
-  if(!scored.length) {
-    showToast("❌ No encontré: \""+cleanText+"\"", true);
-    if(vp) { vp.textContent = "❌ No encontrado: \""+text+"\""; setTimeout(()=>vp.style.display="none",3000); }
-    return;
-  }
-
-  // ── 5. Mostrar opciones si hay variantes del mismo producto ──
-  // Siempre mostrar opciones si hay 2+ resultados con score alto
-  const top = scored[0];
-  const topScore = top.score;
-
-  // Agrupar resultados similares — mostrar si hay más de 1 con score >= 60% del top
-  const candidates = scored.filter(x => x.score >= Math.max(0.5, topScore * 0.6)).slice(0, 6);
-
-  if(candidates.length > 1) {
-    // Siempre mostrar opciones cuando hay más de un candidato
-    const choices = candidates.map(x => ({
-      id: x.prod.id,
-      nombre: x.prod.nombre,
-      qty: bsAmount ? Math.max(1, Math.round(bsAmount / (x.prod.precio||1))) : qty,
-      precio: x.prod.precio,
-      unidad: x.prod.unidad||"unidad",
-      _tipo: x.prod._tipo
-    }));
-    if(vp) vp.textContent = "🤔 Encontré varias opciones, elegí una:";
-    showVoiceChoices(choices, text);
-    return;
-  }
-
-  // ── 6. Agregar o abrir selector ─────────────────────────
-  const prod = top.prod;
-  const tipo = prod._tipo || "catalogo";
-  const finalQty = bsAmount
-    ? Math.max(0.5, Math.round((bsAmount / (prod.precio||1)) * 2) / 2)
-    : Math.max(1, qty||1);
-
-  // Coquette: siempre abrir el selector con qty/monto pre-cargado
-  if(tipo === "coquette") {
-    if(vp) { vp.textContent = "🌸 "+prod.nombre+" — elegí la cantidad:"; }
-    openCqSelector(prod.id);
-    setTimeout(() => {
-      const qtyInp = document.getElementById("cqQtyUnidad");
-      if(bsAmount) {
-        const montoInp = document.getElementById("cqMonto");
-        if(montoInp) { montoInp.value = bsAmount; if(window.cqCalcFromMonto) cqCalcFromMonto(); }
-      } else if(qtyInp) {
-        qtyInp.value = finalQty;
-        if(window.cqCalcTotal) cqCalcTotal();
-      }
-    }, 200);
-    return;
-  }
-
-  // Productos normales: agregar directo
-  const key = tipo+"_"+prod.id;
-  const stockMax = (prod.stock != null && prod.stock > 0) ? prod.stock : Infinity;
-  const actual = cart[key]?.qty || 0;
-  const toAdd = Math.min(Math.round(finalQty), stockMax - actual);
-
-  if(toAdd <= 0) {
-    showToast("⚠️ Sin stock para "+prod.nombre, true);
-    if(vp) vp.style.display="none";
-    return;
-  }
-  if(cart[key]) cart[key].qty += toAdd;
-  else cart[key] = {prod, qty:toAdd, tipo};
-  renderCart();
-
-  const label = bsAmount ? "Bs."+bsAmount+" de "+prod.nombre : toAdd+"× "+prod.nombre;
-  showToast("✅ "+label+" agregado");
-  if(toAdd < Math.round(finalQty)) showToast("⚠️ Solo "+toAdd+" disponibles",true);
-  if(vp) { vp.textContent = "✅ "+label; setTimeout(()=>vp.style.display="none",2000); }
-}
-
-// ── Panel de elección cuando hay ambigüedad ──────────────────
-function showVoiceChoices(matches, entendido) {
-  const panel = document.getElementById("voiceChoicesPanel");
-  if(!panel) return;
-  panel.style.display="block";
-  panel.innerHTML = `
-    <div style="font-size:.78rem;color:var(--gr);margin-bottom:8px">
-      🎤 <b>"${entendido}"</b> — ¿Cuál querés?
-    </div>
-    <div style="display:flex;flex-direction:column;gap:6px">
-    ${matches.map(m => {
-      const precioStr = m.precio ? `Bs.${parseFloat(m.precio).toFixed(2)}` : '—';
-      const badge = m._tipo==='temporal' ? '<span style="font-size:.68rem;color:#e07b00;font-weight:700"> 🏪</span>'
-                  : m._tipo==='coquette' ? '<span style="font-size:.68rem;color:var(--v);font-weight:700"> 🌸</span>' : '';
-      return `<button onclick="selectVoiceChoice('${m.id}',${m.qty||1},'${m._tipo||'catalogo'}')"
-        style="display:flex;align-items:center;justify-content:space-between;
-               background:#f0fff4;border:1.5px solid var(--vbg);border-radius:8px;
-               padding:9px 12px;cursor:pointer;text-align:left;width:100%">
-        <span style="font-size:.82rem;font-weight:700">${m.nombre}${badge}</span>
-        <span style="font-size:.82rem;color:var(--v);font-weight:900;white-space:nowrap;margin-left:8px">${precioStr}</span>
-      </button>`;
-    }).join("")}
-    </div>
-    <button onclick="document.getElementById('voiceChoicesPanel').style.display='none';document.getElementById('voiceTranscriptPanel').style.display='none'"
-      style="font-size:.72rem;color:var(--gr);background:none;border:none;cursor:pointer;margin-top:6px;padding:0">
-      ✕ Cancelar
-    </button>`;
-}
-
-function selectVoiceChoice(id, qty, tipo) {
-  tipo = tipo || "catalogo";
-  const prod = tipo === "temporal"
-    ? DB.tempProds.find(p => p.id === id)
-    : tipo === "coquette"
-      ? (typeof cqProds !== "undefined" ? cqProds : []).find(p => p.id === id)
-      : DB.products[id];
-  if(!prod) return;
-  const key = tipo+"_"+id;
-  const stockMax = (prod.stock != null && prod.stock > 0) ? prod.stock : Infinity;
-  const actual = cart[key]?.qty || 0;
-  const toAdd = Math.min(Math.max(1,Math.round(qty||1)), stockMax - actual);
-  // Coquette: abrir selector
-  if(tipo === "coquette") {
-    document.getElementById("voiceChoicesPanel").style.display="none";
-    openCqSelector(id);
-    setTimeout(() => {
-      const qtyInp = document.getElementById("cqQtyUnidad");
-      if(qtyInp) { qtyInp.value = Math.max(0.5, qty||1); if(window.cqCalcTotal) cqCalcTotal(); }
-    }, 200);
-    return;
-  }
-  if(toAdd <= 0) { showToast("⚠️ Sin stock para "+prod.nombre, true); }
-  else {
-    if(cart[key]) cart[key].qty += toAdd;
-    else cart[key] = {prod, qty:toAdd, tipo};
-    renderCart();
-    showToast("✅ "+prod.nombre+" ×"+toAdd+" agregado");
-  }
-  document.getElementById("voiceChoicesPanel").style.display="none";
-  const vp = document.getElementById("voiceTranscriptPanel");
-  if(vp) setTimeout(()=>{ vp.style.display="none"; },1500);
-}
 
 // ── Push-to-Talk: Espacio (toggle) ────────────────────────────
 document.addEventListener("keydown", (e)=>{
@@ -2993,44 +2595,12 @@ function closeModal(id) {
 window.openModal = openModal;
 window.closeModal = closeModal;
 
+let toastTimer;
 function showToast(msg,error=false){
   const t=document.getElementById("toast");
   t.textContent=msg; t.className="toast show"+(error?" error":"");
   clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),2600);
 }
-
-// ── Resize panel derecho ─────────────────────────────────────
-(function(){
-  const resizer = document.getElementById('sellRightResizer');
-  const panel   = document.getElementById('sellRight');
-  if(!resizer || !panel) return;
-  let startX, startW;
-  resizer.addEventListener('mousedown', e => {
-    startX = e.clientX;
-    startW = panel.offsetWidth;
-    resizer.classList.add('dragging');
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-    const onMove = ev => {
-      const delta = startX - ev.clientX;
-      const newW = Math.min(600, Math.max(220, startW + delta));
-      panel.style.width = newW + 'px';
-    };
-    const onUp = () => {
-      resizer.classList.remove('dragging');
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      localStorage.setItem('sellRightW', panel.offsetWidth);
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-    e.preventDefault();
-  });
-  const saved = localStorage.getItem('sellRightW');
-  if(saved) panel.style.width = Math.min(600, Math.max(220, parseInt(saved))) + 'px';
-})();
 </script>
 </body>
 </html>
