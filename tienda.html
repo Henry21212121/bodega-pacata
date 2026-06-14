@@ -1331,18 +1331,23 @@ function actualizarUIModCalc() {
   const banner = document.getElementById('modoCalcBanner');
   const btn    = document.getElementById('btnModoCalc');
   const label  = document.getElementById('modoCalcLabel');
+  const layout = document.querySelector('.sell-layout');
   if(modoCalculadora) {
     if(banner) banner.style.display = 'block';
     if(btn)  { btn.textContent = 'Desactivar'; btn.style.background = '#ff6d00'; btn.style.color = '#fff'; }
     if(label) { label.textContent = '🧮 Activado'; label.style.color = '#e65100'; }
-    document.getElementById('modoCalcLabel')?.nextElementSibling && 
-      (document.getElementById('modoCalcLabel').nextElementSibling.textContent = 'Las ventas solo calculan, no modifican stock');
+    // Reducir altura del layout para compensar el banner
+    if(layout) {
+      requestAnimationFrame(() => {
+        const bannerH = banner ? banner.offsetHeight || 34 : 34;
+        layout.style.height = `calc(100vh - ${116 + bannerH}px)`;
+      });
+    }
   } else {
     if(banner) banner.style.display = 'none';
     if(btn)  { btn.textContent = 'Activar'; btn.style.background = '#eee'; btn.style.color = '#555'; }
     if(label) { label.textContent = 'Desactivado'; label.style.color = '#555'; }
-    document.getElementById('modoCalcLabel')?.nextElementSibling &&
-      (document.getElementById('modoCalcLabel').nextElementSibling.textContent = 'Las ventas se registran normalmente');
+    if(layout) layout.style.height = 'calc(100vh - 116px)';
   }
 }
 
