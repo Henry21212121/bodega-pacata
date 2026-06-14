@@ -181,18 +181,6 @@ input[type=file]{display:none;}
 /* ── ADMIN MAP ── */
 .admin-map-wrap{height:280px;border-radius:10px;overflow:hidden;border:2px solid var(--vbg);margin-bottom:10px;}
 .orders-map-wrap{height:340px;border-radius:10px;overflow:hidden;border:2px solid var(--vbg);margin:10px 0;}
-/* ── Libreta de Compras ─────────────────────────── */
-.cmp-prod-card{background:#fff;border:2px solid var(--vbg);border-radius:14px;padding:14px;margin-bottom:10px;transition:border-color .2s;}
-.cmp-prod-card.selected{border-color:var(--v);background:#f0fff4;}
-.cmp-prod-card.comprado{border-color:#4caf50;background:#e8f5e9;opacity:.85;}
-.cmp-check{width:26px;height:26px;border-radius:7px;border:2.5px solid #ccc;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;font-size:1rem;}
-.cmp-check.on{background:var(--v);border-color:var(--v);color:#fff;}
-.cmp-badge-urgente{background:#ffebee;color:#c62828;font-size:.7rem;font-weight:900;padding:2px 8px;border-radius:12px;white-space:nowrap;}
-.cmp-badge-bajo{background:#fff3e0;color:#e65100;font-size:.7rem;font-weight:900;padding:2px 8px;border-radius:12px;white-space:nowrap;}
-.cmp-stab-content{animation:fadeIn .2s;}
-.cmp-compra-card{background:#fff;border:2px solid var(--vbg);border-radius:14px;padding:14px;margin-bottom:12px;}
-.cmp-compra-card .prev-data{font-size:.73rem;color:#999;margin-top:8px;padding-top:8px;border-top:1px solid #f0f0f0;}
-.cmp-stab{transition:all .2s;}
 </style>
 </head>
 <body>
@@ -244,7 +232,6 @@ input[type=file]{display:none;}
       <button class="atab" onclick="showTab('mensajes',this)">📢 Mensajes</button>
       <button class="atab" onclick="showTab('intro',this)">🎬 Intro</button>
       <button class="atab" onclick="showTab('historial',this)">📋 Historial</button>
-      <button class="atab" onclick="showTab('compras',this)">🛒 Compras</button>
       <button class="atab" onclick="showTab('config',this)">⚙️ Config</button>
     </div>
   </div>
@@ -355,9 +342,24 @@ input[type=file]{display:none;}
         <h2>🛍️ Productos</h2>
         <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
           <input type="text" id="prodSearch" placeholder="🔍 Buscar..." style="flex:1;min-width:150px;padding:7px 12px;border:1.5px solid #d0e8d8;border-radius:8px;outline:none;font-size:.85rem" oninput="renderAdmProds()">
+          <select id="prodSortBy" onchange="renderAdmProds()"
+            style="padding:7px 10px;border:1.5px solid #d0e8d8;border-radius:8px;font-size:.82rem;outline:none;background:#fff;cursor:pointer">
+            <option value="nombre">📋 A → Z</option>
+            <option value="nombre_desc">📋 Z → A</option>
+            <option value="updated">🕐 Recién modificados</option>
+            <option value="stock_asc">📦 Menor stock primero</option>
+            <option value="sin_stock">🔴 Agotados primero</option>
+            <option value="bajo_stock">⚠️ Bajo mínimo primero</option>
+            <option value="sin_foto">📷 Sin foto primero</option>
+            <option value="con_vencimiento">📅 Con vencimiento</option>
+            <option value="sin_desc">📝 Sin descripción</option>
+            <option value="margen_asc">💰 Menor margen primero</option>
+            <option value="precio_desc">💲 Mayor precio primero</option>
+          </select>
           <button class="btn btn-v btn-sm" onclick="openProdEditor(null)">+ Nuevo producto</button>
           <button class="btn btn-sec btn-sm" onclick="openNewCat()" title="Agregar categoría">🗂️ + Categoría</button>
           <button class="btn btn-or btn-sm" onclick="bulkGenDescriptions()" id="bulkDescBtn" title="Genera descripciones con IA para todos los productos que no tienen una">✨ Descripciones masivas</button>
+          <button class="btn btn-ro btn-sm" onclick="confirmarResetStock()" title="Poner stock en 0 a todos los productos">🗑️ Resetear stock</button>
         </div>
         <div id="bulkDescProgress" style="display:none;background:#fff8ec;border:1px solid #fde19a;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:.82rem"></div>
         <div class="filter-pills" id="catFilterPills"></div>
@@ -467,161 +469,6 @@ input[type=file]{display:none;}
         </div>
       </div>
     </div>
-
-    <!-- ══════════════════════════════════════════════════════
-         LIBRETA DE COMPRAS
-    ══════════════════════════════════════════════════════ -->
-    <div id="tab-compras" class="tab-content" style="display:none">
-      <div class="panel">
-
-        <!-- FASE 0: Inicio -->
-        <div id="cmp-fase0">
-          <div style="text-align:center;padding:24px 0">
-            <div style="font-size:2rem;margin-bottom:8px">🛒</div>
-            <h2 style="margin-bottom:6px">Libreta de Compras</h2>
-            <p style="color:var(--gr);font-size:.88rem;margin-bottom:20px">
-              Generá la lista de compras del día y registrá en tiempo real lo que comprás en el mercado.
-            </p>
-            <button class="btn btn-v" style="font-size:1rem;padding:14px 32px;border-radius:12px" onclick="iniciarSesionCompras()">
-              📋 Compras de hoy
-            </button>
-            <div id="cmp-sesiones-prev" style="margin-top:24px"></div>
-          </div>
-        </div>
-
-        <!-- FASE 1: Selección de productos -->
-        <div id="cmp-fase1" style="display:none">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-            <div>
-              <h3 style="margin:0">📋 Productos a comprar</h3>
-              <div style="font-size:.78rem;color:var(--gr)" id="cmp-fecha-label"></div>
-            </div>
-            <button class="btn btn-or" style="font-size:.9rem;padding:10px 20px" onclick="irDeCompras()">
-              🛍️ Ir de compras
-            </button>
-          </div>
-          <p style="font-size:.82rem;color:var(--gr);margin-bottom:12px">
-            Seleccioná los productos que vas a comprar hoy. Tocá uno para ingresar la cantidad.
-          </p>
-          <div id="cmp-lista-seleccion"></div>
-          <div style="text-align:center;margin-top:16px">
-            <button class="btn btn-or" style="font-size:1rem;padding:14px 32px;border-radius:12px;width:100%;max-width:400px" onclick="irDeCompras()">
-              🛍️ Ir de compras →
-            </button>
-          </div>
-        </div>
-
-        <!-- RESUMEN PRE-COMPRA -->
-        <div id="cmp-resumen-previo" style="display:none">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-            <button onclick="volverASeleccion()" class="btn btn-sec btn-sm">← Volver</button>
-            <h3 style="margin:0">💰 Resumen de compras</h3>
-          </div>
-          <div id="cmp-resumen-content"></div>
-          <button class="btn btn-v" style="width:100%;padding:14px;font-size:1rem;margin-top:16px;border-radius:12px" onclick="abrirModoCompra()">
-            🚀 Empezar a comprar
-          </button>
-        </div>
-
-        <!-- FASE 2: MODO COMPRA (4 pestañas) -->
-        <div id="cmp-fase2" style="display:none">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px">
-            <div>
-              <h3 style="margin:0">🛒 En el mercado</h3>
-              <div style="font-size:.75rem;color:var(--gr)" id="cmp-progreso"></div>
-            </div>
-            <button class="btn btn-v btn-sm" onclick="finalizarCompras()">✅ Finalizar</button>
-          </div>
-
-          <!-- Sub-tabs -->
-          <div style="display:flex;gap:4px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px">
-            <button class="cmp-stab active" onclick="cmpShowTab('comprar',this)" style="flex:1;min-width:80px;padding:8px 6px;font-size:.8rem;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:var(--v);color:#fff">🛍️ Comprar</button>
-            <button class="cmp-stab" onclick="cmpShowTab('comprados',this)" style="flex:1;min-width:80px;padding:8px 6px;font-size:.8rem;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#eee;color:#555">✅ Comprados</button>
-            <button class="cmp-stab" onclick="cmpShowTab('adicionales',this)" style="flex:1;min-width:80px;padding:8px 6px;font-size:.8rem;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#eee;color:#555">➕ Adicionales</button>
-            <button class="cmp-stab" onclick="cmpShowTab('nuevos',this)" style="flex:1;min-width:80px;padding:8px 6px;font-size:.8rem;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#eee;color:#555">🆕 Nuevos</button>
-          </div>
-
-          <!-- Tab: Comprar -->
-          <div id="cmp-tab-comprar" class="cmp-stab-content">
-            <div id="cmp-comprar-list"></div>
-            <div id="cmp-comprar-empty" style="display:none;text-align:center;padding:30px;color:var(--gr)">
-              ✅ Todos los productos fueron comprados
-            </div>
-          </div>
-
-          <!-- Tab: Comprados -->
-          <div id="cmp-tab-comprados" class="cmp-stab-content" style="display:none">
-            <div id="cmp-comprados-list"></div>
-          </div>
-
-          <!-- Tab: Adicionales -->
-          <div id="cmp-tab-adicionales" class="cmp-stab-content" style="display:none">
-            <div style="margin-bottom:12px">
-              <input type="text" id="cmp-adicional-search" placeholder="🔍 Buscar producto del catálogo..."
-                oninput="cmpBuscarAdicional()"
-                style="width:100%;padding:12px;border:2px solid var(--vbg);border-radius:10px;font-size:.9rem;box-sizing:border-box">
-              <div id="cmp-adicional-results" style="margin-top:6px"></div>
-            </div>
-            <h4 style="color:var(--gr);font-size:.82rem;margin:12px 0 8px">Productos no seleccionados inicialmente:</h4>
-            <div id="cmp-adicionales-list"></div>
-          </div>
-
-          <!-- Tab: Nuevos -->
-          <div id="cmp-tab-nuevos" class="cmp-stab-content" style="display:none">
-            <div style="background:#f0fff4;border:2px solid var(--vbg);border-radius:12px;padding:16px;margin-bottom:16px">
-              <h4 style="margin:0 0 12px;color:var(--v)">🆕 Agregar producto nuevo</h4>
-              <div style="display:flex;flex-direction:column;gap:10px">
-                <div>
-                  <label style="font-size:.82rem;color:var(--gr);font-weight:700">Nombre del producto *</label>
-                  <input type="text" id="cmp-nuevo-nombre" placeholder="Ej: Arroz Bolívar 1 kg"
-                    style="width:100%;padding:12px;border:2px solid var(--vbg);border-radius:10px;font-size:.95rem;margin-top:4px;box-sizing:border-box">
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-                  <div>
-                    <label style="font-size:.82rem;color:var(--gr);font-weight:700">Cantidad comprada</label>
-                    <input type="number" id="cmp-nuevo-qty" placeholder="0" min="1"
-                      style="width:100%;padding:12px;border:2px solid var(--vbg);border-radius:10px;font-size:.95rem;margin-top:4px;box-sizing:border-box">
-                  </div>
-                  <div>
-                    <label style="font-size:.82rem;color:var(--gr);font-weight:700">Costo de lote (Bs.)</label>
-                    <input type="number" id="cmp-nuevo-costo" placeholder="0.00" step="0.5" min="0"
-                      style="width:100%;padding:12px;border:2px solid var(--vbg);border-radius:10px;font-size:.95rem;margin-top:4px;box-sizing:border-box">
-                  </div>
-                </div>
-                <div>
-                  <label style="font-size:.82rem;color:var(--gr);font-weight:700">Categoría</label>
-                  <input type="text" id="cmp-nuevo-cat" placeholder="Ej: ABARROTES"
-                    style="width:100%;padding:12px;border:2px solid var(--vbg);border-radius:10px;font-size:.95rem;margin-top:4px;box-sizing:border-box">
-                </div>
-                <button class="btn btn-v" style="padding:12px;font-size:.95rem;border-radius:10px" onclick="cmpAgregarNuevo()">
-                  ➕ Agregar a la lista
-                </button>
-              </div>
-            </div>
-            <div id="cmp-nuevos-list"></div>
-          </div>
-        </div>
-
-        <!-- FASE 3: Reporte final -->
-        <div id="cmp-fase3" style="display:none">
-          <div style="text-align:center;margin-bottom:20px">
-            <div style="font-size:2rem">🎉</div>
-            <h3>¡Compras finalizadas!</h3>
-          </div>
-          <div id="cmp-reporte-final"></div>
-          <div style="display:flex;gap:8px;margin-top:16px">
-            <button class="btn btn-v" style="flex:1;padding:14px;font-size:.95rem" onclick="cmpDescargarPDF()">
-              📄 Descargar PDF
-            </button>
-            <button class="btn btn-sec" style="flex:1;padding:14px;font-size:.95rem" onclick="cmpNuevaSesion()">
-              🔄 Nueva sesión
-            </button>
-          </div>
-        </div>
-
-      </div>
-    </div>
-    <!-- FIN LIBRETA DE COMPRAS -->
 
     <!-- CONFIG -->
     <div id="tab-config" class="tab-content" style="display:none">
@@ -749,33 +596,38 @@ input[type=file]{display:none;}
   </div><!-- adm-main -->
 </div><!-- adm-wrap -->
 
-<!-- MODAL: Cantidad a comprar (fase 1) -->
-<div class="confirm-ov" id="cmpCantModal">
-  <div class="confirm-box" style="width:min(380px,96vw);position:relative">
-    <button class="modal-close-btn" onclick="close2('cmpCantModal')" title="Cerrar">✕</button>
-    <h3 id="cmpCantTitle" style="margin-bottom:4px;padding-right:36px;font-size:1rem">Producto</h3>
-    <!-- Datos históricos -->
-    <div id="cmpCantHistorico" style="background:#f0fff4;border:1.5px solid var(--vbg);border-radius:10px;padding:10px 12px;margin:10px 0;font-size:.82rem"></div>
-    <!-- Campo cantidad -->
-    <label style="font-size:.9rem;font-weight:800;color:var(--gr);display:block;margin-bottom:6px">Cantidad a comprar:</label>
-    <input type="number" id="cmpCantInput" min="1" step="1" placeholder="0"
-      style="width:100%;padding:16px;border:2.5px solid var(--v);border-radius:12px;font-size:1.4rem;font-weight:900;text-align:center;box-sizing:border-box;margin-bottom:14px"
-      onkeydown="if(event.key==='Enter')cmpConfirmarCant()">
-    <button class="btn btn-v" style="width:100%;padding:14px;font-size:1rem;border-radius:12px" onclick="cmpConfirmarCant()">
-      ✅ Aceptar
-    </button>
-  </div>
-</div>
-
-<!-- MODAL: Validar producto nuevo al llegar a tienda -->
-<div class="confirm-ov" id="cmpValidarNuevoModal">
-  <div class="confirm-box" style="width:min(440px,96vw);position:relative;max-height:85vh;overflow-y:auto">
-    <button class="modal-close-btn" onclick="close2('cmpValidarNuevoModal')" title="Cerrar">✕</button>
-    <h3 style="margin-bottom:12px;padding-right:36px">🆕 Validar producto nuevo</h3>
-    <div id="cmpValidarContent"></div>
-    <div style="display:flex;gap:8px;margin-top:16px">
-      <button class="btn btn-sec" style="flex:1" onclick="close2('cmpValidarNuevoModal')">Después</button>
-      <button class="btn btn-v" style="flex:2" onclick="cmpGuardarProductoNuevo()">💾 Guardar en catálogo</button>
+<!-- MODAL: Reset de stock -->
+<div class="confirm-ov" id="resetStockModal">
+  <div class="confirm-box" style="width:min(400px,96vw);position:relative">
+    <button class="modal-close-btn" onclick="close2('resetStockModal')" title="Cerrar">✕</button>
+    <div style="text-align:center;margin-bottom:16px">
+      <div style="font-size:2.5rem">⚠️</div>
+      <h3 style="color:var(--ro);margin:8px 0 4px">Resetear todo el stock</h3>
+      <p style="font-size:.85rem;color:var(--gr);margin:0">Esta acción pondrá el stock de <b>todos los productos</b> en <b>0</b>. No se borrará ningún producto ni sus datos.</p>
+    </div>
+    <div id="resetStockPaso1">
+      <p style="font-size:.9rem;text-align:center;margin-bottom:16px">¿Estás seguro que querés continuar?</p>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-sec" style="flex:1" onclick="close2('resetStockModal')">Cancelar</button>
+        <button class="btn btn-ro" style="flex:1" onclick="resetStockPaso2()">Sí, continuar →</button>
+      </div>
+    </div>
+    <div id="resetStockPaso2" style="display:none">
+      <p style="font-size:.9rem;text-align:center;margin-bottom:10px;color:var(--ro);font-weight:800">Segunda confirmación — esta acción NO se puede deshacer</p>
+      <p style="font-size:.82rem;text-align:center;color:var(--gr);margin-bottom:16px">Escribí <b>RESETEAR</b> para confirmar:</p>
+      <input type="text" id="resetStockConfirmInput" placeholder="Escribí RESETEAR"
+        style="width:100%;padding:12px;border:2px solid var(--ro);border-radius:10px;font-size:1rem;text-align:center;box-sizing:border-box;margin-bottom:12px;font-weight:800"
+        oninput="document.getElementById('btnConfirmarReset').disabled=this.value!=='RESETEAR'">
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-sec" style="flex:1" onclick="close2('resetStockModal')">Cancelar</button>
+        <button class="btn btn-ro" style="flex:2" id="btnConfirmarReset" disabled onclick="ejecutarResetStock()">
+          🗑️ Resetear todo el stock
+        </button>
+      </div>
+    </div>
+    <div id="resetStockProgreso" style="display:none;text-align:center;padding:10px 0">
+      <div class="adm-loading" style="margin-bottom:8px">Reseteando stock...</div>
+      <div id="resetStockMsg" style="font-size:.82rem;color:var(--gr)"></div>
     </div>
   </div>
 </div>
@@ -1666,29 +1518,50 @@ function filterProdCat(cat, btn) {
 }
 
 function renderAdmProds() {
-  const q = (document.getElementById("prodSearch")?.value||"").toLowerCase().trim();
+  const q      = (document.getElementById("prodSearch")?.value||"").toLowerCase().trim();
+  const sortBy = document.getElementById("prodSortBy")?.value || "nombre";
   let prods = Object.values(DB.products);
+
   if(currentProdCat !== "all") prods = prods.filter(p => p.cat === currentProdCat);
-  if(q) prods = prods.filter(p => p.nombre.toLowerCase().includes(q));
-  prods.sort((a,b) => a.nombre.localeCompare(b.nombre));
+  if(q) prods = prods.filter(p => p.nombre.toLowerCase().includes(q) || (p.cat||"").toLowerCase().includes(q));
+
+  if(sortBy === "sin_foto")         prods = [...prods.filter(p=>!p.img), ...prods.filter(p=>!!p.img)];
+  else if(sortBy==="con_vencimiento") prods = prods.filter(p => p.expiry && p.expiry !== "");
+  else if(sortBy==="sin_stock")     prods = [...prods.filter(p=>p.stock===0), ...prods.filter(p=>p.stock!==0)];
+  else if(sortBy==="bajo_stock")    prods = [...prods.filter(p=>p.stock>0&&p.stockMin>0&&p.stock<=p.stockMin), ...prods.filter(p=>!(p.stock>0&&p.stockMin>0&&p.stock<=p.stockMin))];
+  else if(sortBy==="sin_desc")      prods = [...prods.filter(p=>!p.desc), ...prods.filter(p=>!!p.desc)];
+  else if(sortBy==="updated")       prods = prods.sort((a,b)=>(b.updatedAt?.seconds||0)-(a.updatedAt?.seconds||0));
+  else if(sortBy==="stock_asc")     prods = prods.sort((a,b)=>(a.stock||0)-(b.stock||0));
+  else if(sortBy==="margen_asc")    prods = prods.sort((a,b)=>{ const ma=a.costoUnit>0?(a.precio-a.costoUnit)/a.precio:1; const mb=b.costoUnit>0?(b.precio-b.costoUnit)/b.precio:1; return ma-mb; });
+  else if(sortBy==="precio_desc")   prods = prods.sort((a,b)=>(b.precio||0)-(a.precio||0));
+  else if(sortBy==="nombre_desc")   prods = prods.sort((a,b)=>b.nombre.localeCompare(a.nombre));
+  else                               prods = prods.sort((a,b)=>a.nombre.localeCompare(b.nombre));
 
   const list = document.getElementById("prodList");
-  if(!prods.length) { list.innerHTML='<p style="color:var(--gr);font-size:.82rem;padding:10px">Sin productos</p>'; return; }
+  if(!prods.length) { list.innerHTML='<p style="color:var(--gr);font-size:.82rem;padding:10px">Sin productos para este filtro</p>'; return; }
 
-  list.innerHTML = prods.map(p => {
+  const sortLabels = { sin_foto:"📷 Sin foto", con_vencimiento:"📅 Con vencimiento", sin_stock:"🔴 Agotados primero", bajo_stock:"⚠️ Bajo mínimo primero", sin_desc:"📝 Sin descripción", updated:"🕐 Recién modificados", stock_asc:"📦 Menor stock", margen_asc:"💰 Menor margen", precio_desc:"💲 Mayor precio" };
+  const badge = sortLabels[sortBy]
+    ? `<div style="font-size:.75rem;color:var(--or);font-weight:700;margin-bottom:6px;padding:3px 10px;background:#fff8ec;border-radius:20px;display:inline-block">Ordenado: ${sortLabels[sortBy]} · ${prods.length} prods</div><br>`
+    : `<div style="font-size:.75rem;color:var(--gr);margin-bottom:6px">${prods.length} productos</div>`;
+
+  list.innerHTML = badge + prods.map(p => {
     const stockClass = p.stock===0?"chip-out":p.stockMin>0&&p.stock<=p.stockMin?"chip-low":"chip-ok";
-    const stockLbl = p.stock===0?"🔴 Agotado":p.stockMin>0&&p.stock<=p.stockMin?`⚠️ ${p.stock}`:`✅ ${p.stock}`;
-    const margen = p.costoUnit > 0 ? (((p.precio-p.costoUnit)/p.precio)*100).toFixed(0)+"%" : "—";
-    const imgEl = p.img ? `<img src="${p.img}">` : (DB.categories[p.cat]?.emoji||"📦");
+    const stockLbl   = p.stock===0?"🔴 Agotado":p.stockMin>0&&p.stock<=p.stockMin?`⚠️ ${p.stock}`:`✅ ${p.stock}`;
+    const margen     = p.costoUnit>0?(((p.precio-p.costoUnit)/p.precio)*100).toFixed(0)+"%":"—";
+    const imgEl      = p.img?`<img src="${p.img}">`:(DB.categories[p.cat]?.emoji||"📦");
+    const sinFoto    = !p.img?'· <span class="chip" style="background:#fce4ec;color:#c62828;font-size:.65rem">📷 Sin foto</span>':"";
+    const venc       = p.expiry?`· <span class="chip" style="background:#e3f2fd;color:#1565c0;font-size:.65rem">📅 ${p.expiry}</span>`:"";
+    const upd        = p.updatedAt?.seconds?`· <span style="font-size:.65rem;color:#bbb">${new Date(p.updatedAt.seconds*1000).toLocaleDateString("es",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}</span>`:"";
     return `<div class="prod-item">
       <div class="prod-thumb" onclick="quickImg('${p.id}')">${imgEl}</div>
       <div class="prod-inf">
         <div class="prod-nm">${p.nombre}</div>
-        <div class="prod-meta">${p.cat} · <b>Venta:Bs.${p.precio.toFixed(2)}</b> · Costo:Bs.${(p.costoUnit||0).toFixed(2)} · Margen:${margen} · <span class="chip ${stockClass}">${stockLbl}</span>${p.estado==="oculto"?'· <span class="chip" style="background:#f5f5f5;color:#999">Oculto</span>':""}${!p.desc?'· <span class="chip" style="background:#fff3e0;color:#f07d10;font-size:.65rem">Sin desc.</span>':""}</div>
+        <div class="prod-meta">${p.cat} · <b>Venta:Bs.${p.precio.toFixed(2)}</b> · Costo:Bs.${(p.costoUnit||0).toFixed(2)} · Margen:${margen} · <span class="chip ${stockClass}">${stockLbl}</span>${p.estado==="oculto"?'· <span class="chip" style="background:#f5f5f5;color:#999">Oculto</span>':""}${!p.desc?'· <span class="chip" style="background:#fff3e0;color:#f07d10;font-size:.65rem">Sin desc.</span>':""}${sinFoto}${venc}${upd}</div>
       </div>
       <div class="prod-acts">
         <button class="btn btn-v btn-sm" onclick="openProdEditor('${p.id}')">✏️</button>
-        <button class="btn btn-sec btn-sm" title="Duplicar producto" onclick="duplicateProd('${p.id}')">📋</button>
+        <button class="btn btn-sec btn-sm" title="Duplicar" onclick="duplicateProd('${p.id}')">📋</button>
         <button class="btn btn-sec btn-sm" onclick="toggleHide('${p.id}')">${p.estado==="oculto"?"👁️":"🙈"}</button>
         <button class="btn btn-ro btn-sm" onclick="askDelete('${p.id}')">🗑️</button>
       </div>
@@ -3815,539 +3688,64 @@ async function trackApiUsage(type, count=1) {
   } catch(e) {}
 }
 
-// ════════════════════════════════════════════════════════════
-// LIBRETA DE COMPRAS
-// ════════════════════════════════════════════════════════════
-let cmpSesion = null;        // sesión activa
-let cmpSeleccion = {};       // { prodId: { prod, qty } }
-let cmpComprados = [];       // productos ya comprados
-let cmpNuevos = [];          // productos nuevos temporales
-let cmpNoSelec = [];         // productos no seleccionados (para adicionales)
-let cmpEditId = null;        // id del producto en el modal de cantidad
-
-// ── Helpers ────────────────────────────────────────────────
-function fmtFechaCompra(d) {
-  const dias=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-  const meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-  const h=d.getHours(),m=d.getMinutes(),ampm=h>=12?'PM':'AM',hh=h%12||12,mm=m.toString().padStart(2,'0');
-  return `${dias[d.getDay()]}, ${d.getDate()} de ${meses[d.getMonth()]} de ${d.getFullYear()}, ${hh}:${mm} ${ampm}`;
+// ── Reset de Stock ────────────────────────────────────────
+function confirmarResetStock() {
+  document.getElementById('resetStockPaso1').style.display = 'block';
+  document.getElementById('resetStockPaso2').style.display = 'none';
+  document.getElementById('resetStockProgreso').style.display = 'none';
+  document.getElementById('resetStockConfirmInput').value = '';
+  document.getElementById('btnConfirmarReset').disabled = true;
+  open2('resetStockModal');
 }
 
-function showCmpFase(fase) {
-  ['cmp-fase0','cmp-fase1','cmp-resumen-previo','cmp-fase2','cmp-fase3'].forEach(id=>{
-    const el=document.getElementById(id);
-    if(el) el.style.display='none';
-  });
-  const target = document.getElementById('cmp-'+fase);
-  if(target) target.style.display='block';
+function resetStockPaso2() {
+  document.getElementById('resetStockPaso1').style.display = 'none';
+  document.getElementById('resetStockPaso2').style.display = 'block';
+  setTimeout(() => document.getElementById('resetStockConfirmInput').focus(), 200);
 }
 
-// ── Fase 0 → Inicio ────────────────────────────────────────
-async function iniciarSesionCompras() {
-  const ahora = new Date();
-  cmpSesion = {
-    id: 'cmp_'+Date.now(),
-    fechaObj: ahora,
-    fecha: fmtFechaCompra(ahora),
-    estado: 'seleccion'
-  };
-  cmpSeleccion = {};
-  cmpComprados = [];
-  cmpNuevos = [];
+async function ejecutarResetStock() {
+  document.getElementById('resetStockPaso2').style.display = 'none';
+  document.getElementById('resetStockProgreso').style.display = 'block';
 
-  document.getElementById('cmp-fecha-label').textContent = cmpSesion.fecha;
-
-  // Construir lista: agotados primero, luego bajo mínimo
   const prods = Object.values(DB.products);
-  const agotados = prods.filter(p=>p.stock===0).sort((a,b)=>a.nombre.localeCompare(b.nombre));
-  const bajoMin  = prods.filter(p=>p.stock>0&&p.stockMin>0&&p.stock<=p.stockMin).sort((a,b)=>a.nombre.localeCompare(b.nombre));
-  const casiMin  = prods.filter(p=>p.stock>0&&p.stockMin>0&&p.stock>p.stockMin&&p.stock<=p.stockMin*2).sort((a,b)=>a.nombre.localeCompare(b.nombre));
-  const listaInicial = [...agotados,...bajoMin,...casiMin];
+  const total = prods.length;
+  let procesados = 0, errores = 0;
+  const msgEl = document.getElementById('resetStockMsg');
 
-  // Guardar los que NO están en la lista para "Adicionales"
-  const listaIds = new Set(listaInicial.map(p=>p.id));
-  cmpNoSelec = prods.filter(p=>!listaIds.has(p.id)).sort((a,b)=>a.nombre.localeCompare(b.nombre));
-
-  renderCmpSeleccion(listaInicial);
-  showCmpFase('fase1');
-}
-
-function renderCmpSeleccion(lista) {
-  const el = document.getElementById('cmp-lista-seleccion');
-  if(!lista.length) { el.innerHTML='<p style="color:var(--gr);text-align:center">✅ No hay productos agotados o bajos en stock</p>'; return; }
-
-  el.innerHTML = lista.map(p=>{
-    const urgente = p.stock===0;
-    const badge = urgente
-      ? '<span class="cmp-badge-urgente">🔴 AGOTADO</span>'
-      : '<span class="cmp-badge-bajo">⚠️ BAJO STOCK</span>';
-    const sel = cmpSeleccion[p.id];
-    const isOn = !!sel;
-    return `<div class="cmp-prod-card ${isOn?'selected':''}" id="cmpcard-${p.id}">
-      <div style="display:flex;align-items:center;gap:12px">
-        ${p.img?`<img src="${p.img}" style="width:56px;height:56px;object-fit:cover;border-radius:10px;flex-shrink:0">`
-               :`<div style="width:56px;height:56px;background:var(--vbg);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0">📦</div>`}
-        <div style="flex:1;min-width:0">
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px">
-            ${badge}
-            <span style="font-size:.82rem;font-weight:900">${p.nombre}</span>
-          </div>
-          <div style="font-size:.75rem;color:var(--gr)">Stock: ${p.stock} | Mín: ${p.stockMin||0} | Cat: ${p.cat||'—'}</div>
-          ${isOn?`<div style="font-size:.8rem;color:var(--v);font-weight:800;margin-top:3px">✅ Cantidad: ${sel.qty}</div>`:''}
-        </div>
-        <div class="cmp-check ${isOn?'on':''}" id="cmpchk-${p.id}" onclick="cmpToggleProd('${p.id}')">
-          ${isOn?'✓':''}
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function cmpToggleProd(id) {
-  const prod = DB.products[id];
-  if(!prod) return;
-  if(cmpSeleccion[id]) {
-    // Deseleccionar
-    delete cmpSeleccion[id];
-    const card = document.getElementById('cmpcard-'+id);
-    const chk  = document.getElementById('cmpchk-'+id);
-    if(card) card.classList.remove('selected');
-    if(chk)  { chk.classList.remove('on'); chk.textContent=''; }
-    // Re-render solo esa card
-    iniciarSesionCompras(); // re-render completo para simplicidad
-    return;
-  }
-  // Seleccionar → abrir modal de cantidad
-  cmpEditId = id;
-  document.getElementById('cmpCantTitle').textContent = prod.nombre;
-  // Datos históricos
-  const hist = [];
-  if(prod.cantAdq) hist.push(`📦 Última cant. adquirida: <b>${prod.cantAdq}</b>`);
-  if(prod.costoLote) hist.push(`💵 Costo de lote anterior: <b>Bs.${(+prod.costoLote).toFixed(2)}</b>`);
-  if(prod.costoUnit) hist.push(`🏷️ Costo unitario anterior: <b>Bs.${(+prod.costoUnit).toFixed(2)}</b>`);
-  document.getElementById('cmpCantHistorico').innerHTML = hist.length
-    ? hist.join('<br>')
-    : '<span style="color:#aaa">Sin datos históricos</span>';
-  document.getElementById('cmpCantInput').value = prod.cantAdq||'';
-  open2('cmpCantModal');
-  setTimeout(()=>document.getElementById('cmpCantInput').focus(),300);
-}
-
-function cmpConfirmarCant() {
-  const qty = parseInt(document.getElementById('cmpCantInput').value)||0;
-  if(qty<=0) { showToast('Ingresá una cantidad válida', true); return; }
-  const prod = DB.products[cmpEditId];
-  if(!prod) return;
-  cmpSeleccion[cmpEditId] = { prod, qty, costoLote: prod.costoLote||0 };
-  close2('cmpCantModal');
-  cmpEditId = null;
-  // Re-render para marcar el check
-  const prods = Object.values(DB.products);
-  const agotados = prods.filter(p=>p.stock===0).sort((a,b)=>a.nombre.localeCompare(b.nombre));
-  const bajoMin  = prods.filter(p=>p.stock>0&&p.stockMin>0&&p.stock<=p.stockMin).sort((a,b)=>a.nombre.localeCompare(b.nombre));
-  const casiMin  = prods.filter(p=>p.stock>0&&p.stockMin>0&&p.stock>p.stockMin&&p.stock<=p.stockMin*2).sort((a,b)=>a.nombre.localeCompare(b.nombre));
-  renderCmpSeleccion([...agotados,...bajoMin,...casiMin]);
-}
-
-// ── Ir de compras → Resumen previo ─────────────────────────
-function irDeCompras() {
-  const items = Object.values(cmpSeleccion);
-  if(!items.length) { showToast('Seleccioná al menos un producto', true); return; }
-
-  const totalEst = items.reduce((s,x)=>s+(+x.costoLote||0),0);
-  const el = document.getElementById('cmp-resumen-content');
-  el.innerHTML = `
-    <div style="background:#f0fff4;border:2px solid var(--vbg);border-radius:12px;padding:14px;margin-bottom:14px">
-      <div style="font-weight:800;font-size:.9rem;margin-bottom:10px">📋 ${items.length} producto${items.length!==1?'s':''} a comprar</div>
-      ${items.map(x=>`
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--vbg);font-size:.85rem">
-          <span style="font-weight:700">${x.prod.nombre}</span>
-          <span style="color:var(--gr)">Cant: <b>${x.qty}</b></span>
-        </div>`).join('')}
-      <div style="display:flex;justify-content:space-between;margin-top:12px;font-size:1rem;font-weight:900">
-        <span>💰 Total estimado (costos anteriores):</span>
-        <span style="color:var(--v)">Bs.${totalEst.toFixed(2)}</span>
-      </div>
-      <div style="font-size:.75rem;color:var(--gr);margin-top:4px">* Los costos reales se ingresan al comprar cada producto</div>
-    </div>`;
-  showCmpFase('resumen-previo');
-}
-
-function volverASeleccion() {
-  showCmpFase('fase1');
-}
-
-// ── Abrir modo compra (4 tabs) ──────────────────────────────
-function abrirModoCompra() {
-  renderCmpComprar();
-  renderCmpComprados();
-  renderCmpAdicionales();
-  renderCmpNuevos();
-  showCmpFase('fase2');
-  cmpShowTab('comprar', document.querySelector('.cmp-stab'));
-}
-
-function cmpShowTab(tab, btn) {
-  document.querySelectorAll('.cmp-stab-content').forEach(el=>el.style.display='none');
-  document.querySelectorAll('.cmp-stab').forEach(b=>{b.style.background='#eee';b.style.color='#555';});
-  const el = document.getElementById('cmp-tab-'+tab);
-  if(el) el.style.display='block';
-  if(btn) { btn.style.background='var(--v)'; btn.style.color='#fff'; }
-}
-
-// ── Tab Comprar ────────────────────────────────────────────
-function renderCmpComprar() {
-  const items = Object.values(cmpSeleccion).filter(x=>!cmpComprados.find(c=>c.id===x.prod.id));
-  const el = document.getElementById('cmp-comprar-list');
-  const empty = document.getElementById('cmp-comprar-empty');
-  if(!items.length) { el.innerHTML=''; empty.style.display='block'; actualizarProgreso(); return; }
-  empty.style.display='none';
-
-  el.innerHTML = items.map(x=>{
-    const p = x.prod;
-    const costoUnit = x.qty>0 ? ((+x.costoLote||0)/x.qty).toFixed(4) : '—';
-    return `<div class="cmp-compra-card" id="cmpcompracard-${p.id}">
-      <div style="display:flex;gap:12px;align-items:flex-start">
-        ${p.img?`<img src="${p.img}" style="width:72px;height:72px;object-fit:cover;border-radius:10px;flex-shrink:0">`
-               :`<div style="width:72px;height:72px;background:var(--vbg);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:2rem;flex-shrink:0">📦</div>`}
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:900;font-size:.95rem;margin-bottom:6px">${p.nombre}</div>
-          <div style="font-size:.75rem;color:var(--gr);margin-bottom:8px">${p.cat||''}</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-            <div>
-              <label style="font-size:.78rem;color:var(--gr);font-weight:700;display:block">Cantidad a comprar</label>
-              <input type="number" id="cmpqty-${p.id}" value="${x.qty}" min="1"
-                style="width:100%;padding:10px;border:2px solid var(--vbg);border-radius:8px;font-size:1rem;font-weight:800;box-sizing:border-box"
-                oninput="cmpRecalcUnit('${p.id}')">
-            </div>
-            <div>
-              <label style="font-size:.78rem;color:var(--gr);font-weight:700;display:block">Costo de lote (Bs.)</label>
-              <input type="number" id="cmpcosto-${p.id}" value="${x.costoLote||''}" min="0" step="0.5"
-                style="width:100%;padding:10px;border:2px solid var(--vbg);border-radius:8px;font-size:1rem;font-weight:800;box-sizing:border-box"
-                oninput="cmpRecalcUnit('${p.id}')">
-            </div>
-          </div>
-          <div style="font-size:.82rem;margin-bottom:10px">
-            Costo unitario: <b id="cmpunit-${p.id}">${costoUnit !== '—' ? 'Bs.'+costoUnit : '—'}</b>
-          </div>
-          <div class="prev-data">
-            Anterior → Cant: ${p.cantAdq||'—'} | Lote: ${p.costoLote?'Bs.'+(+p.costoLote).toFixed(2):'—'} | Unit: ${p.costoUnit?'Bs.'+(+p.costoUnit).toFixed(4):'—'}
-          </div>
-          <button class="btn btn-v" style="width:100%;margin-top:10px;padding:12px;font-size:.95rem;border-radius:10px"
-            onclick="cmpMarcarComprado('${p.id}')">
-            ✅ Comprado
-          </button>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-  actualizarProgreso();
-}
-
-function cmpRecalcUnit(id) {
-  const qty   = parseFloat(document.getElementById('cmpqty-'+id)?.value)||0;
-  const costo = parseFloat(document.getElementById('cmpcosto-'+id)?.value)||0;
-  const unitEl= document.getElementById('cmpunit-'+id);
-  if(unitEl) unitEl.textContent = qty>0 ? 'Bs.'+(costo/qty).toFixed(4) : '—';
-}
-
-async function cmpMarcarComprado(id) {
-  const qty   = parseInt(document.getElementById('cmpqty-'+id)?.value)||0;
-  const costo = parseFloat(document.getElementById('cmpcosto-'+id)?.value)||0;
-  const unit  = qty>0 ? costo/qty : 0;
-  const prod  = DB.products[id];
-  if(!prod) return;
-
-  // Actualizar en selección
-  if(cmpSeleccion[id]) {
-    cmpSeleccion[id].qty = qty;
-    cmpSeleccion[id].costoLote = costo;
-    cmpSeleccion[id].costoUnit = unit;
-  }
-  cmpComprados.push({id, nombre:prod.nombre, img:prod.img||'', qty, costoLote:costo, costoUnit:unit, cat:prod.cat||''});
-
-  // Actualizar en Firestore
-  try {
-    await fs.updateDoc(fs.doc(db,'products',id), {
-      cantAdq: qty,
-      costoLote: costo,
-      costoUnit: unit,
-      stock: fs.increment(qty),
+  // Procesar en lotes de 10 (límite de Firestore batch = 500, pero mejor ir de a poco)
+  const LOTE = 20;
+  for(let i = 0; i < prods.length; i += LOTE) {
+    const lote = prods.slice(i, i + LOTE);
+    const batch = fs.writeBatch(db);
+    lote.forEach(p => {
+      batch.update(fs.doc(db, 'products', p.id), { stock: 0, updatedAt: fs.serverTimestamp() });
     });
-    showToast('✅ '+prod.nombre+' comprado y stock actualizado');
-  } catch(e) { showToast('Error actualizando: '+e.message, true); }
-
-  renderCmpComprar();
-  renderCmpComprados();
-}
-
-// ── Tab Comprados ─────────────────────────────────────────
-function renderCmpComprados() {
-  const el = document.getElementById('cmp-comprados-list');
-  if(!cmpComprados.length) { el.innerHTML='<p style="color:var(--gr);text-align:center;padding:20px">Aún no marcaste ningún producto como comprado</p>'; return; }
-  el.innerHTML = cmpComprados.map(x=>`
-    <div style="display:flex;align-items:center;gap:12px;background:#e8f5e9;border:2px solid #a5d6a7;border-radius:12px;padding:12px;margin-bottom:8px">
-      ${x.img?`<img src="${x.img}" style="width:50px;height:50px;object-fit:cover;border-radius:8px;flex-shrink:0">`
-             :`<div style="width:50px;height:50px;background:#c8e6c9;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">✅</div>`}
-      <div style="flex:1">
-        <div style="font-weight:900;font-size:.9rem">${x.nombre}</div>
-        <div style="font-size:.78rem;color:#555;margin-top:3px">
-          Cant: ${x.qty} | Lote: Bs.${(+x.costoLote).toFixed(2)} | Unit: Bs.${(+x.costoUnit).toFixed(4)}
-        </div>
-      </div>
-      <span style="color:#2e7d32;font-size:1.3rem">✅</span>
-    </div>`).join('');
-}
-
-// ── Tab Adicionales ───────────────────────────────────────
-function renderCmpAdicionales() {
-  const el = document.getElementById('cmp-adicionales-list');
-  const compradosIds = new Set([...Object.keys(cmpSeleccion),...cmpComprados.map(c=>c.id)]);
-  const lista = cmpNoSelec.filter(p=>!compradosIds.has(p.id));
-  if(!lista.length) { el.innerHTML='<p style="color:var(--gr);text-align:center">Sin productos adicionales disponibles</p>'; return; }
-  el.innerHTML = lista.slice(0,30).map(p=>`
-    <div style="display:flex;align-items:center;gap:10px;padding:10px;border-bottom:1px solid var(--vbg);cursor:pointer"
-      onclick="cmpAgregarAdicional('${p.id}')">
-      ${p.img?`<img src="${p.img}" style="width:44px;height:44px;object-fit:cover;border-radius:8px;flex-shrink:0">`
-             :`<div style="width:44px;height:44px;background:var(--vbg);border-radius:8px;flex-shrink:0"></div>`}
-      <div style="flex:1"><div style="font-size:.88rem;font-weight:700">${p.nombre}</div>
-        <div style="font-size:.73rem;color:var(--gr)">${p.cat||''} | Stock: ${p.stock}</div></div>
-      <span style="color:var(--v);font-size:1.2rem;font-weight:900">+</span>
-    </div>`).join('');
-}
-
-function cmpBuscarAdicional() {
-  const q = document.getElementById('cmp-adicional-search').value.toLowerCase().trim();
-  const el = document.getElementById('cmp-adicional-results');
-  if(!q) { el.innerHTML=''; return; }
-  const res = Object.values(DB.products).filter(p=>p.nombre.toLowerCase().includes(q)).slice(0,8);
-  el.innerHTML = res.map(p=>`
-    <div style="display:flex;align-items:center;gap:10px;padding:10px;background:#f9fef9;border:1px solid var(--vbg);border-radius:8px;margin-bottom:4px;cursor:pointer"
-      onclick="cmpAgregarAdicional('${p.id}')">
-      <div style="flex:1;font-size:.88rem;font-weight:700">${p.nombre}</div>
-      <span style="color:var(--v);font-size:1.2rem;font-weight:900">+</span>
-    </div>`).join('');
-}
-
-function cmpAgregarAdicional(id) {
-  const prod = DB.products[id];
-  if(!prod) return;
-  cmpEditId = id;
-  document.getElementById('cmpCantTitle').textContent = prod.nombre;
-  const hist=[];
-  if(prod.cantAdq) hist.push(`📦 Última cant.: <b>${prod.cantAdq}</b>`);
-  if(prod.costoLote) hist.push(`💵 Costo lote ant.: <b>Bs.${(+prod.costoLote).toFixed(2)}</b>`);
-  if(prod.costoUnit) hist.push(`🏷️ Costo unit. ant.: <b>Bs.${(+prod.costoUnit).toFixed(4)}</b>`);
-  document.getElementById('cmpCantHistorico').innerHTML = hist.length?hist.join('<br>'):'<span style="color:#aaa">Sin datos históricos</span>';
-  document.getElementById('cmpCantInput').value = prod.cantAdq||'';
-  open2('cmpCantModal');
-  setTimeout(()=>document.getElementById('cmpCantInput').focus(),300);
-  // Al confirmar, ir a tab comprar
-  window._cmpAdicionalMode = true;
-}
-
-// Override cmpConfirmarCant para modo adicional
-const _origCmpConfirmar = window.cmpConfirmarCant;
-window.cmpConfirmarCant = function() {
-  const qty = parseInt(document.getElementById('cmpCantInput').value)||0;
-  if(qty<=0) { showToast('Ingresá una cantidad válida', true); return; }
-  const prod = DB.products[cmpEditId];
-  if(!prod) return;
-  cmpSeleccion[cmpEditId] = { prod, qty, costoLote: prod.costoLote||0 };
-  close2('cmpCantModal');
-  if(window._cmpAdicionalMode) {
-    window._cmpAdicionalMode = false;
-    renderCmpComprar();
-    renderCmpAdicionales();
-    cmpShowTab('comprar', document.querySelector('.cmp-stab'));
-  } else {
-    const prods = Object.values(DB.products);
-    const agotados = prods.filter(p=>p.stock===0).sort((a,b)=>a.nombre.localeCompare(b.nombre));
-    const bajoMin  = prods.filter(p=>p.stock>0&&p.stockMin>0&&p.stock<=p.stockMin).sort((a,b)=>a.nombre.localeCompare(b.nombre));
-    const casiMin  = prods.filter(p=>p.stock>0&&p.stockMin>0&&p.stock>p.stockMin&&p.stock<=p.stockMin*2).sort((a,b)=>a.nombre.localeCompare(b.nombre));
-    renderCmpSeleccion([...agotados,...bajoMin,...casiMin]);
+    try {
+      await batch.commit();
+      procesados += lote.length;
+    } catch(e) {
+      errores += lote.length;
+    }
+    if(msgEl) msgEl.textContent = `${procesados} de ${total} productos procesados...`;
   }
-  cmpEditId = null;
-};
 
-// ── Tab Nuevos ────────────────────────────────────────────
-function cmpAgregarNuevo() {
-  const nombre = document.getElementById('cmp-nuevo-nombre').value.trim();
-  const qty    = parseInt(document.getElementById('cmp-nuevo-qty').value)||0;
-  const costo  = parseFloat(document.getElementById('cmp-nuevo-costo').value)||0;
-  const cat    = document.getElementById('cmp-nuevo-cat').value.trim();
-  if(!nombre) { showToast('Ingresá el nombre del producto', true); return; }
-  if(!qty)    { showToast('Ingresá la cantidad', true); return; }
-  cmpNuevos.push({ _tmpId:'tmp_'+Date.now(), nombre, qty, costoLote:costo, costoUnit:qty>0?costo/qty:0, cat, validado:false });
-  ['cmp-nuevo-nombre','cmp-nuevo-qty','cmp-nuevo-costo','cmp-nuevo-cat'].forEach(id=>{
-    const el=document.getElementById(id); if(el) el.value='';
-  });
-  renderCmpNuevos();
-  showToast('✅ '+nombre+' agregado temporalmente');
+  // Resultado
+  document.getElementById('resetStockProgreso').innerHTML = `
+    <div style="font-size:1.5rem;margin-bottom:8px">${errores===0?'✅':'⚠️'}</div>
+    <div style="font-weight:800;margin-bottom:6px">${errores===0?'Stock reseteado correctamente':'Completado con algunos errores'}</div>
+    <div style="font-size:.82rem;color:var(--gr);margin-bottom:16px">
+      ${procesados} productos reseteados · ${errores} errores
+    </div>
+    <button class="btn btn-v" onclick="close2('resetStockModal')" style="width:100%">Cerrar</button>`;
+
+  if(errores === 0) showToast(`✅ Stock de ${procesados} productos reseteado a 0`);
+  else showToast(`⚠️ ${procesados} OK · ${errores} errores`, true);
 }
 
-function renderCmpNuevos() {
-  const el = document.getElementById('cmp-nuevos-list');
-  if(!cmpNuevos.length) { el.innerHTML='<p style="color:var(--gr);text-align:center;padding:16px">Sin productos nuevos aún</p>'; return; }
-  el.innerHTML = `<h4 style="color:var(--gr);font-size:.82rem;margin:0 0 8px">Productos nuevos agregados (${cmpNuevos.length}):</h4>`+
-    cmpNuevos.map((x,i)=>`
-      <div style="background:#fff8ec;border:1.5px solid #fde19a;border-radius:12px;padding:12px;margin-bottom:8px">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <div style="font-weight:800;font-size:.9rem">${x.nombre}</div>
-            <div style="font-size:.75rem;color:#777;margin-top:2px">Cant: ${x.qty} | Lote: Bs.${x.costoLote.toFixed(2)} | ${x.cat||'sin categoría'}</div>
-          </div>
-          <div style="display:flex;gap:6px">
-            <button class="btn btn-v btn-sm" onclick="cmpValidarNuevo(${i})" title="Validar al llegar">📝</button>
-            <button class="btn btn-ro btn-sm" onclick="cmpEliminarNuevo(${i})">✕</button>
-          </div>
-        </div>
-        ${x.validado?'<span style="color:var(--v);font-size:.75rem;font-weight:700">✅ Listo para guardar</span>':''}
-      </div>`).join('');
-}
-
-function cmpEliminarNuevo(i) {
-  cmpNuevos.splice(i,1);
-  renderCmpNuevos();
-}
-
-function cmpValidarNuevo(i) {
-  const x = cmpNuevos[i];
-  window._cmpValidarIdx = i;
-  const cats = [...new Set(Object.values(DB.products).map(p=>p.cat||'').filter(Boolean))].sort();
-  document.getElementById('cmpValidarContent').innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <div><label style="font-size:.82rem;font-weight:700;color:var(--gr)">Nombre *</label>
-        <input id="cvNombre" value="${x.nombre}" style="width:100%;padding:10px;border:2px solid var(--vbg);border-radius:8px;font-size:.9rem;box-sizing:border-box;margin-top:3px"></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div><label style="font-size:.82rem;font-weight:700;color:var(--gr)">Precio venta (Bs.)</label>
-          <input id="cvPrecio" type="number" step="0.5" value="${x.precio||''}" style="width:100%;padding:10px;border:2px solid var(--vbg);border-radius:8px;font-size:.9rem;box-sizing:border-box;margin-top:3px"></div>
-        <div><label style="font-size:.82rem;font-weight:700;color:var(--gr)">Unidad</label>
-          <input id="cvUnidad" value="${x.unidad||'unidad'}" style="width:100%;padding:10px;border:2px solid var(--vbg);border-radius:8px;font-size:.9rem;box-sizing:border-box;margin-top:3px"></div>
-      </div>
-      <div><label style="font-size:.82rem;font-weight:700;color:var(--gr)">Categoría</label>
-        <select id="cvCat" style="width:100%;padding:10px;border:2px solid var(--vbg);border-radius:8px;font-size:.9rem;box-sizing:border-box;margin-top:3px">
-          ${cats.map(c=>`<option value="${c}" ${c===x.cat?'selected':''}>${c}</option>`).join('')}
-          <option value="">Sin categoría</option>
-        </select></div>
-      <div><label style="font-size:.82rem;font-weight:700;color:var(--gr)">Stock mínimo</label>
-        <input id="cvStockMin" type="number" value="${x.stockMin||0}" style="width:100%;padding:10px;border:2px solid var(--vbg);border-radius:8px;font-size:.9rem;box-sizing:border-box;margin-top:3px"></div>
-      <div style="background:#fff3e0;border-radius:8px;padding:10px;font-size:.8rem;color:#777">
-        💡 La imagen y las promociones se pueden agregar después desde el panel de productos.
-        El stock inicial será ${x.qty} (la cantidad que compraste).
-      </div>
-    </div>`;
-  open2('cmpValidarNuevoModal');
-}
-
-async function cmpGuardarProductoNuevo() {
-  const i = window._cmpValidarIdx;
-  const nombre = document.getElementById('cvNombre')?.value.trim();
-  const precio = parseFloat(document.getElementById('cvPrecio')?.value)||0;
-  const unidad = document.getElementById('cvUnidad')?.value.trim()||'unidad';
-  const cat    = document.getElementById('cvCat')?.value||'';
-  const stockMin = parseInt(document.getElementById('cvStockMin')?.value)||0;
-  if(!nombre) { showToast('Completá el nombre', true); return; }
-  const x = cmpNuevos[i];
-  try {
-    const newId = cat.slice(0,2).toUpperCase()+'-NEW-'+Date.now().toString().slice(-5);
-    await fs.setDoc(fs.doc(db,'products',newId), {
-      id:newId, nombre, precio, unidad, cat, stock:x.qty, stockMin,
-      cantAdq:x.qty, costoLote:x.costoLote, costoUnit:x.costoUnit,
-      estado:'ok', promoActive:false, promos:[], img:'',
-      createdAt:fs.serverTimestamp()
-    });
-    cmpNuevos[i].validado = true;
-    cmpNuevos[i]._savedId = newId;
-    renderCmpNuevos();
-    close2('cmpValidarNuevoModal');
-    showToast('✅ '+nombre+' guardado en catálogo');
-  } catch(e) { showToast('Error: '+e.message, true); }
-}
-
-// ── Progreso ─────────────────────────────────────────────
-function actualizarProgreso() {
-  const total = Object.keys(cmpSeleccion).length + cmpNuevos.length;
-  const comp  = cmpComprados.length + cmpNuevos.filter(x=>x.validado).length;
-  const el = document.getElementById('cmp-progreso');
-  if(el) el.textContent = `${comp} de ${total} productos comprados`;
-}
-
-// ── Finalizar compras ─────────────────────────────────────
-async function finalizarCompras() {
-  if(!cmpComprados.length && !cmpNuevos.length) { showToast('No hay productos comprados aún', true); return; }
-  const totalLote = [...cmpComprados,...cmpNuevos].reduce((s,x)=>s+(+x.costoLote||0),0);
-  const fecha = cmpSesion?.fecha || fmtFechaCompra(new Date());
-
-  // Guardar sesión en Firestore
-  try {
-    await fs.addDoc(fs.collection(db,'compras_sesiones'),{
-      fecha, comprados:cmpComprados, nuevos:cmpNuevos,
-      totalLote, createdAt:fs.serverTimestamp()
-    });
-  } catch(e) {}
-
-  // Reporte final
-  const el = document.getElementById('cmp-reporte-final');
-  el.innerHTML = `
-    <div style="background:#f0fff4;border:2px solid var(--vbg);border-radius:12px;padding:16px;margin-bottom:12px">
-      <div style="font-size:.82rem;color:var(--gr);margin-bottom:8px">${fecha}</div>
-      <div style="font-weight:900;font-size:1.1rem;margin-bottom:12px">📊 Resumen de la sesión</div>
-      ${[...cmpComprados,...cmpNuevos.map(x=>({...x,nombre:x.nombre+'  🆕'}))].map(x=>`
-        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--vbg);font-size:.85rem">
-          <span>${x.nombre}</span>
-          <span>Cant:${x.qty} | Bs.${(+x.costoLote).toFixed(2)}</span>
-        </div>`).join('')}
-      <div style="display:flex;justify-content:space-between;margin-top:12px;font-size:1.1rem;font-weight:900">
-        <span>💰 Total invertido:</span>
-        <span style="color:var(--v)">Bs.${totalLote.toFixed(2)}</span>
-      </div>
-    </div>`;
-  showCmpFase('fase3');
-}
-
-function cmpNuevaSesion() {
-  cmpSesion=null; cmpSeleccion={}; cmpComprados=[]; cmpNuevos=[]; cmpNoSelec=[];
-  showCmpFase('fase0');
-}
-
-function cmpDescargarPDF() {
-  const contenido = document.getElementById('cmp-reporte-final').innerHTML;
-  const fecha = cmpSesion?.fecha||fmtFechaCompra(new Date());
-  const win = window.open('','_blank');
-  win.document.write(`<!DOCTYPE html><html><head>
-    <meta charset="UTF-8"><title>Reporte de Compras</title>
-    <style>body{font-family:Arial,sans-serif;padding:24px;max-width:600px;margin:auto}
-    h1{color:#2d7a45;font-size:1.1rem}
-    @media print{button{display:none!important}}</style>
-    </head><body>
-    <h1>🛒 La Bodega Online Pacata — Reporte de Compras</h1>
-    <p style="color:#666;font-size:.82rem">${fecha}</p>
-    ${contenido}
-    <br><button onclick="window.print()" style="background:#2d7a45;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:1rem;cursor:pointer">🖨️ Imprimir / Guardar PDF</button>
-  </body></html>`);
-  win.document.close();
-}
-
-// Exponer funciones de compras al scope global
-window.iniciarSesionCompras = iniciarSesionCompras;
-window.cmpToggleProd = cmpToggleProd;
-window.cmpConfirmarCant = window.cmpConfirmarCant; // ya sobreescrita arriba
-window.irDeCompras = irDeCompras;
-window.volverASeleccion = volverASeleccion;
-window.abrirModoCompra = abrirModoCompra;
-window.cmpShowTab = cmpShowTab;
-window.cmpMarcarComprado = cmpMarcarComprado;
-window.cmpRecalcUnit = cmpRecalcUnit;
-window.cmpBuscarAdicional = cmpBuscarAdicional;
-window.cmpAgregarAdicional = cmpAgregarAdicional;
-window.cmpAgregarNuevo = cmpAgregarNuevo;
-window.cmpEliminarNuevo = cmpEliminarNuevo;
-window.cmpValidarNuevo = cmpValidarNuevo;
-window.cmpGuardarProductoNuevo = cmpGuardarProductoNuevo;
-window.finalizarCompras = finalizarCompras;
-window.cmpNuevaSesion = cmpNuevaSesion;
-window.cmpDescargarPDF = cmpDescargarPDF;
+window.confirmarResetStock = confirmarResetStock;
+window.resetStockPaso2 = resetStockPaso2;
+window.ejecutarResetStock = ejecutarResetStock;
 </script>
 
 <!-- MODAL: ASIGNAR REPARTIDOR -->
