@@ -30,6 +30,8 @@
                  onSnapshot, collection, query, where, orderBy, limit,
                  serverTimestamp, increment, writeBatch };
   window._dbReady = true;
+window.clearPedImg = clearPedImg;
+window.setPedImg = setPedImg;
 </script>
 <style>
 :root{--v:#2d7a45;--vl:#4caf6e;--vbg:#eaf6ee;--am:#f5c842;--amo:#e0aa10;--or:#f07d10;--ro:#e53935;--tx:#1a2a1e;--gr:#6b7c72;--gcl:#f2f7f4;--wh:#fff;--sh:0 2px 12px rgba(45,122,69,.12);--rd:12px;}
@@ -250,7 +252,6 @@ input[type=file]{display:none;}
             <input type="date" id="dashFrom" style="padding:4px 8px;border:1.5px solid #d0e8d8;border-radius:7px;font-size:.75rem;outline:none">
             <input type="date" id="dashTo" style="padding:4px 8px;border:1.5px solid #d0e8d8;border-radius:7px;font-size:.75rem;outline:none">
             <button class="btn btn-v btn-sm" onclick="setDashRange('custom',null)">Filtrar</button>
-            <button class="btn btn-ro btn-sm" onclick="abrirResetPedidos()" title="Borrar pedidos y movimientos para empezar desde 0">🔄 Resetear datos</button>
           </div>
         </div>
         <div class="panel-grid" id="dashStats">
@@ -343,24 +344,9 @@ input[type=file]{display:none;}
         <h2>🛍️ Productos</h2>
         <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
           <input type="text" id="prodSearch" placeholder="🔍 Buscar..." style="flex:1;min-width:150px;padding:7px 12px;border:1.5px solid #d0e8d8;border-radius:8px;outline:none;font-size:.85rem" oninput="renderAdmProds()">
-          <select id="prodSortBy" onchange="renderAdmProds()"
-            style="padding:7px 10px;border:1.5px solid #d0e8d8;border-radius:8px;font-size:.82rem;outline:none;background:#fff;cursor:pointer">
-            <option value="nombre">📋 A → Z</option>
-            <option value="nombre_desc">📋 Z → A</option>
-            <option value="updated">🕐 Recién modificados</option>
-            <option value="stock_asc">📦 Menor stock primero</option>
-            <option value="sin_stock">🔴 Agotados primero</option>
-            <option value="bajo_stock">⚠️ Bajo mínimo primero</option>
-            <option value="sin_foto">📷 Sin foto primero</option>
-            <option value="con_vencimiento">📅 Con vencimiento</option>
-            <option value="sin_desc">📝 Sin descripción</option>
-            <option value="margen_asc">💰 Menor margen primero</option>
-            <option value="precio_desc">💲 Mayor precio primero</option>
-          </select>
           <button class="btn btn-v btn-sm" onclick="openProdEditor(null)">+ Nuevo producto</button>
           <button class="btn btn-sec btn-sm" onclick="openNewCat()" title="Agregar categoría">🗂️ + Categoría</button>
           <button class="btn btn-or btn-sm" onclick="bulkGenDescriptions()" id="bulkDescBtn" title="Genera descripciones con IA para todos los productos que no tienen una">✨ Descripciones masivas</button>
-          <button class="btn btn-ro btn-sm" onclick="confirmarResetStock()" title="Poner stock en 0 a todos los productos">🗑️ Resetear stock</button>
         </div>
         <div id="bulkDescProgress" style="display:none;background:#fff8ec;border:1px solid #fde19a;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:.82rem"></div>
         <div class="filter-pills" id="catFilterPills"></div>
@@ -522,17 +508,6 @@ input[type=file]{display:none;}
           <div class="fld"><label>🕐 Hora cierre delivery (pedidos presenciales)</label><input type="time" id="cfgDeliveryClose" value="16:00"></div>
           <div class="fld"><label>⏰ Duración franja programada (min)</label><input type="number" id="cfgDeliverySlotMins" min="15" step="15" value="30" placeholder="30"></div>
         </div>
-        <div style="background:#fff8ec;border:1.5px solid #fde19a;border-radius:10px;padding:12px;margin-bottom:12px">
-          <div style="font-size:.82rem;font-weight:800;color:#e07b00;margin-bottom:6px">⏰ Pedido programado</div>
-          <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
-            <div class="tog-wrap" onclick="togCfg('cfgScheduledEnabled')" id="cfgScheduledEnabled-wrap" style="width:44px;height:24px;border-radius:12px;background:#ccc;position:relative;transition:background .2s;flex-shrink:0">
-              <div id="cfgScheduledEnabled-knob" style="position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s"></div>
-            </div>
-            <input type="checkbox" id="cfgScheduledEnabled" style="display:none">
-            <span style="font-size:.82rem">Permitir que clientes programen pedidos para otro horario</span>
-          </label>
-          <p style="font-size:.75rem;color:#888;margin:6px 0 0 54px">Cuando está desactivado, la opción de "programar pedido" no aparece en la tienda online aunque esté cerrada.</p>
-        </div>
         <div style="background:#f9fef9;border:1px solid #c8e6c9;border-radius:10px;padding:12px;margin-bottom:12px">
           <div style="font-size:.8rem;font-weight:800;color:var(--v);margin-bottom:8px">🚚 Tarifas de delivery por distancia</div>
           <div class="form-row">
@@ -608,117 +583,16 @@ input[type=file]{display:none;}
   </div><!-- adm-main -->
 </div><!-- adm-wrap -->
 
-<!-- MODAL: Reset de stock -->
-<div class="confirm-ov" id="resetStockModal">
-  <div class="confirm-box" style="width:min(400px,96vw);position:relative">
-    <button class="modal-close-btn" onclick="close2('resetStockModal')" title="Cerrar">✕</button>
-    <div style="text-align:center;margin-bottom:16px">
-      <div style="font-size:2.5rem">⚠️</div>
-      <h3 style="color:var(--ro);margin:8px 0 4px">Resetear todo el stock</h3>
-      <p style="font-size:.85rem;color:var(--gr);margin:0">Esta acción pondrá el stock de <b>todos los productos</b> en <b>0</b>. No se borrará ningún producto ni sus datos.</p>
-    </div>
-    <div id="resetStockPaso1">
-      <p style="font-size:.9rem;text-align:center;margin-bottom:16px">¿Estás seguro que querés continuar?</p>
-      <div style="display:flex;gap:10px">
-        <button class="btn btn-sec" style="flex:1" onclick="close2('resetStockModal')">Cancelar</button>
-        <button class="btn btn-ro" style="flex:1" onclick="resetStockPaso2()">Sí, continuar →</button>
-      </div>
-    </div>
-    <div id="resetStockPaso2" style="display:none">
-      <p style="font-size:.9rem;text-align:center;margin-bottom:10px;color:var(--ro);font-weight:800">Segunda confirmación — esta acción NO se puede deshacer</p>
-      <p style="font-size:.82rem;text-align:center;color:var(--gr);margin-bottom:16px">Escribí <b>RESETEAR</b> para confirmar:</p>
-      <input type="text" id="resetStockConfirmInput" placeholder="Escribí RESETEAR"
-        style="width:100%;padding:12px;border:2px solid var(--ro);border-radius:10px;font-size:1rem;text-align:center;box-sizing:border-box;margin-bottom:12px;font-weight:800"
-        oninput="document.getElementById('btnConfirmarReset').disabled=this.value!=='RESETEAR'">
-      <div style="display:flex;gap:10px">
-        <button class="btn btn-sec" style="flex:1" onclick="close2('resetStockModal')">Cancelar</button>
-        <button class="btn btn-ro" style="flex:2" id="btnConfirmarReset" disabled onclick="ejecutarResetStock()">
-          🗑️ Resetear todo el stock
-        </button>
-      </div>
-    </div>
-    <div id="resetStockProgreso" style="display:none;text-align:center;padding:10px 0">
-      <div class="adm-loading" style="margin-bottom:8px">Reseteando stock...</div>
-      <div id="resetStockMsg" style="font-size:.82rem;color:var(--gr)"></div>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL: Reset de pedidos y movimientos -->
-<div class="confirm-ov" id="resetPedidosModal">
-  <div class="confirm-box" style="width:min(440px,96vw);position:relative;max-height:88vh;overflow-y:auto">
-    <button class="modal-close-btn" onclick="close2('resetPedidosModal')" title="Cerrar">✕</button>
-
-    <!-- Paso 1 -->
-    <div id="rp-paso1">
-      <div style="text-align:center;margin-bottom:16px">
-        <div style="font-size:2.5rem">⚠️</div>
-        <h3 style="color:var(--ro);margin:8px 0 4px">Resetear pedidos y movimientos</h3>
-        <p style="font-size:.84rem;color:var(--gr);margin:0 0 12px">
-          Esta acción eliminará permanentemente:
-        </p>
-        <div style="text-align:left;background:#fff8ec;border:1.5px solid #fde19a;border-radius:10px;padding:12px;font-size:.82rem;margin-bottom:12px">
-          <div style="margin-bottom:4px">🛒 <b>Pedidos online</b> (orders)</div>
-          <div style="margin-bottom:4px">🏪 <b>Ventas tienda física</b> (sales_physical)</div>
-          <div style="margin-bottom:4px">💸 <b>Gastos</b> (gastos_physical)</div>
-          <div style="margin-bottom:4px">📦 <b>Compras</b> (compras_physical, compras_sesiones)</div>
-          <div style="margin-bottom:4px">📋 <b>Fiados y pagos</b> (fiados, pagos_fiado)</div>
-          <div style="margin-bottom:4px">⭐ <b>Calificaciones</b> (calificaciones)</div>
-          <div style="margin-bottom:4px">💬 <b>Sugerencias</b> (suggestions)</div>
-          <div style="margin-bottom:4px">📊 <b>Estadísticas</b> (stats, consumo_api)</div>
-          <div style="margin-bottom:4px">👥 <b>Clientes</b> (clients, ubicaciones_verificadas)</div>
-          <div>🥬 <b>Productos temporales</b> (tempProducts)</div>
-        </div>
-        <div style="background:#e8f5e9;border:1.5px solid #a5d6a7;border-radius:10px;padding:10px;font-size:.82rem;color:#2e7d32;margin-bottom:16px">
-          ✅ Se guardará un <b>respaldo completo</b> en Firestore antes de borrar.<br>
-          Los productos, categorías y configuración <b>NO se tocan</b>.
-        </div>
-      </div>
-      <div style="display:flex;gap:10px">
-        <button class="btn btn-sec" style="flex:1" onclick="close2('resetPedidosModal')">Cancelar</button>
-        <button class="btn btn-ro" style="flex:1" onclick="rpPaso2()">Sí, continuar →</button>
-      </div>
-    </div>
-
-    <!-- Paso 2: doble confirmación -->
-    <div id="rp-paso2" style="display:none">
-      <div style="text-align:center;margin-bottom:16px">
-        <div style="font-size:2rem">🔐</div>
-        <h3 style="color:var(--ro);margin:8px 0 4px">Segunda confirmación</h3>
-        <p style="font-size:.84rem;color:var(--gr)">Esta acción <b>NO se puede deshacer</b>.<br>Escribí <b>BORRAR TODO</b> para confirmar:</p>
-      </div>
-      <input type="text" id="rpConfirmInput" placeholder="Escribí BORRAR TODO"
-        style="width:100%;padding:14px;border:2px solid var(--ro);border-radius:10px;font-size:1rem;text-align:center;box-sizing:border-box;margin-bottom:12px;font-weight:800"
-        oninput="document.getElementById('btnConfirmarRp').disabled=this.value!=='BORRAR TODO'">
-      <div style="display:flex;gap:10px">
-        <button class="btn btn-sec" style="flex:1" onclick="close2('resetPedidosModal')">Cancelar</button>
-        <button class="btn btn-ro" style="flex:2" id="btnConfirmarRp" disabled onclick="ejecutarResetPedidos()">
-          🗑️ Borrar y empezar desde 0
-        </button>
-      </div>
-    </div>
-
-    <!-- Progreso -->
-    <div id="rp-progreso" style="display:none;text-align:center;padding:16px 0">
-      <div style="font-size:1.5rem;margin-bottom:8px">⏳</div>
-      <div style="font-weight:800;margin-bottom:8px" id="rp-progreso-titulo">Guardando respaldo...</div>
-      <div style="font-size:.82rem;color:var(--gr);margin-bottom:12px" id="rp-progreso-msg"></div>
-      <div style="background:var(--vbg);border-radius:8px;height:8px;overflow:hidden">
-        <div id="rp-progreso-bar" style="background:var(--v);height:100%;width:0%;transition:width .3s"></div>
-      </div>
-    </div>
-
-    <!-- Resultado -->
-    <div id="rp-resultado" style="display:none"></div>
-  </div>
-</div>
-
 <!-- MODAL EDITOR PRODUCTO -->
 <div class="mover" id="prodEditor"><button onclick="close2('prodEditor')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
   <div class="mbox" style="width:min(520px,96vw)">
     <h3 id="pedTitle">Producto</h3>
     <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
-      <div class="img-preview" id="pedImgPrev" onclick="document.getElementById('pedImgFile').click()">📷</div>
+      <div style="position:relative;flex-shrink:0">
+        <div class="img-preview" id="pedImgPrev" onclick="document.getElementById('pedImgFile').click()">📷</div>
+        <button id="pedImgClearBtn" onclick="clearPedImg()" title="Eliminar foto"
+          style="display:none;position:absolute;top:-7px;right:-7px;width:22px;height:22px;border-radius:50%;background:#e53935;color:#fff;border:none;font-size:.75rem;font-weight:900;cursor:pointer;line-height:1;z-index:5">✕</button>
+      </div>
       <div style="flex:1">
         <div class="form-row">
           <div class="fld">
@@ -884,6 +758,23 @@ let isAuth = false;
 let editProdId = null;
 let deleteProdId = null;
 let pedImgTemp = "";
+
+function setPedImg(src) {
+  pedImgTemp = src || "";
+  const prev = document.getElementById("pedImgPrev");
+  const btn  = document.getElementById("pedImgClearBtn");
+  if(src) {
+    prev.innerHTML = `<img src="${src}" style="width:100%;height:100%;object-fit:cover">`;
+    if(btn) btn.style.display = "flex";
+  } else {
+    prev.innerHTML = "📷";
+    if(btn) btn.style.display = "none";
+  }
+}
+
+function clearPedImg() {
+  setPedImg("");
+}
 let currentOrderFilter = "all";
 let currentProdCat = "all";
 let currentOrderDetail = null;
@@ -1599,54 +1490,29 @@ function filterProdCat(cat, btn) {
 }
 
 function renderAdmProds() {
-  const q      = (document.getElementById("prodSearch")?.value||"").toLowerCase().trim();
-  const sortBy = document.getElementById("prodSortBy")?.value || "nombre";
+  const q = (document.getElementById("prodSearch")?.value||"").toLowerCase().trim();
   let prods = Object.values(DB.products);
-
   if(currentProdCat !== "all") prods = prods.filter(p => p.cat === currentProdCat);
-  if(q) prods = prods.filter(p => p.nombre.toLowerCase().includes(q) || (p.cat||"").toLowerCase().includes(q));
-
-  if(sortBy === "sin_foto")         prods = [...prods.filter(p=>!p.img), ...prods.filter(p=>!!p.img)];
-  else if(sortBy==="con_vencimiento") prods = prods.filter(p => p.expiry && p.expiry !== "");
-  else if(sortBy==="sin_stock")     prods = [...prods.filter(p=>p.stock===0), ...prods.filter(p=>p.stock!==0)];
-  else if(sortBy==="bajo_stock")    prods = [...prods.filter(p=>p.stock>0&&p.stockMin>0&&p.stock<=p.stockMin), ...prods.filter(p=>!(p.stock>0&&p.stockMin>0&&p.stock<=p.stockMin))];
-  else if(sortBy==="sin_desc")      prods = [...prods.filter(p=>!p.desc), ...prods.filter(p=>!!p.desc)];
-  else if(sortBy==="updated")       prods = prods.sort((a,b)=>(b.updatedAt?.seconds||0)-(a.updatedAt?.seconds||0));
-  else if(sortBy==="stock_asc")     prods = prods.sort((a,b)=>(a.stock||0)-(b.stock||0));
-  else if(sortBy==="margen_asc")    prods = prods.sort((a,b)=>{ const ma=a.costoUnit>0?(a.precio-a.costoUnit)/a.precio:1; const mb=b.costoUnit>0?(b.precio-b.costoUnit)/b.precio:1; return ma-mb; });
-  else if(sortBy==="precio_desc")   prods = prods.sort((a,b)=>(b.precio||0)-(a.precio||0));
-  else if(sortBy==="nombre_desc")   prods = prods.sort((a,b)=>b.nombre.localeCompare(a.nombre));
-  else                               prods = prods.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  if(q) prods = prods.filter(p => p.nombre.toLowerCase().includes(q));
+  prods.sort((a,b) => a.nombre.localeCompare(b.nombre));
 
   const list = document.getElementById("prodList");
-  if(!prods.length) { list.innerHTML='<p style="color:var(--gr);font-size:.82rem;padding:10px">Sin productos para este filtro</p>'; return; }
+  if(!prods.length) { list.innerHTML='<p style="color:var(--gr);font-size:.82rem;padding:10px">Sin productos</p>'; return; }
 
-  const sortLabels = { sin_foto:"📷 Sin foto", con_vencimiento:"📅 Con vencimiento", sin_stock:"🔴 Agotados primero", bajo_stock:"⚠️ Bajo mínimo primero", sin_desc:"📝 Sin descripción", updated:"🕐 Recién modificados", stock_asc:"📦 Menor stock", margen_asc:"💰 Menor margen", precio_desc:"💲 Mayor precio" };
-  const badge = sortLabels[sortBy]
-    ? `<div style="font-size:.75rem;color:var(--or);font-weight:700;margin-bottom:6px;padding:3px 10px;background:#fff8ec;border-radius:20px;display:inline-block">Ordenado: ${sortLabels[sortBy]} · ${prods.length} prods</div><br>`
-    : `<div style="font-size:.75rem;color:var(--gr);margin-bottom:6px">${prods.length} productos</div>`;
-
-  list.innerHTML = badge + prods.map(p => {
+  list.innerHTML = prods.map(p => {
     const stockClass = p.stock===0?"chip-out":p.stockMin>0&&p.stock<=p.stockMin?"chip-low":"chip-ok";
-    const stockLbl   = p.stock===0?"🔴 Agotado":p.stockMin>0&&p.stock<=p.stockMin?`⚠️ ${p.stock}`:`✅ ${p.stock}`;
-    const margen     = p.costoUnit>0?(((p.precio-p.costoUnit)/p.precio)*100).toFixed(0)+"%":"—";
-    const imgEl      = p.img?`<img src="${p.img}">`:(DB.categories[p.cat]?.emoji||"📦");
-    const sinFoto    = !p.img?'· <span class="chip" style="background:#fce4ec;color:#c62828;font-size:.65rem">📷 Sin foto</span>':"";
-    const venc       = p.expiry?`· <span class="chip" style="background:#e3f2fd;color:#1565c0;font-size:.65rem">📅 ${p.expiry}</span>`:"";
-    const upd        = p.updatedAt?.seconds?`· <span style="font-size:.65rem;color:#bbb">${new Date(p.updatedAt.seconds*1000).toLocaleDateString("es",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}</span>`:"";
+    const stockLbl = p.stock===0?"🔴 Agotado":p.stockMin>0&&p.stock<=p.stockMin?`⚠️ ${p.stock}`:`✅ ${p.stock}`;
+    const margen = p.costoUnit > 0 ? (((p.precio-p.costoUnit)/p.precio)*100).toFixed(0)+"%" : "—";
+    const imgEl = p.img ? `<img src="${p.img}">` : (DB.categories[p.cat]?.emoji||"📦");
     return `<div class="prod-item">
-      <div style="width:72px;flex-shrink:0;text-align:center">
-        <div style="font-size:.6rem;color:#aaa;margin-bottom:2px">código</div>
-        <div style="font-size:.65rem;font-weight:900;color:var(--v);background:var(--vbg);border-radius:6px;padding:3px 4px;word-break:break-all;line-height:1.2">${p.id}</div>
-      </div>
       <div class="prod-thumb" onclick="quickImg('${p.id}')">${imgEl}</div>
       <div class="prod-inf">
         <div class="prod-nm">${p.nombre}</div>
-        <div class="prod-meta">${p.cat} · <b>Venta:Bs.${p.precio.toFixed(2)}</b> · Costo:Bs.${(p.costoUnit||0).toFixed(2)} · Margen:${margen} · <span class="chip ${stockClass}">${stockLbl}</span>${p.estado==="oculto"?'· <span class="chip" style="background:#f5f5f5;color:#999">Oculto</span>':""}${!p.desc?'· <span class="chip" style="background:#fff3e0;color:#f07d10;font-size:.65rem">Sin desc.</span>':""}${sinFoto}${venc}${upd}</div>
+        <div class="prod-meta">${p.cat} · <b>Venta:Bs.${p.precio.toFixed(2)}</b> · Costo:Bs.${(p.costoUnit||0).toFixed(2)} · Margen:${margen} · <span class="chip ${stockClass}">${stockLbl}</span>${p.estado==="oculto"?'· <span class="chip" style="background:#f5f5f5;color:#999">Oculto</span>':""}${!p.desc?'· <span class="chip" style="background:#fff3e0;color:#f07d10;font-size:.65rem">Sin desc.</span>':""}</div>
       </div>
       <div class="prod-acts">
         <button class="btn btn-v btn-sm" onclick="openProdEditor('${p.id}')">✏️</button>
-        <button class="btn btn-sec btn-sm" title="Duplicar" onclick="duplicateProd('${p.id}')">📋</button>
+        <button class="btn btn-sec btn-sm" title="Duplicar producto" onclick="duplicateProd('${p.id}')">📋</button>
         <button class="btn btn-sec btn-sm" onclick="toggleHide('${p.id}')">${p.estado==="oculto"?"👁️":"🙈"}</button>
         <button class="btn btn-ro btn-sm" onclick="askDelete('${p.id}')">🗑️</button>
       </div>
@@ -1712,12 +1578,7 @@ function duplicateProd(id) {
   document.getElementById("pedCostoLote").value = p.costoLote || "";
   document.getElementById("pedCostoUnit").value = p.costoUnit || "";
   document.getElementById("pedPromoActive").checked = p.promoActive || false;
-  pedImgTemp = p.img || "";
-  if(pedImgTemp) {
-    document.getElementById("pedImgPrev").innerHTML = `<img src="${pedImgTemp}" style="width:100%;height:100%;object-fit:cover">`;
-  } else {
-    document.getElementById("pedImgPrev").innerHTML = "📷";
-  }
+  setPedImg(p.img || "");
   renderTiers(p.promos || [[1, p.precio||0]]);
   calcCostoUnit();
 
@@ -1837,13 +1698,7 @@ function openProdEditor(id) {
   document.getElementById("pedCostoLote").value = p?.costoLote || "";
   document.getElementById("pedCostoUnit").value = p?.costoUnit || "";
   document.getElementById("pedPromoActive").checked = p?.promoActive || false;
-  pedImgTemp = p?.img || "";
-
-  if(pedImgTemp) {
-    document.getElementById("pedImgPrev").innerHTML = `<img src="${pedImgTemp}" style="width:100%;height:100%;object-fit:cover">`;
-  } else {
-    document.getElementById("pedImgPrev").innerHTML = "📷";
-  }
+  setPedImg(p?.img || "");
   renderTiers(p?.promos || [[1, p?.precio||0]]);
   calcCostoUnit();
   open2("prodEditor");
@@ -1912,14 +1767,12 @@ async function handlePedImg(ev) {
   const file = ev.target.files[0]; if(!file) return;
   try {
     const url = await uploadToCloudinary(file);
-    pedImgTemp = url;
-    document.getElementById("pedImgPrev").innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover">`;
+    setPedImg(url);
   } catch(e) {
     // Fallback: base64 resize
     const r = new FileReader();
     r.onload = e2 => resizeImg(e2.target.result, 500, data => {
-      pedImgTemp = data;
-      document.getElementById("pedImgPrev").innerHTML = `<img src="${data}" style="width:100%;height:100%;object-fit:cover">`;
+      setPedImg(data);
     });
     r.readAsDataURL(file);
   }
@@ -2214,15 +2067,6 @@ function loadConfig() {
   set("cfgDeliveryClose", c.deliveryClose||"16:00");
   set("cfgDeliverySlotMins", c.deliverySlotMins||30);
   set("cfgPin", "");
-  // Toggle pedido programado
-  const schedCb = document.getElementById("cfgScheduledEnabled");
-  if(schedCb) {
-    schedCb.checked = c.scheduledEnabled === true; // default OFF
-    const wrap = document.getElementById("cfgScheduledEnabled-wrap");
-    const knob = document.getElementById("cfgScheduledEnabled-knob");
-    if(wrap) wrap.style.background = schedCb.checked ? 'var(--v)' : '#ccc';
-    if(knob) knob.style.left = schedCb.checked ? '23px' : '3px';
-  }
   // Voice toggle
   const voiceCb = document.getElementById("cfgVoiceEnabled");
   if(voiceCb) {
@@ -2296,7 +2140,6 @@ async function saveConfig() {
     storeLat: window._storeLat || DB.config.storeLat || -17.3895,
     storeLng: window._storeLng || DB.config.storeLng || -66.1568,
     voiceEnabled: document.getElementById("cfgVoiceEnabled")?.checked !== false,
-    scheduledEnabled: document.getElementById("cfgScheduledEnabled")?.checked === true,
     pwdSet: true
   };
   if(pin && pin.length>=4) data.pin = pin;
@@ -3782,179 +3625,6 @@ async function trackApiUsage(type, count=1) {
     await fs.setDoc(fs.doc(db,"consumo_api",today), update, {merge:true});
   } catch(e) {}
 }
-
-// ── Reset de Stock ────────────────────────────────────────
-function confirmarResetStock() {
-  document.getElementById('resetStockPaso1').style.display = 'block';
-  document.getElementById('resetStockPaso2').style.display = 'none';
-  document.getElementById('resetStockProgreso').style.display = 'none';
-  document.getElementById('resetStockConfirmInput').value = '';
-  document.getElementById('btnConfirmarReset').disabled = true;
-  open2('resetStockModal');
-}
-
-function resetStockPaso2() {
-  document.getElementById('resetStockPaso1').style.display = 'none';
-  document.getElementById('resetStockPaso2').style.display = 'block';
-  setTimeout(() => document.getElementById('resetStockConfirmInput').focus(), 200);
-}
-
-async function ejecutarResetStock() {
-  document.getElementById('resetStockPaso2').style.display = 'none';
-  document.getElementById('resetStockProgreso').style.display = 'block';
-
-  const prods = Object.values(DB.products);
-  const total = prods.length;
-  let procesados = 0, errores = 0;
-  const msgEl = document.getElementById('resetStockMsg');
-
-  // Procesar en lotes de 10 (límite de Firestore batch = 500, pero mejor ir de a poco)
-  const LOTE = 20;
-  for(let i = 0; i < prods.length; i += LOTE) {
-    const lote = prods.slice(i, i + LOTE);
-    const batch = fs.writeBatch(db);
-    lote.forEach(p => {
-      batch.update(fs.doc(db, 'products', p.id), { stock: 0, updatedAt: fs.serverTimestamp() });
-    });
-    try {
-      await batch.commit();
-      procesados += lote.length;
-    } catch(e) {
-      errores += lote.length;
-    }
-    if(msgEl) msgEl.textContent = `${procesados} de ${total} productos procesados...`;
-  }
-
-  // Resultado
-  document.getElementById('resetStockProgreso').innerHTML = `
-    <div style="font-size:1.5rem;margin-bottom:8px">${errores===0?'✅':'⚠️'}</div>
-    <div style="font-weight:800;margin-bottom:6px">${errores===0?'Stock reseteado correctamente':'Completado con algunos errores'}</div>
-    <div style="font-size:.82rem;color:var(--gr);margin-bottom:16px">
-      ${procesados} productos reseteados · ${errores} errores
-    </div>
-    <button class="btn btn-v" onclick="close2('resetStockModal')" style="width:100%">Cerrar</button>`;
-
-  if(errores === 0) showToast(`✅ Stock de ${procesados} productos reseteado a 0`);
-  else showToast(`⚠️ ${procesados} OK · ${errores} errores`, true);
-}
-
-window.confirmarResetStock = confirmarResetStock;
-window.resetStockPaso2 = resetStockPaso2;
-window.ejecutarResetStock = ejecutarResetStock;
-
-// ════════════════════════════════════════════════════════
-// RESET DE PEDIDOS Y MOVIMIENTOS
-// ════════════════════════════════════════════════════════
-function abrirResetPedidos() {
-  document.getElementById('rp-paso1').style.display = 'block';
-  document.getElementById('rp-paso2').style.display = 'none';
-  document.getElementById('rp-progreso').style.display = 'none';
-  document.getElementById('rp-resultado').style.display = 'none';
-  document.getElementById('rpConfirmInput').value = '';
-  document.getElementById('btnConfirmarRp').disabled = true;
-  open2('resetPedidosModal');
-}
-
-function rpPaso2() {
-  document.getElementById('rp-paso1').style.display = 'none';
-  document.getElementById('rp-paso2').style.display = 'block';
-  setTimeout(()=>document.getElementById('rpConfirmInput').focus(), 200);
-}
-
-function rpSetProgreso(titulo, msg, pct) {
-  document.getElementById('rp-progreso-titulo').textContent = titulo;
-  document.getElementById('rp-progreso-msg').textContent = msg;
-  document.getElementById('rp-progreso-bar').style.width = pct + '%';
-}
-
-async function rpGetColeccion(nombre, limite=400) {
-  try {
-    const snap = await fs.getDocs(fs.query(fs.collection(db, nombre), fs.limit(limite)));
-    return snap.docs.map(d => ({id: d.id, ...d.data()}));
-  } catch(e) { return []; }
-}
-
-async function rpBorrarColeccion(nombre) {
-  let total = 0;
-  while(true) {
-    const snap = await fs.getDocs(fs.query(fs.collection(db, nombre), fs.limit(100)));
-    if(snap.empty) break;
-    const batch = fs.writeBatch(db);
-    snap.docs.forEach(d => batch.delete(fs.doc(db, nombre, d.id)));
-    await batch.commit();
-    total += snap.docs.length;
-  }
-  return total;
-}
-
-async function ejecutarResetPedidos() {
-  document.getElementById('rp-paso2').style.display = 'none';
-  document.getElementById('rp-progreso').style.display = 'block';
-
-  const colecciones = [
-    'orders','sales_physical','gastos_physical','compras_physical',
-    'compras_sesiones','fiados','pagos_fiado','calificaciones',
-    'suggestions','stats','consumo_api',
-    'clients','ubicaciones_verificadas','tempProducts'
-  ];
-
-  // PASO 1: Respaldo
-  rpSetProgreso('Guardando respaldo...', 'Recopilando datos...', 5);
-  const fechaBackup = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
-  const resumen = {};
-  let paso = 0;
-  for(const col of colecciones) {
-    rpSetProgreso('Guardando respaldo...', 'Respaldando ' + col + '...', 5 + (paso/colecciones.length)*35);
-    const docs = await rpGetColeccion(col);
-    resumen[col] = docs.length + ' registros';
-    paso++;
-  }
-  try {
-    await fs.setDoc(fs.doc(db, 'backups', fechaBackup), {
-      fecha: fechaBackup, createdAt: fs.serverTimestamp(), resumen
-    });
-  } catch(e) {}
-
-  // PASO 2: Borrar
-  const resultados = {};
-  paso = 0;
-  for(const col of colecciones) {
-    rpSetProgreso('Borrando datos...', 'Limpiando ' + col + '...', 42 + (paso/colecciones.length)*55);
-    resultados[col] = await rpBorrarColeccion(col);
-    paso++;
-  }
-
-  rpSetProgreso('Finalizando...', 'Listo', 100);
-  const totalBorrados = Object.values(resultados).reduce((s,n)=>s+n,0);
-
-  document.getElementById('rp-progreso').style.display = 'none';
-  document.getElementById('rp-resultado').style.display = 'block';
-  document.getElementById('rp-resultado').innerHTML = `
-    <div style="text-align:center;margin-bottom:16px">
-      <div style="font-size:2rem">✅</div>
-      <h3 style="color:var(--v);margin:8px 0 4px">¡Sistema reseteado!</h3>
-      <p style="font-size:.82rem;color:var(--gr)">Respaldo guardado con clave <b>${fechaBackup}</b></p>
-    </div>
-    <div style="background:#f0fff4;border:1.5px solid var(--vbg);border-radius:10px;padding:12px;font-size:.82rem;margin-bottom:16px">
-      ${Object.entries(resultados).map(([col,n])=>`
-        <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--vbg)">
-          <span style="color:var(--gr)">${col}</span>
-          <span style="color:${n>0?'var(--ro)':'#aaa'};font-weight:700">${n} eliminados</span>
-        </div>`).join('')}
-      <div style="display:flex;justify-content:space-between;padding:6px 0;font-weight:900;margin-top:4px">
-        <span>Total</span><span style="color:var(--ro)">${totalBorrados} registros eliminados</span>
-      </div>
-    </div>
-    <button class="btn btn-v" style="width:100%;padding:12px;font-size:.95rem" onclick="close2('resetPedidosModal');location.reload()">
-      🚀 Empezar desde 0
-    </button>`;
-
-  showToast('✅ ' + totalBorrados + ' registros eliminados. Respaldo en Firestore.');
-}
-
-window.abrirResetPedidos = abrirResetPedidos;
-window.rpPaso2 = rpPaso2;
-window.ejecutarResetPedidos = ejecutarResetPedidos;
 </script>
 
 <!-- MODAL: ASIGNAR REPARTIDOR -->
