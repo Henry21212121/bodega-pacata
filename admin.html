@@ -250,6 +250,7 @@ input[type=file]{display:none;}
             <input type="date" id="dashFrom" style="padding:4px 8px;border:1.5px solid #d0e8d8;border-radius:7px;font-size:.75rem;outline:none">
             <input type="date" id="dashTo" style="padding:4px 8px;border:1.5px solid #d0e8d8;border-radius:7px;font-size:.75rem;outline:none">
             <button class="btn btn-v btn-sm" onclick="setDashRange('custom',null)">Filtrar</button>
+            <button class="btn btn-ro btn-sm" onclick="abrirResetPedidos()" title="Borrar pedidos y movimientos para empezar desde 0">🔄 Resetear datos</button>
           </div>
         </div>
         <div class="panel-grid" id="dashStats">
@@ -629,6 +630,75 @@ input[type=file]{display:none;}
       <div class="adm-loading" style="margin-bottom:8px">Reseteando stock...</div>
       <div id="resetStockMsg" style="font-size:.82rem;color:var(--gr)"></div>
     </div>
+  </div>
+</div>
+
+<!-- MODAL: Reset de pedidos y movimientos -->
+<div class="confirm-ov" id="resetPedidosModal">
+  <div class="confirm-box" style="width:min(440px,96vw);position:relative;max-height:88vh;overflow-y:auto">
+    <button class="modal-close-btn" onclick="close2('resetPedidosModal')" title="Cerrar">✕</button>
+
+    <!-- Paso 1 -->
+    <div id="rp-paso1">
+      <div style="text-align:center;margin-bottom:16px">
+        <div style="font-size:2.5rem">⚠️</div>
+        <h3 style="color:var(--ro);margin:8px 0 4px">Resetear pedidos y movimientos</h3>
+        <p style="font-size:.84rem;color:var(--gr);margin:0 0 12px">
+          Esta acción eliminará permanentemente:
+        </p>
+        <div style="text-align:left;background:#fff8ec;border:1.5px solid #fde19a;border-radius:10px;padding:12px;font-size:.82rem;margin-bottom:12px">
+          <div style="margin-bottom:4px">🛒 <b>Pedidos online</b> (orders)</div>
+          <div style="margin-bottom:4px">🏪 <b>Ventas tienda física</b> (sales_physical)</div>
+          <div style="margin-bottom:4px">💸 <b>Gastos</b> (gastos_physical)</div>
+          <div style="margin-bottom:4px">📦 <b>Compras</b> (compras_physical, compras_sesiones)</div>
+          <div style="margin-bottom:4px">📋 <b>Fiados y pagos</b> (fiados, pagos_fiado)</div>
+          <div style="margin-bottom:4px">⭐ <b>Calificaciones</b> (calificaciones)</div>
+          <div style="margin-bottom:4px">💬 <b>Sugerencias</b> (suggestions)</div>
+          <div style="margin-bottom:4px">📊 <b>Estadísticas</b> (stats, consumo_api)</div>
+          <div style="margin-bottom:4px">👥 <b>Clientes</b> (clients, ubicaciones_verificadas)</div>
+          <div>🥬 <b>Productos temporales</b> (tempProducts)</div>
+        </div>
+        <div style="background:#e8f5e9;border:1.5px solid #a5d6a7;border-radius:10px;padding:10px;font-size:.82rem;color:#2e7d32;margin-bottom:16px">
+          ✅ Se guardará un <b>respaldo completo</b> en Firestore antes de borrar.<br>
+          Los productos, categorías y configuración <b>NO se tocan</b>.
+        </div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-sec" style="flex:1" onclick="close2('resetPedidosModal')">Cancelar</button>
+        <button class="btn btn-ro" style="flex:1" onclick="rpPaso2()">Sí, continuar →</button>
+      </div>
+    </div>
+
+    <!-- Paso 2: doble confirmación -->
+    <div id="rp-paso2" style="display:none">
+      <div style="text-align:center;margin-bottom:16px">
+        <div style="font-size:2rem">🔐</div>
+        <h3 style="color:var(--ro);margin:8px 0 4px">Segunda confirmación</h3>
+        <p style="font-size:.84rem;color:var(--gr)">Esta acción <b>NO se puede deshacer</b>.<br>Escribí <b>BORRAR TODO</b> para confirmar:</p>
+      </div>
+      <input type="text" id="rpConfirmInput" placeholder="Escribí BORRAR TODO"
+        style="width:100%;padding:14px;border:2px solid var(--ro);border-radius:10px;font-size:1rem;text-align:center;box-sizing:border-box;margin-bottom:12px;font-weight:800"
+        oninput="document.getElementById('btnConfirmarRp').disabled=this.value!=='BORRAR TODO'">
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-sec" style="flex:1" onclick="close2('resetPedidosModal')">Cancelar</button>
+        <button class="btn btn-ro" style="flex:2" id="btnConfirmarRp" disabled onclick="ejecutarResetPedidos()">
+          🗑️ Borrar y empezar desde 0
+        </button>
+      </div>
+    </div>
+
+    <!-- Progreso -->
+    <div id="rp-progreso" style="display:none;text-align:center;padding:16px 0">
+      <div style="font-size:1.5rem;margin-bottom:8px">⏳</div>
+      <div style="font-weight:800;margin-bottom:8px" id="rp-progreso-titulo">Guardando respaldo...</div>
+      <div style="font-size:.82rem;color:var(--gr);margin-bottom:12px" id="rp-progreso-msg"></div>
+      <div style="background:var(--vbg);border-radius:8px;height:8px;overflow:hidden">
+        <div id="rp-progreso-bar" style="background:var(--v);height:100%;width:0%;transition:width .3s"></div>
+      </div>
+    </div>
+
+    <!-- Resultado -->
+    <div id="rp-resultado" style="display:none"></div>
   </div>
 </div>
 
@@ -3746,6 +3816,120 @@ async function ejecutarResetStock() {
 window.confirmarResetStock = confirmarResetStock;
 window.resetStockPaso2 = resetStockPaso2;
 window.ejecutarResetStock = ejecutarResetStock;
+
+// ════════════════════════════════════════════════════════
+// RESET DE PEDIDOS Y MOVIMIENTOS
+// ════════════════════════════════════════════════════════
+function abrirResetPedidos() {
+  document.getElementById('rp-paso1').style.display = 'block';
+  document.getElementById('rp-paso2').style.display = 'none';
+  document.getElementById('rp-progreso').style.display = 'none';
+  document.getElementById('rp-resultado').style.display = 'none';
+  document.getElementById('rpConfirmInput').value = '';
+  document.getElementById('btnConfirmarRp').disabled = true;
+  open2('resetPedidosModal');
+}
+
+function rpPaso2() {
+  document.getElementById('rp-paso1').style.display = 'none';
+  document.getElementById('rp-paso2').style.display = 'block';
+  setTimeout(()=>document.getElementById('rpConfirmInput').focus(), 200);
+}
+
+function rpSetProgreso(titulo, msg, pct) {
+  document.getElementById('rp-progreso-titulo').textContent = titulo;
+  document.getElementById('rp-progreso-msg').textContent = msg;
+  document.getElementById('rp-progreso-bar').style.width = pct + '%';
+}
+
+async function rpGetColeccion(nombre, limite=400) {
+  try {
+    const snap = await fs.getDocs(fs.query(fs.collection(db, nombre), fs.limit(limite)));
+    return snap.docs.map(d => ({id: d.id, ...d.data()}));
+  } catch(e) { return []; }
+}
+
+async function rpBorrarColeccion(nombre) {
+  let total = 0;
+  while(true) {
+    const snap = await fs.getDocs(fs.query(fs.collection(db, nombre), fs.limit(100)));
+    if(snap.empty) break;
+    const batch = fs.writeBatch(db);
+    snap.docs.forEach(d => batch.delete(fs.doc(db, nombre, d.id)));
+    await batch.commit();
+    total += snap.docs.length;
+  }
+  return total;
+}
+
+async function ejecutarResetPedidos() {
+  document.getElementById('rp-paso2').style.display = 'none';
+  document.getElementById('rp-progreso').style.display = 'block';
+
+  const colecciones = [
+    'orders','sales_physical','gastos_physical','compras_physical',
+    'compras_sesiones','fiados','pagos_fiado','calificaciones',
+    'suggestions','stats','consumo_api',
+    'clients','ubicaciones_verificadas','tempProducts'
+  ];
+
+  // PASO 1: Respaldo
+  rpSetProgreso('Guardando respaldo...', 'Recopilando datos...', 5);
+  const fechaBackup = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+  const resumen = {};
+  let paso = 0;
+  for(const col of colecciones) {
+    rpSetProgreso('Guardando respaldo...', 'Respaldando ' + col + '...', 5 + (paso/colecciones.length)*35);
+    const docs = await rpGetColeccion(col);
+    resumen[col] = docs.length + ' registros';
+    paso++;
+  }
+  try {
+    await fs.setDoc(fs.doc(db, 'backups', fechaBackup), {
+      fecha: fechaBackup, createdAt: fs.serverTimestamp(), resumen
+    });
+  } catch(e) {}
+
+  // PASO 2: Borrar
+  const resultados = {};
+  paso = 0;
+  for(const col of colecciones) {
+    rpSetProgreso('Borrando datos...', 'Limpiando ' + col + '...', 42 + (paso/colecciones.length)*55);
+    resultados[col] = await rpBorrarColeccion(col);
+    paso++;
+  }
+
+  rpSetProgreso('Finalizando...', 'Listo', 100);
+  const totalBorrados = Object.values(resultados).reduce((s,n)=>s+n,0);
+
+  document.getElementById('rp-progreso').style.display = 'none';
+  document.getElementById('rp-resultado').style.display = 'block';
+  document.getElementById('rp-resultado').innerHTML = `
+    <div style="text-align:center;margin-bottom:16px">
+      <div style="font-size:2rem">✅</div>
+      <h3 style="color:var(--v);margin:8px 0 4px">¡Sistema reseteado!</h3>
+      <p style="font-size:.82rem;color:var(--gr)">Respaldo guardado con clave <b>${fechaBackup}</b></p>
+    </div>
+    <div style="background:#f0fff4;border:1.5px solid var(--vbg);border-radius:10px;padding:12px;font-size:.82rem;margin-bottom:16px">
+      ${Object.entries(resultados).map(([col,n])=>`
+        <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--vbg)">
+          <span style="color:var(--gr)">${col}</span>
+          <span style="color:${n>0?'var(--ro)':'#aaa'};font-weight:700">${n} eliminados</span>
+        </div>`).join('')}
+      <div style="display:flex;justify-content:space-between;padding:6px 0;font-weight:900;margin-top:4px">
+        <span>Total</span><span style="color:var(--ro)">${totalBorrados} registros eliminados</span>
+      </div>
+    </div>
+    <button class="btn btn-v" style="width:100%;padding:12px;font-size:.95rem" onclick="close2('resetPedidosModal');location.reload()">
+      🚀 Empezar desde 0
+    </button>`;
+
+  showToast('✅ ' + totalBorrados + ' registros eliminados. Respaldo en Firestore.');
+}
+
+window.abrirResetPedidos = abrirResetPedidos;
+window.rpPaso2 = rpPaso2;
+window.ejecutarResetPedidos = ejecutarResetPedidos;
 </script>
 
 <!-- MODAL: ASIGNAR REPARTIDOR -->
