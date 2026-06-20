@@ -2029,14 +2029,38 @@ function fmtFechaCorta(d) {
   return `${dias[d.getDay()]} ${d.getDate()}/${(d.getMonth()+1)} · ${d.toLocaleTimeString("es",{hour:"2-digit",minute:"2-digit"})}`;
 }
 
+// ── Resuelve costo/ganancia de un item de venta, con fallback al catálogo actual ──
+// Las ventas guardadas antes de este cambio no tienen costoUnit/ganancia guardados,
+// así que si faltan, los recalculamos consultando el producto en DB.products / cqProds.
+function resolveItemCost(i) {
+  if(i.costoUnit != null && i.costoTotal != null && i.ganancia != null && (i.costoUnit > 0 || i.ganancia !== 0)) {
+    return { costoUnit: i.costoUnit, costoTotal: i.costoTotal, ganancia: i.ganancia };
+  }
+  let costoUnit = 0;
+  if(i.tipo === "catalogo") {
+    costoUnit = DB.products[i.prodId]?.costoUnit || 0;
+  } else if(i.tipo === "temporal") {
+    const tp = (DB.tempProds||[]).find(p => p.id === i.prodId);
+    costoUnit = tp?.costoUnit || 0;
+  } else if(i.tipo === "coquette") {
+    const cp = (cqProds||[]).find(p => p.id === i.prodId) ||
+               (cqProds||[]).find(p => i.prodId?.startsWith?.("cq_"+p.id));
+    costoUnit = cp?.precioUnit || 0;
+  }
+  const qty = i.qty || 0;
+  const costoTotal = costoUnit * qty;
+  const ganancia = ((i.precio||0) * qty) - costoTotal;
+  return { costoUnit, costoTotal, ganancia };
+}
+
 function renderDayStats() {
   const period = document.getElementById("dayPeriod")?.value||"today";
   const sales = filterByPeriod(allSales, period);
   const gastos = filterByPeriod(allGastos, period);
   const totalV = sales.reduce((s,x)=>s+(x.total||0),0);
   const totalG = gastos.reduce((s,x)=>s+(x.monto||0),0);
-  const totalGanancia = sales.reduce((s,x)=>s+(x.items||[]).reduce((s2,i)=>s2+(i.ganancia||0),0),0);
-  const totalCosto = sales.reduce((s,x)=>s+(x.items||[]).reduce((s2,i)=>s2+(i.costoTotal||0),0),0);
+  const totalGanancia = sales.reduce((s,x)=>s+(x.items||[]).reduce((s2,i)=>s2+resolveItemCost(i).ganancia,0),0);
+  const totalCosto = sales.reduce((s,x)=>s+(x.items||[]).reduce((s2,i)=>s2+resolveItemCost(i).costoTotal,0),0);
   document.getElementById("dVentas").textContent="Bs."+totalV.toFixed(0);
   document.getElementById("dQty").textContent=sales.length;
   document.getElementById("dGastos").textContent="Bs."+totalG.toFixed(0);
@@ -2065,14 +2089,14 @@ function renderDayTickets() {
     const t = s.createdAt?.seconds ? new Date(s.createdAt.seconds*1000) : new Date();
     const items = s.items||[{prodNombre:s.prodNombre,qty:s.qty,precio:s.precio}];
     const itemsHtml = items.map(i=>{
-      const gan = i.ganancia != null ? i.ganancia : null;
+      const { ganancia: gan } = resolveItemCost(i);
       return `<div style="display:flex;justify-content:space-between;font-size:.76rem;color:var(--gr);padding:2px 0">
         <span>${i.qty}× ${i.prodNombre} — Bs.${((i.precio||0)*i.qty).toFixed(2)}</span>
-        ${gan!=null?`<span style="color:var(--v);font-weight:700;white-space:nowrap;margin-left:8px">+Bs.${gan.toFixed(2)}</span>`:''}
+        <span style="color:var(--v);font-weight:700;white-space:nowrap;margin-left:8px">+Bs.${gan.toFixed(2)}</span>
       </div>`;
     }).join("");
-    const totalGanancia = items.reduce((s2,i)=>s2+(i.ganancia||0),0);
-    const totalCosto = items.reduce((s2,i)=>s2+(i.costoTotal||0),0);
+    const totalGanancia = items.reduce((s2,i)=>s2+resolveItemCost(i).ganancia,0);
+    const totalCosto = items.reduce((s2,i)=>s2+resolveItemCost(i).costoTotal,0);
     return `<div class="ticket">
       <div class="ticket-header">
         <span class="ticket-code">${s.payMethod==="qr"?"📱 QR":"💵 Efectivo"}</span>
@@ -2103,17 +2127,17 @@ function renderDayPorVenta() {
     const t = s.createdAt?.seconds ? new Date(s.createdAt.seconds*1000) : new Date();
     const items = s.items||[{prodNombre:s.prodNombre,qty:s.qty,precio:s.precio}];
     const itemsHtml = items.map(i=>{
-      const gan = i.ganancia != null ? i.ganancia : null;
+      const { ganancia: gan } = resolveItemCost(i);
       return `<div style="font-size:.78rem;display:flex;justify-content:space-between;padding:3px 0">
         <span>${i.qty}× ${i.prodNombre}</span>
         <span style="text-align:right">
           <span style="color:var(--gr)">Bs.${((i.precio||0)*i.qty).toFixed(2)}</span>
-          ${gan!=null?`<span style="color:var(--v);font-weight:700;margin-left:6px">+Bs.${gan.toFixed(2)}</span>`:''}
+          <span style="color:var(--v);font-weight:700;margin-left:6px">+Bs.${gan.toFixed(2)}</span>
         </span>
       </div>`;
     }).join("");
-    const totalGanancia = items.reduce((s2,i)=>s2+(i.ganancia||0),0);
-    const totalCosto = items.reduce((s2,i)=>s2+(i.costoTotal||0),0);
+    const totalGanancia = items.reduce((s2,i)=>s2+resolveItemCost(i).ganancia,0);
+    const totalCosto = items.reduce((s2,i)=>s2+resolveItemCost(i).costoTotal,0);
     return `<div class="ticket" style="border-left:3px solid var(--v)">
       <div class="ticket-header">
         <span style="font-weight:900;color:var(--v)">Venta #${idx+1} — ${items.length} artículo${items.length!==1?"s":""}</span>
@@ -2227,15 +2251,16 @@ function downloadDayReportDialog() {
   const gastos = filterByPeriod(allGastos, period);
   const totalV = sales.reduce((s,x)=>s+(x.total||0),0);
   const totalG = gastos.reduce((s,x)=>s+(x.monto||0),0);
-  const totalCosto = sales.reduce((s,x)=>s+(x.items||[]).reduce((s2,i)=>s2+(i.costoTotal||0),0),0);
-  const totalGanancia = sales.reduce((s,x)=>s+(x.items||[]).reduce((s2,i)=>s2+(i.ganancia||0),0),0);
+  const totalCosto = sales.reduce((s,x)=>s+(x.items||[]).reduce((s2,i)=>s2+resolveItemCost(i).costoTotal,0),0);
+  const totalGanancia = sales.reduce((s,x)=>s+(x.items||[]).reduce((s2,i)=>s2+resolveItemCost(i).ganancia,0),0);
 
   if(fmt==="csv") {
     const rows=[["Fecha","Tipo","Producto","Cantidad","Precio","Costo","Ganancia","Total","Pago"]];
     sales.forEach(s=>{
       const t=s.createdAt?.seconds?new Date(s.createdAt.seconds*1000):new Date();
       (s.items||[{prodNombre:s.prodNombre,qty:s.qty,precio:s.precio,subtotal:s.total}]).forEach(i=>{
-        rows.push([t.toLocaleDateString("es"),"Venta",i.prodNombre.replace(/,/g," "),i.qty||1,(i.precio||0).toFixed(2),(i.costoTotal||0).toFixed(2),(i.ganancia||0).toFixed(2),(i.subtotal||i.total||0).toFixed(2),s.payMethod||"efectivo"]);
+        const rc = resolveItemCost(i);
+        rows.push([t.toLocaleDateString("es"),"Venta",i.prodNombre.replace(/,/g," "),i.qty||1,(i.precio||0).toFixed(2),rc.costoTotal.toFixed(2),rc.ganancia.toFixed(2),(i.subtotal||i.total||0).toFixed(2),s.payMethod||"efectivo"]);
       });
     });
     gastos.forEach(g=>{
@@ -2273,7 +2298,8 @@ function downloadDayReportDialog() {
     sales.forEach(s=>{
       const t=s.createdAt?.seconds?new Date(s.createdAt.seconds*1000):new Date();
       (s.items||[{prodNombre:s.prodNombre,qty:s.qty,precio:s.precio,subtotal:s.total}]).forEach(i=>{
-        html+=`<tr><td>${t.toLocaleDateString("es")}</td><td>${i.prodNombre}</td><td>${i.qty||1}</td><td>Bs.${(i.precio||0).toFixed(2)}</td><td>Bs.${(i.costoTotal||0).toFixed(2)}</td><td class="gan">Bs.${(i.ganancia||0).toFixed(2)}</td><td>Bs.${(i.subtotal||i.total||0).toFixed(2)}</td><td>${s.payMethod||"efectivo"}</td></tr>`;
+        const rc = resolveItemCost(i);
+        html+=`<tr><td>${t.toLocaleDateString("es")}</td><td>${i.prodNombre}</td><td>${i.qty||1}</td><td>Bs.${(i.precio||0).toFixed(2)}</td><td>Bs.${rc.costoTotal.toFixed(2)}</td><td class="gan">Bs.${rc.ganancia.toFixed(2)}</td><td>Bs.${(i.subtotal||i.total||0).toFixed(2)}</td><td>${s.payMethod||"efectivo"}</td></tr>`;
       });
     });
     html+=`</tbody><tfoot><tr><td colspan="4"></td><td class="tot">Bs.${totalCosto.toFixed(2)}</td><td class="tot gan">Bs.${totalGanancia.toFixed(2)}</td><td class="tot">Bs.${totalV.toFixed(2)}</td><td></td></tr></tfoot></table>`;
