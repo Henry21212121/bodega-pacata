@@ -74,8 +74,8 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 
 /* SELL LAYOUT */
 .sell-layout{display:flex;height:calc(100vh - 116px);overflow:hidden;}
-.sell-left{flex:1;overflow-y:auto;padding:10px 10px 10px 12px;border-right:2px solid var(--vbg);}
-.sell-right{width:380px;display:flex;flex-direction:column;background:#fff;min-width:220px;max-width:600px;position:relative;}
+.sell-left{flex:1;overflow-y:auto;padding:10px 10px 10px 12px;border-right:2px solid var(--vbg);margin-right:380px;transition:margin-right .05s;}
+.sell-right{width:380px;display:flex;flex-direction:column;background:#fff;min-width:220px;max-width:600px;position:fixed;top:0;right:0;bottom:0;z-index:95;box-shadow:-3px 0 14px rgba(0,0,0,.12);}
 #sellRightResizer{position:absolute;left:0;top:0;width:6px;height:100%;cursor:col-resize;z-index:50;background:transparent;transition:background .15s;}
 #sellRightResizer:hover,#sellRightResizer.dragging{background:var(--vbg);}
 #sellRightResizer::after{content:'';position:absolute;left:2px;top:50%;transform:translateY(-50%);height:40px;width:2px;border-radius:2px;background:var(--vbg);opacity:.7;}
@@ -224,8 +224,8 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 .btn-ro{background:var(--ro);color:#fff;}
 
 /* MIC FAB */
-.mic-fab{position:fixed;bottom:82px;right:16px;background:var(--v);color:#fff;border:none;border-radius:50%;width:52px;height:52px;box-shadow:0 4px 20px rgba(45,122,69,.4);cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:300;-webkit-tap-highlight-color:transparent;}
-.mic-fab.active{background:var(--ro);box-shadow:0 4px 20px rgba(229,57,53,.5);animation:pulse .8s infinite;}
+.mic-fab{flex-shrink:0;align-self:center;margin:0 10px;background:var(--v);color:#fff;border:none;border-radius:50%;width:38px;height:38px;box-shadow:0 2px 8px rgba(45,122,69,.35);cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;}
+.mic-fab.active{background:var(--ro);box-shadow:0 2px 12px rgba(229,57,53,.5);animation:pulse .8s infinite;}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08);}}
 .voice-panel{display:none;position:fixed;bottom:84px;right:14px;width:min(300px,88vw);background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.22);z-index:299;padding:14px;border:2px solid var(--vbg);}
 
@@ -290,6 +290,14 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
   <button class="tab-btn" onclick="showTab('mi-dia',this)"><span class="tab-icon">📊</span><span>Mi Día</span></button>
   <button class="tab-btn" onclick="showTab('fiados',this)"><span class="tab-icon">📋</span><span>Fiados</span></button>
   <button class="tab-btn" onclick="showTab('configuracion',this)"><span class="tab-icon">⚙️</span><span>Config</span></button>
+  <button class="mic-fab" id="micFab" onclick="toggleVoiceSearch()" title="Búsqueda por voz">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="9" y="2" width="6" height="11" rx="3"/>
+      <path d="M5 10a7 7 0 0 0 14 0"/>
+      <line x1="12" y1="17" x2="12" y2="21"/>
+      <line x1="8" y1="21" x2="16" y2="21"/>
+    </svg>
+  </button>
 </div>
 
 <!-- ══ TAB VENDER ══ -->
@@ -724,16 +732,6 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 </div>
 
 <!-- MODAL: COMPRA -->
-
-<!-- MIC FAB — graba directo sin burbuja -->
-<button class="mic-fab" id="micFab" onclick="toggleVoiceSearch()">
-  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="9" y="2" width="6" height="11" rx="3"/>
-    <path d="M5 10a7 7 0 0 0 14 0"/>
-    <line x1="12" y1="17" x2="12" y2="21"/>
-    <line x1="8" y1="21" x2="16" y2="21"/>
-  </svg>
-</button>
 
 <!-- MODAL: FIAR DESDE CARRITO -->
 <div class="modal-ov" id="fiarModal"><button onclick="closeModal('fiarModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
@@ -1522,7 +1520,7 @@ function onVendSearch() {
 
   const allProds = [
     ...Object.values(DB.products).filter(p=>p.estado!=="oculto").map(p=>({...p,_tipo:"catalogo"})),
-    ...cqProds.map(p=>({...p,_tipo:"coquette"}))
+    ...cqProds.filter(p=>!p.oculto).map(p=>({...p,_tipo:"coquette"}))
   ].filter(p=>p.nombre?.toLowerCase().includes(q));
 
   // Hide regular product grid, show search results in grid format
@@ -1588,7 +1586,7 @@ function renderVendProds() {
       wrap.innerHTML=`<div style="text-align:center;padding:30px;color:var(--gr);font-size:.82rem">Sin productos COQUETTE.<br>Andá a la pestaña <b>🥬 Productos</b> para agregar.</div>`;
       return;
     }
-    wrap.innerHTML = `<div class="section-title">🥬 Productos COQUETTE</div><div class="prod-grid">${cqProds.map(p=>makeCqCard(p)).join("")}</div>`;
+    wrap.innerHTML = `<div class="section-title">🥬 Productos COQUETTE</div><div class="prod-grid">${cqProds.filter(p=>!p.oculto).map(p=>makeCqCard(p)).join("")}</div>`;
   }
 }
 
@@ -2350,21 +2348,32 @@ function renderCoquetteProds() {
   const list = cqFilterActive==='all' ? cqProds : cqProds.filter(p=>p.tipo===cqFilterActive);
   if(!list.length) { el.innerHTML='<div style="text-align:center;padding:20px;color:var(--gr);font-size:.82rem">Sin productos. Tocá + Agregar.</div>'; return; }
   el.innerHTML = list.map(p=>`
-    <div style="background:#fff;border-radius:12px;padding:10px 12px;margin-bottom:8px;box-shadow:var(--sh);display:flex;align-items:center;gap:10px">
+    <div style="background:#fff;border-radius:12px;padding:10px 12px;margin-bottom:8px;box-shadow:var(--sh);display:flex;align-items:center;gap:10px;${p.oculto?'opacity:.5':''}">
       <div style="width:52px;height:52px;border-radius:8px;background:var(--vbg);flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:1.4rem">
         ${p.img ? `<img src="${p.img}" style="width:100%;height:100%;object-fit:cover">` : (p.tipo==='libras'?'🥬':p.tipo==='kilos'?'🐔':'🔢')}
       </div>
       <div style="flex:1;min-width:0">
-        <div style="font-weight:800;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.nombre}</div>
+        <div style="font-weight:800;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.nombre}${p.oculto?' <span style="font-size:.65rem;color:var(--gr);font-weight:700">(oculto)</span>':''}</div>
         <div style="font-size:.72rem;color:var(--gr)">${tipoLabel(p.tipo)} · ${p.unidad||''} · Bs.${(p.precioVenta||0).toFixed(2)}</div>
         ${p.precioUnit?`<div style="font-size:.7rem;color:var(--gr)">P.U.: Bs.${(p.precioUnit||0).toFixed(2)}</div>`:''}
       </div>
       <div style="display:flex;gap:5px;flex-shrink:0">
         <button onclick="window.openCqSelector('${p.id}')" style="background:var(--v);color:#fff;border:none;border-radius:8px;padding:7px 10px;font-size:.78rem;font-weight:800;cursor:pointer">🛒</button>
         <button onclick="window.openAddProdCoquette('${p.id}')" style="background:var(--vbg);color:var(--v);border:none;border-radius:8px;padding:7px 8px;cursor:pointer;font-size:.72rem">✏️</button>
+        <button onclick="window.toggleHideCq('${p.id}')" title="${p.oculto?'Mostrar':'Ocultar'}" style="background:var(--vbg);color:var(--gr);border:none;border-radius:8px;padding:7px 8px;cursor:pointer;font-size:.72rem">${p.oculto?'👁️':'🙈'}</button>
         <button onclick="window.deleteCqProd('${p.id}')" style="background:#ffebee;color:var(--ro);border:none;border-radius:8px;padding:7px 8px;cursor:pointer;font-size:.72rem">🗑️</button>
       </div>
     </div>`).join('');
+}
+
+async function toggleHideCq(id) {
+  const p = cqProds.find(x=>x.id===id);
+  if(!p) return;
+  const nuevoEstado = !p.oculto;
+  try {
+    await fs.updateDoc(fs.doc(db,'coquette_products',id), { oculto: nuevoEstado });
+    showToast(nuevoEstado ? '🙈 Producto ocultado' : '👁️ Producto visible');
+  } catch(e) { showToast('Error: '+e.message, true); }
 }
 
 function tipoLabel(t) {
@@ -2680,6 +2689,7 @@ window.openAddProdCoquette = openAddProdCoquette;
 window.makeCqCard = makeCqCard;
 window.saveCoquetteProd = saveCoquetteProd;
 window.deleteCqProd = deleteCqProd;
+window.toggleHideCq = toggleHideCq;
 window.filterProdsCoquette = filterProdsCoquette;
 window.openCqSelector = openCqSelector;
 window.confirmCqAdd = confirmCqAdd;
@@ -2727,6 +2737,7 @@ function showToast(msg,error=false){
 (function(){
   const resizer = document.getElementById('sellRightResizer');
   const panel   = document.getElementById('sellRight');
+  const left    = document.querySelector('.sell-left');
   if(!resizer || !panel) return;
   let startX, startW;
   resizer.addEventListener('mousedown', e => {
@@ -2739,6 +2750,7 @@ function showToast(msg,error=false){
       const delta = startX - ev.clientX;
       const newW = Math.min(600, Math.max(220, startW + delta));
       panel.style.width = newW + 'px';
+      if(left) left.style.marginRight = newW + 'px';
     };
     const onUp = () => {
       resizer.classList.remove('dragging');
@@ -2753,7 +2765,11 @@ function showToast(msg,error=false){
     e.preventDefault();
   });
   const saved = localStorage.getItem('sellRightW');
-  if(saved) panel.style.width = Math.min(600, Math.max(220, parseInt(saved))) + 'px';
+  if(saved) {
+    const w = Math.min(600, Math.max(220, parseInt(saved)));
+    panel.style.width = w + 'px';
+    if(left) left.style.marginRight = w + 'px';
+  }
 })();
 </script>
 </body>
