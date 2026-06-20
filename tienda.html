@@ -472,6 +472,8 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
     <div class="stats-grid" id="dayStatsGrid">
       <div class="stat-card"><div class="stat-val" id="dVentas">Bs.0</div><div class="stat-lbl">Ventas</div></div>
       <div class="stat-card"><div class="stat-val" id="dQty">0</div><div class="stat-lbl">Transacciones</div></div>
+      <div class="stat-card"><div class="stat-val" id="dCapital" style="color:#1565c0">Bs.0</div><div class="stat-lbl">Capital (costo)</div></div>
+      <div class="stat-card"><div class="stat-val" id="dGanancia" style="color:var(--v)">Bs.0</div><div class="stat-lbl">Ganancia</div></div>
       <div class="stat-card"><div class="stat-val" id="dGastos">Bs.0</div><div class="stat-lbl">Gastos</div></div>
       <div class="stat-card"><div class="stat-val" id="dNeto">Bs.0</div><div class="stat-lbl" style="color:var(--v)">Neto</div></div>
     </div>
@@ -1811,12 +1813,6 @@ async function confirmSale() {
   if(!items.length) return;
   const total = cartTotal();
 
-  // Aviso si no hay conexión — evita que el usuario insista con clics
-  if(!modoCalculadora && navigator.onLine === false) {
-    showToast("⚠️ Sin conexión a internet. Esperá a reconectar antes de vender.", true);
-    return;
-  }
-
   const btn = document.getElementById("confirmSaleBtn");
   _ventaEnProceso = true;
   if(btn) {
@@ -1827,11 +1823,18 @@ async function confirmSale() {
     btn.style.cursor = "not-allowed";
   }
 
-  const saleItems = items.map(([,e])=>{return {
-    prodId:e.prod.id, prodNombre:e.prod.nombre,
-    qty:e.qty, precio:e.prod.precio||0,
-    subtotal:(e.prod.precio||0)*e.qty, tipo:e.tipo
-  }});
+  const saleItems = items.map(([,e])=>{
+    const costoUnit = e.tipo==="catalogo" ? (DB.products[e.prod.id]?.costoUnit||0)
+                     : e.tipo==="temporal" ? (e.prod.costoUnit||0)
+                     : (e.prod.precioUnit||0); // coquette
+    return {
+      prodId:e.prod.id, prodNombre:e.prod.nombre,
+      qty:e.qty, precio:e.prod.precio||0,
+      subtotal:(e.prod.precio||0)*e.qty, tipo:e.tipo,
+      costoUnit, costoTotal: costoUnit*e.qty,
+      ganancia: ((e.prod.precio||0)-costoUnit)*e.qty
+    };
+  });
 
   const sale = {
     items: saleItems, total, payMethod,
@@ -2011,10 +2014,16 @@ function renderDayStats() {
   const gastos = filterByPeriod(allGastos, period);
   const totalV = sales.reduce((s,x)=>s+(x.total||0),0);
   const totalG = gastos.reduce((s,x)=>s+(x.monto||0),0);
+  const totalGanancia = sales.reduce((s,x)=>s+(x.items||[]).reduce((s2,i)=>s2+(i.ganancia||0),0),0);
+  const totalCosto = sales.reduce((s,x)=>s+(x.items||[]).reduce((s2,i)=>s2+(i.costoTotal||0),0),0);
   document.getElementById("dVentas").textContent="Bs."+totalV.toFixed(0);
   document.getElementById("dQty").textContent=sales.length;
   document.getElementById("dGastos").textContent="Bs."+totalG.toFixed(0);
   document.getElementById("dNeto").textContent="Bs."+(totalV-totalG).toFixed(0);
+  const ganEl = document.getElementById("dGanancia");
+  if(ganEl) ganEl.textContent="Bs."+totalGanancia.toFixed(0);
+  const capEl = document.getElementById("dCapital");
+  if(capEl) capEl.textContent="Bs."+totalCosto.toFixed(0);
 }
 
 function renderDayDetail() {
@@ -2033,21 +2042,32 @@ function renderDayTickets() {
   if(!sales.length) { el.innerHTML=`<div style="text-align:center;padding:16px;color:var(--gr);font-size:.8rem">Sin ventas</div>`; return; }
   el.innerHTML = sales.map(s=>{
     const t = s.createdAt?.seconds ? new Date(s.createdAt.seconds*1000) : new Date();
-    const itemsHtml = (s.items||[{prodNombre:s.prodNombre,qty:s.qty,precio:s.precio}]).map(i=>
-      `<div style="font-size:.76rem;color:var(--gr)">${i.qty}× ${i.prodNombre} — Bs.${((i.precio||0)*i.qty).toFixed(2)}</div>`
-    ).join("");
+    const items = s.items||[{prodNombre:s.prodNombre,qty:s.qty,precio:s.precio}];
+    const itemsHtml = items.map(i=>{
+      const gan = i.ganancia != null ? i.ganancia : null;
+      return `<div style="display:flex;justify-content:space-between;font-size:.76rem;color:var(--gr);padding:2px 0">
+        <span>${i.qty}× ${i.prodNombre} — Bs.${((i.precio||0)*i.qty).toFixed(2)}</span>
+        ${gan!=null?`<span style="color:var(--v);font-weight:700;white-space:nowrap;margin-left:8px">+Bs.${gan.toFixed(2)}</span>`:''}
+      </div>`;
+    }).join("");
+    const totalGanancia = items.reduce((s2,i)=>s2+(i.ganancia||0),0);
+    const totalCosto = items.reduce((s2,i)=>s2+(i.costoTotal||0),0);
     return `<div class="ticket">
       <div class="ticket-header">
         <span class="ticket-code">${s.payMethod==="qr"?"📱 QR":"💵 Efectivo"}</span>
         <span class="ticket-time">${fmtFechaCorta(t)}</span>
       </div>
       ${itemsHtml}
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px;font-weight:900;font-size:.88rem;color:var(--v)">
-        <span>Total</span><span>Bs.${(s.total||0).toFixed(2)}</span>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;padding-top:6px;border-top:1px solid var(--vbg)">
+        <button onclick="revertirVenta('${s.id}')" title="Cancelar / revertir esta venta"
+          style="background:none;border:1.5px solid var(--ro);color:var(--ro);border-radius:8px;padding:4px 9px;font-size:.68rem;font-weight:800;cursor:pointer;white-space:nowrap">
+          ↩️ Revertir
+        </button>
+        <div style="text-align:right">
+          <div style="font-size:.68rem;color:var(--gr)">Costo: Bs.${totalCosto.toFixed(2)} · Ganancia: <span style="color:var(--v);font-weight:800">Bs.${totalGanancia.toFixed(2)}</span></div>
+          <div style="font-weight:900;font-size:.9rem;color:var(--v)">Total: Bs.${(s.total||0).toFixed(2)}</div>
+        </div>
       </div>
-      <button onclick="revertirVenta('${s.id}')" style="margin-top:8px;width:100%;background:none;border:1.5px solid var(--ro);color:var(--ro);border-radius:8px;padding:6px;font-size:.72rem;font-weight:800;cursor:pointer">
-        ↩️ Cancelar / revertir esta venta
-      </button>
     </div>`;
   }).join("");
 }
@@ -2061,23 +2081,34 @@ function renderDayPorVenta() {
   el.innerHTML = sales.map((s,idx)=>{
     const t = s.createdAt?.seconds ? new Date(s.createdAt.seconds*1000) : new Date();
     const items = s.items||[{prodNombre:s.prodNombre,qty:s.qty,precio:s.precio}];
-    const itemsHtml = items.map(i=>
-      `<div style="font-size:.78rem;display:flex;justify-content:space-between;padding:3px 0">
-        <span>${i.qty}× ${i.prodNombre}</span><span style="color:var(--gr)">Bs.${((i.precio||0)*i.qty).toFixed(2)}</span>
-      </div>`
-    ).join("");
+    const itemsHtml = items.map(i=>{
+      const gan = i.ganancia != null ? i.ganancia : null;
+      return `<div style="font-size:.78rem;display:flex;justify-content:space-between;padding:3px 0">
+        <span>${i.qty}× ${i.prodNombre}</span>
+        <span style="text-align:right">
+          <span style="color:var(--gr)">Bs.${((i.precio||0)*i.qty).toFixed(2)}</span>
+          ${gan!=null?`<span style="color:var(--v);font-weight:700;margin-left:6px">+Bs.${gan.toFixed(2)}</span>`:''}
+        </span>
+      </div>`;
+    }).join("");
+    const totalGanancia = items.reduce((s2,i)=>s2+(i.ganancia||0),0);
+    const totalCosto = items.reduce((s2,i)=>s2+(i.costoTotal||0),0);
     return `<div class="ticket" style="border-left:3px solid var(--v)">
       <div class="ticket-header">
         <span style="font-weight:900;color:var(--v)">Venta #${idx+1} — ${items.length} artículo${items.length!==1?"s":""}</span>
         <span class="ticket-time">${fmtFechaCorta(t)}</span>
       </div>
       ${itemsHtml}
-      <div style="display:flex;justify-content:space-between;margin-top:6px;padding-top:6px;border-top:1px solid var(--vbg);font-weight:900;font-size:.92rem;color:var(--v)">
-        <span>${s.payMethod==="qr"?"📱 QR":"💵 Efectivo"}</span><span>Bs.${(s.total||0).toFixed(2)}</span>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;padding-top:6px;border-top:1px solid var(--vbg)">
+        <button onclick="revertirVenta('${s.id}')" title="Cancelar / revertir esta venta"
+          style="background:none;border:1.5px solid var(--ro);color:var(--ro);border-radius:8px;padding:4px 9px;font-size:.68rem;font-weight:800;cursor:pointer;white-space:nowrap">
+          ↩️ Revertir
+        </button>
+        <div style="text-align:right">
+          <div style="font-size:.68rem;color:var(--gr)">${s.payMethod==="qr"?"📱 QR":"💵 Efectivo"} · Costo: Bs.${totalCosto.toFixed(2)} · Ganancia: <span style="color:var(--v);font-weight:800">Bs.${totalGanancia.toFixed(2)}</span></div>
+          <div style="font-weight:900;font-size:.92rem;color:var(--v)">Total: Bs.${(s.total||0).toFixed(2)}</div>
+        </div>
       </div>
-      <button onclick="revertirVenta('${s.id}')" style="margin-top:8px;width:100%;background:none;border:1.5px solid var(--ro);color:var(--ro);border-radius:8px;padding:6px;font-size:.72rem;font-weight:800;cursor:pointer">
-        ↩️ Cancelar / revertir esta venta
-      </button>
     </div>`;
   }).join("");
 }
@@ -2175,19 +2206,28 @@ function downloadDayReportDialog() {
   const gastos = filterByPeriod(allGastos, period);
   const totalV = sales.reduce((s,x)=>s+(x.total||0),0);
   const totalG = gastos.reduce((s,x)=>s+(x.monto||0),0);
+  const totalCosto = sales.reduce((s,x)=>s+(x.items||[]).reduce((s2,i)=>s2+(i.costoTotal||0),0),0);
+  const totalGanancia = sales.reduce((s,x)=>s+(x.items||[]).reduce((s2,i)=>s2+(i.ganancia||0),0),0);
 
   if(fmt==="csv") {
-    const rows=[["Fecha","Tipo","Producto","Cantidad","Precio","Total","Pago"]];
+    const rows=[["Fecha","Tipo","Producto","Cantidad","Precio","Costo","Ganancia","Total","Pago"]];
     sales.forEach(s=>{
       const t=s.createdAt?.seconds?new Date(s.createdAt.seconds*1000):new Date();
       (s.items||[{prodNombre:s.prodNombre,qty:s.qty,precio:s.precio,subtotal:s.total}]).forEach(i=>{
-        rows.push([t.toLocaleDateString("es"),"Venta",i.prodNombre.replace(/,/g," "),i.qty||1,(i.precio||0).toFixed(2),(i.subtotal||i.total||0).toFixed(2),s.payMethod||"efectivo"]);
+        rows.push([t.toLocaleDateString("es"),"Venta",i.prodNombre.replace(/,/g," "),i.qty||1,(i.precio||0).toFixed(2),(i.costoTotal||0).toFixed(2),(i.ganancia||0).toFixed(2),(i.subtotal||i.total||0).toFixed(2),s.payMethod||"efectivo"]);
       });
     });
     gastos.forEach(g=>{
       const t=g.createdAt?.seconds?new Date(g.createdAt.seconds*1000):new Date();
-      rows.push([t.toLocaleDateString("es"),"Gasto",g.desc.replace(/,/g," "),"","",(g.monto||0).toFixed(2),""]);
+      rows.push([t.toLocaleDateString("es"),"Gasto",g.desc.replace(/,/g," "),"","","","",(g.monto||0).toFixed(2),""]);
     });
+    rows.push([]);
+    rows.push(["","","","","","RESUMEN","","",""]);
+    rows.push(["","","Capital (costo)","","","",totalCosto.toFixed(2),"",""]);
+    rows.push(["","","Ganancia","","","",totalGanancia.toFixed(2),"",""]);
+    rows.push(["","","Ventas totales","","","","",totalV.toFixed(2),""]);
+    rows.push(["","","Gastos totales","","","","",totalG.toFixed(2),""]);
+    rows.push(["","","Neto","","","","",(totalV-totalG).toFixed(2),""]);
     const csv="\ufeff"+rows.map(r=>r.join(",")).join("\n");
     const a=document.createElement("a");
     a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
@@ -2203,18 +2243,19 @@ function downloadDayReportDialog() {
     th{background:#c8e6c9;color:#1a4d2a;padding:5px 7px;border:1.5px solid #7cb98a;}
     td{padding:4px 7px;border:1px solid #9ecfaa;}
     tr:nth-child(even)td{background:#f0f9f2;}
-    .tot{font-weight:900;color:#1b5e20;}</style></head><body>
+    .tot{font-weight:900;color:#1b5e20;}
+    .gan{color:#1565c0;font-weight:700;}</style></head><body>
     <h1>🌸 Tienda COQUETTE — Reporte ${periodoLabel}</h1>
     <p style="color:#666;font-size:10px">Generado: ${new Date().toLocaleString("es-BO")}</p>
     <h2>💰 Ventas (${sales.length} transacciones)</h2>
-    <table><thead><tr><th>Fecha</th><th>Producto</th><th>Cant.</th><th>Precio</th><th>Total</th><th>Pago</th></tr></thead><tbody>`;
+    <table><thead><tr><th>Fecha</th><th>Producto</th><th>Cant.</th><th>Precio</th><th>Costo</th><th>Ganancia</th><th>Total</th><th>Pago</th></tr></thead><tbody>`;
     sales.forEach(s=>{
       const t=s.createdAt?.seconds?new Date(s.createdAt.seconds*1000):new Date();
       (s.items||[{prodNombre:s.prodNombre,qty:s.qty,precio:s.precio,subtotal:s.total}]).forEach(i=>{
-        html+=`<tr><td>${t.toLocaleDateString("es")}</td><td>${i.prodNombre}</td><td>${i.qty||1}</td><td>Bs.${(i.precio||0).toFixed(2)}</td><td>Bs.${(i.subtotal||i.total||0).toFixed(2)}</td><td>${s.payMethod||"efectivo"}</td></tr>`;
+        html+=`<tr><td>${t.toLocaleDateString("es")}</td><td>${i.prodNombre}</td><td>${i.qty||1}</td><td>Bs.${(i.precio||0).toFixed(2)}</td><td>Bs.${(i.costoTotal||0).toFixed(2)}</td><td class="gan">Bs.${(i.ganancia||0).toFixed(2)}</td><td>Bs.${(i.subtotal||i.total||0).toFixed(2)}</td><td>${s.payMethod||"efectivo"}</td></tr>`;
       });
     });
-    html+=`</tbody><tfoot><tr><td colspan="4"></td><td class="tot">Bs.${totalV.toFixed(2)}</td><td></td></tr></tfoot></table>`;
+    html+=`</tbody><tfoot><tr><td colspan="4"></td><td class="tot">Bs.${totalCosto.toFixed(2)}</td><td class="tot gan">Bs.${totalGanancia.toFixed(2)}</td><td class="tot">Bs.${totalV.toFixed(2)}</td><td></td></tr></tfoot></table>`;
     if(gastos.length) {
       html+=`<h2>💸 Gastos</h2><table><thead><tr><th>Fecha</th><th>Descripción</th><th>Monto</th></tr></thead><tbody>`;
       gastos.forEach(g=>{
@@ -2223,10 +2264,14 @@ function downloadDayReportDialog() {
       });
       html+=`</tbody><tfoot><tr><td colspan="2"></td><td class="tot">Bs.${totalG.toFixed(2)}</td></tr></tfoot></table>`;
     }
-    html+=`<h2>📊 Resumen</h2>
-    <table><tr><td><b>Ventas totales</b></td><td class="tot">Bs.${totalV.toFixed(2)}</td></tr>
-    <tr><td><b>Gastos totales</b></td><td style="color:var(--ro,#e53935)">Bs.${totalG.toFixed(2)}</td></tr>
-    <tr><td><b>Neto</b></td><td class="tot">Bs.${(totalV-totalG).toFixed(2)}</td></tr></table>
+    html+=`<h2>📊 Resumen — separando capital de ganancia</h2>
+    <table>
+    <tr><td><b>Capital invertido (costo de productos vendidos)</b></td><td style="color:#1565c0;font-weight:900">Bs.${totalCosto.toFixed(2)}</td></tr>
+    <tr><td><b>Ganancia bruta (utilidad de ventas)</b></td><td class="tot">Bs.${totalGanancia.toFixed(2)}</td></tr>
+    <tr><td><b>Ventas totales (capital + ganancia)</b></td><td class="tot">Bs.${totalV.toFixed(2)}</td></tr>
+    <tr><td><b>Gastos totales</b></td><td style="color:#e53935">Bs.${totalG.toFixed(2)}</td></tr>
+    <tr><td><b>Neto del día (ganancia − gastos)</b></td><td class="tot">Bs.${(totalGanancia-totalG).toFixed(2)}</td></tr>
+    </table>
     <scr`+`ipt>window.print();</scr`+`ipt></body></html>`;
     w.document.write(html);
   }
