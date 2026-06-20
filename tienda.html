@@ -75,7 +75,10 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 /* SELL LAYOUT */
 .sell-layout{display:flex;height:calc(100vh - 116px);overflow:hidden;}
 .sell-left{flex:1;overflow-y:auto;padding:10px 10px 10px 12px;border-right:2px solid var(--vbg);}
-.sell-right{width:380px;display:flex;flex-direction:column;background:#fff;}
+.sell-right{width:380px;display:flex;flex-direction:column;background:#fff;min-width:220px;max-width:600px;position:relative;}
+#sellRightResizer{position:absolute;left:0;top:0;width:6px;height:100%;cursor:col-resize;z-index:50;background:transparent;transition:background .15s;}
+#sellRightResizer:hover,#sellRightResizer.dragging{background:var(--vbg);}
+#sellRightResizer::after{content:'';position:absolute;left:2px;top:50%;transform:translateY(-50%);height:40px;width:2px;border-radius:2px;background:var(--vbg);opacity:.7;}
 .modo-calc-banner{background:linear-gradient(135deg,#e65100,#ff6d00);color:#fff;text-align:center;padding:6px 12px;font-size:.75rem;font-weight:800;letter-spacing:.3px;}
 .modo-calc-banner b{font-size:.82rem;}
 /* Grid inside sell-left: always 3 cols on desktop */
@@ -286,7 +289,6 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
   <button class="tab-btn" onclick="showTab('productos',this)"><span class="tab-icon">🥬</span><span>Productos</span></button>
   <button class="tab-btn" onclick="showTab('mi-dia',this)"><span class="tab-icon">📊</span><span>Mi Día</span></button>
   <button class="tab-btn" onclick="showTab('fiados',this)"><span class="tab-icon">📋</span><span>Fiados</span></button>
-  <button class="tab-btn" onclick="showTab('compras',this)"><span class="tab-icon">🛒</span><span>Compras</span></button>
   <button class="tab-btn" onclick="showTab('configuracion',this)"><span class="tab-icon">⚙️</span><span>Config</span></button>
 </div>
 
@@ -308,7 +310,8 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
       <div id="vendProdsWrap"></div>
     </div>
     <!-- RIGHT: cart -->
-    <div class="sell-right">
+    <div class="sell-right" id="sellRight">
+      <div id="sellRightResizer"></div>
       <div class="sell-right-header">
         <span>🛒 Selección</span>
         <button onclick="clearCart()" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:50px;padding:3px 10px;font-size:.7rem;cursor:pointer">Vaciar</button>
@@ -443,22 +446,39 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 <!-- ══ TAB MI DÍA ══ -->
 <div class="tab-content" id="tab-mi-dia">
   <div class="inner">
+    <!-- Filtros de período -->
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 8px;align-items:center">
-      <select id="dayPeriod" onchange="renderDayStats()" style="padding:6px 10px;border:1.5px solid var(--vbg);border-radius:8px;font-size:.8rem;outline:none">
+      <select id="dayPeriod" onchange="onDayPeriodChange()" style="padding:6px 10px;border:1.5px solid var(--vbg);border-radius:8px;font-size:.8rem;outline:none">
         <option value="today">Hoy</option>
         <option value="week">Esta semana</option>
         <option value="month">Este mes</option>
+        <option value="custom">📅 Rango personalizado</option>
       </select>
+      <input type="date" id="dayFromCustom" style="display:none;padding:6px 8px;border:1.5px solid var(--vbg);border-radius:8px;font-size:.78rem;outline:none" onchange="renderDayStats();renderDayDetail()">
+      <span id="dayCustomSep" style="display:none;color:var(--gr);font-size:.8rem">→</span>
+      <input type="date" id="dayToCustom" style="display:none;padding:6px 8px;border:1.5px solid var(--vbg);border-radius:8px;font-size:.78rem;outline:none" onchange="renderDayStats();renderDayDetail()">
       <button class="btn btn-or" onclick="downloadDayReportDialog()" style="padding:6px 12px;font-size:.78rem">📄 Descargar reporte</button>
     </div>
+
+    <!-- Tarjetas resumen -->
     <div class="stats-grid" id="dayStatsGrid">
       <div class="stat-card"><div class="stat-val" id="dVentas">Bs.0</div><div class="stat-lbl">Ventas</div></div>
       <div class="stat-card"><div class="stat-val" id="dQty">0</div><div class="stat-lbl">Transacciones</div></div>
       <div class="stat-card"><div class="stat-val" id="dGastos">Bs.0</div><div class="stat-lbl">Gastos</div></div>
       <div class="stat-card"><div class="stat-val" id="dNeto">Bs.0</div><div class="stat-lbl" style="color:var(--v)">Neto</div></div>
     </div>
-    <div class="section-title">🧾 Ventas del período</div>
+
+    <!-- Selector de modo de vista del detalle -->
+    <div style="display:flex;gap:4px;margin:14px 0 10px;overflow-x:auto;padding-bottom:2px">
+      <button class="day-view-tab active" onclick="setDayView('cronologico',this)" style="flex:1;min-width:110px;padding:8px 6px;font-size:.78rem;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:var(--v);color:#fff">🕐 Cronológico</button>
+      <button class="day-view-tab" onclick="setDayView('porventa',this)" style="flex:1;min-width:110px;padding:8px 6px;font-size:.78rem;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#eee;color:#555">🧾 Por venta</button>
+      <button class="day-view-tab" onclick="setDayView('porarticulo',this)" style="flex:1;min-width:110px;padding:8px 6px;font-size:.78rem;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#eee;color:#555">📦 Más vendidos</button>
+      <button class="day-view-tab" onclick="setDayView('porpago',this)" style="flex:1;min-width:110px;padding:8px 6px;font-size:.78rem;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#eee;color:#555">💳 Por pago</button>
+    </div>
+
+    <div class="section-title" id="dayDetailTitle">🧾 Ventas del período</div>
     <div id="dayTickets"><div style="text-align:center;padding:20px;color:var(--gr);font-size:.82rem">Sin ventas</div></div>
+
     <div class="section-title">💸 Gastos</div>
     <button class="btn btn-sec" onclick="openAddGasto()" style="width:100%;margin-bottom:8px;padding:9px;font-size:.82rem">+ Registrar gasto</button>
     <div id="dayGastos"></div>
@@ -490,17 +510,6 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
       </table>
     </div>
     <div id="fiadoList"></div>
-  </div>
-</div>
-
-<!-- ══ TAB COMPRAS ══ -->
-<div class="tab-content" id="tab-compras">
-  <div class="inner">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0 8px">
-      <div class="section-title" style="margin:0">🛒 Mis compras</div>
-      <button class="btn btn-v" onclick="openAddCompra()" style="padding:7px 13px;font-size:.78rem">+ Registrar</button>
-    </div>
-    <div id="compraList"><div style="text-align:center;padding:20px;color:var(--gr);font-size:.82rem">Sin compras</div></div>
   </div>
 </div>
 
@@ -715,19 +724,6 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 </div>
 
 <!-- MODAL: COMPRA -->
-<div class="modal-ov" id="compraModal"><button onclick="closeModal('compraModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
-  <div class="modal-box">
-    <div class="modal-title">🛒 Registrar compra</div>
-    <div class="fld"><label>Producto *</label><input type="text" id="compraNombre" placeholder="¿Qué compraste?"></div>
-    <div class="fld"><label>Cantidad</label><input type="number" id="compraCant" step="0.5" min="0" onwheel="this.blur()"></div>
-    <div class="fld"><label>Costo total (Bs.) *</label><input type="number" id="compraCosto" step="0.5" min="0" onwheel="this.blur()"></div>
-    <div class="fld"><label>Proveedor / Lugar</label><input type="text" id="compraProveedor" placeholder="Ej: Mercado La Pampa"></div>
-    <div class="btn-row">
-      <button class="btn btn-sec" onclick="closeModal('compraModal')">Cancelar</button>
-      <button class="btn btn-v" onclick="saveCompra()">Guardar</button>
-    </div>
-  </div>
-</div>
 
 <!-- MIC FAB — graba directo sin burbuja -->
 <button class="mic-fab" id="micFab" onclick="toggleVoiceSearch()">
@@ -1356,7 +1352,7 @@ document.addEventListener('DOMContentLoaded', () => actualizarUIModCalc());
 let currentProdTab = "catalogo";
 let payMethod = "efectivo";
 let editTempId = null;
-let allSales = [], allGastos = [], fiados = [], compras = [];
+let allSales = [], allGastos = [], fiados = [];
 
 // ════════════════════════════════════
 // INIT
@@ -1427,7 +1423,7 @@ async function loadAll() {
 
   fs.onSnapshot(fs.query(fs.collection(db,"sales_physical"), fs.orderBy("createdAt","desc"), fs.limit(200)), snap => {
     allSales = snap.docs.map(d=>({...d.data(),id:d.id}));
-    renderDayStats(); renderDayTickets();
+    renderDayStats(); renderDayDetail();
   });
 
   fs.onSnapshot(fs.query(fs.collection(db,"gastos_physical"), fs.orderBy("createdAt","desc"), fs.limit(100)), snap => {
@@ -1440,11 +1436,6 @@ async function loadAll() {
       .filter(f => !f.cobrado)
       .sort((a,b)=> (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
     renderFiados();
-  });
-
-  fs.onSnapshot(fs.query(fs.collection(db,"compras_physical"), fs.orderBy("createdAt","desc"), fs.limit(100)), snap => {
-    compras = snap.docs.map(d=>({...d.data(),id:d.id}));
-    renderCompras();
   });
 
   loadConfigData();
@@ -1507,7 +1498,7 @@ function showTab(name, btn) {
   document.querySelectorAll(".tab-btn").forEach(el=>el.classList.remove("active"));
   document.getElementById("tab-"+name).classList.add("active");
   btn.classList.add("active");
-  if(name==="mi-dia") { renderDayStats(); renderDayTickets(); renderDayGastos(); }
+  if(name==="mi-dia") { renderDayStats(); renderDayDetail(); renderDayGastos(); }
 }
 
 // ════════════════════════════════════
@@ -1621,7 +1612,8 @@ function makeProdCard(p, tipo) {
   const agotado = p.stock === 0;
   const isTmp = tipo === "temporal";
   const low = p.stockMin > 0 && p.stock <= p.stockMin && p.stock > 0;
-  const conPromo = p.promoActive && p.promos && p.promos.length > 1;
+  // Tienda física: nunca mostrar promos por cantidad (eso es solo del e-commerce)
+  const conPromo = false;
   const inCart = cart[tipo + "_" + p.id];
 
   // Image wrap — exact same as virtual store
@@ -1888,10 +1880,46 @@ async function saveTempProd() {
 }
 
 // ════════════════════════════════════
-// MI DÍA
+// MI DÍA — Reportes avanzados
 // ════════════════════════════════════
+let dayViewMode = "cronologico";
+
+function onDayPeriodChange() {
+  const period = document.getElementById("dayPeriod")?.value;
+  const showCustom = period === "custom";
+  document.getElementById("dayFromCustom").style.display = showCustom ? "inline-block" : "none";
+  document.getElementById("dayCustomSep").style.display  = showCustom ? "inline" : "none";
+  document.getElementById("dayToCustom").style.display   = showCustom ? "inline-block" : "none";
+  if(showCustom) {
+    const today = new Date().toISOString().slice(0,10);
+    if(!document.getElementById("dayFromCustom").value) document.getElementById("dayFromCustom").value = today;
+    if(!document.getElementById("dayToCustom").value)   document.getElementById("dayToCustom").value   = today;
+  }
+  renderDayStats();
+  renderDayDetail();
+  renderDayGastos();
+}
+
+function setDayView(mode, btn) {
+  dayViewMode = mode;
+  document.querySelectorAll(".day-view-tab").forEach(b=>{b.style.background="#eee";b.style.color="#555";});
+  if(btn) { btn.style.background="var(--v)"; btn.style.color="#fff"; }
+  renderDayDetail();
+}
+
 function filterByPeriod(arr, period) {
-  const now = new Date();
+  if(period === "custom") {
+    const fromStr = document.getElementById("dayFromCustom")?.value;
+    const toStr   = document.getElementById("dayToCustom")?.value;
+    if(!fromStr || !toStr) return arr;
+    const from = new Date(fromStr+"T00:00:00");
+    const to   = new Date(toStr+"T23:59:59");
+    return arr.filter(s => {
+      if(!s.createdAt) return true;
+      const t = s.createdAt.seconds ? new Date(s.createdAt.seconds*1000) : new Date(s.createdAt);
+      return t >= from && t <= to;
+    });
+  }
   return arr.filter(s => {
     if(!s.createdAt) return true;
     const t = s.createdAt.seconds ? new Date(s.createdAt.seconds*1000) : new Date(s.createdAt);
@@ -1908,6 +1936,11 @@ function filterByPeriod(arr, period) {
   });
 }
 
+function fmtFechaCorta(d) {
+  const dias=["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+  return `${dias[d.getDay()]} ${d.getDate()}/${(d.getMonth()+1)} · ${d.toLocaleTimeString("es",{hour:"2-digit",minute:"2-digit"})}`;
+}
+
 function renderDayStats() {
   const period = document.getElementById("dayPeriod")?.value||"today";
   const sales = filterByPeriod(allSales, period);
@@ -1920,9 +1953,18 @@ function renderDayStats() {
   document.getElementById("dNeto").textContent="Bs."+(totalV-totalG).toFixed(0);
 }
 
+function renderDayDetail() {
+  if(dayViewMode === "cronologico") renderDayTickets();
+  else if(dayViewMode === "porventa") renderDayPorVenta();
+  else if(dayViewMode === "porarticulo") renderDayPorArticulo();
+  else if(dayViewMode === "porpago") renderDayPorPago();
+}
+
 function renderDayTickets() {
+  document.getElementById("dayDetailTitle").textContent = "🕐 Ventas en orden cronológico";
   const period = document.getElementById("dayPeriod")?.value||"today";
-  const sales = filterByPeriod(allSales, period);
+  const sales = filterByPeriod(allSales, period)
+    .sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
   const el = document.getElementById("dayTickets");
   if(!sales.length) { el.innerHTML=`<div style="text-align:center;padding:16px;color:var(--gr);font-size:.8rem">Sin ventas</div>`; return; }
   el.innerHTML = sales.map(s=>{
@@ -1933,7 +1975,7 @@ function renderDayTickets() {
     return `<div class="ticket">
       <div class="ticket-header">
         <span class="ticket-code">${s.payMethod==="qr"?"📱 QR":"💵 Efectivo"}</span>
-        <span class="ticket-time">${t.toLocaleTimeString("es",{hour:"2-digit",minute:"2-digit"})}</span>
+        <span class="ticket-time">${fmtFechaCorta(t)}</span>
       </div>
       ${itemsHtml}
       <div style="display:flex;justify-content:space-between;margin-top:5px;font-weight:900;font-size:.88rem;color:var(--v)">
@@ -1941,6 +1983,105 @@ function renderDayTickets() {
       </div>
     </div>`;
   }).join("");
+}
+
+function renderDayPorVenta() {
+  document.getElementById("dayDetailTitle").textContent = "🧾 Detalle por venta";
+  const period = document.getElementById("dayPeriod")?.value||"today";
+  const sales = filterByPeriod(allSales, period).sort((a,b)=>(b.total||0)-(a.total||0));
+  const el = document.getElementById("dayTickets");
+  if(!sales.length) { el.innerHTML=`<div style="text-align:center;padding:16px;color:var(--gr);font-size:.8rem">Sin ventas</div>`; return; }
+  el.innerHTML = sales.map((s,idx)=>{
+    const t = s.createdAt?.seconds ? new Date(s.createdAt.seconds*1000) : new Date();
+    const items = s.items||[{prodNombre:s.prodNombre,qty:s.qty,precio:s.precio}];
+    const itemsHtml = items.map(i=>
+      `<div style="font-size:.78rem;display:flex;justify-content:space-between;padding:3px 0">
+        <span>${i.qty}× ${i.prodNombre}</span><span style="color:var(--gr)">Bs.${((i.precio||0)*i.qty).toFixed(2)}</span>
+      </div>`
+    ).join("");
+    return `<div class="ticket" style="border-left:3px solid var(--v)">
+      <div class="ticket-header">
+        <span style="font-weight:900;color:var(--v)">Venta #${idx+1} — ${items.length} artículo${items.length!==1?"s":""}</span>
+        <span class="ticket-time">${fmtFechaCorta(t)}</span>
+      </div>
+      ${itemsHtml}
+      <div style="display:flex;justify-content:space-between;margin-top:6px;padding-top:6px;border-top:1px solid var(--vbg);font-weight:900;font-size:.92rem;color:var(--v)">
+        <span>${s.payMethod==="qr"?"📱 QR":"💵 Efectivo"}</span><span>Bs.${(s.total||0).toFixed(2)}</span>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function renderDayPorArticulo() {
+  document.getElementById("dayDetailTitle").textContent = "📦 Productos más vendidos";
+  const period = document.getElementById("dayPeriod")?.value||"today";
+  const sales = filterByPeriod(allSales, period);
+  const el = document.getElementById("dayTickets");
+  if(!sales.length) { el.innerHTML=`<div style="text-align:center;padding:16px;color:var(--gr);font-size:.8rem">Sin ventas</div>`; return; }
+  const agrupado = {};
+  sales.forEach(s => {
+    const items = s.items||[{prodNombre:s.prodNombre,qty:s.qty,precio:s.precio}];
+    items.forEach(i => {
+      const key = i.prodNombre || "—";
+      if(!agrupado[key]) agrupado[key] = {nombre:key, qty:0, total:0, ventas:0};
+      agrupado[key].qty += (i.qty||0);
+      agrupado[key].total += (i.precio||0)*(i.qty||0);
+      agrupado[key].ventas++;
+    });
+  });
+  const lista = Object.values(agrupado).sort((a,b)=>b.qty-a.qty);
+  const maxQty = lista[0]?.qty || 1;
+  el.innerHTML = lista.map((p,idx) => {
+    const barWidth = Math.max(8, (p.qty/maxQty)*100);
+    const medal = idx===0?"🥇":idx===1?"🥈":idx===2?"🥉":"";
+    return `<div class="ticket" style="padding:10px 12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-weight:800;font-size:.85rem">${medal} ${p.nombre}</span>
+        <span style="font-weight:900;color:var(--v);font-size:.85rem">${p.qty} unid.</span>
+      </div>
+      <div style="background:var(--vbg);border-radius:6px;height:8px;overflow:hidden;margin-bottom:4px">
+        <div style="background:var(--v);height:100%;width:${barWidth}%;border-radius:6px"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--gr)">
+        <span>${p.ventas} venta${p.ventas!==1?"s":""}</span>
+        <span>Bs.${p.total.toFixed(2)} generados</span>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function renderDayPorPago() {
+  document.getElementById("dayDetailTitle").textContent = "💳 Resumen por forma de pago";
+  const period = document.getElementById("dayPeriod")?.value||"today";
+  const sales = filterByPeriod(allSales, period);
+  const el = document.getElementById("dayTickets");
+  if(!sales.length) { el.innerHTML=`<div style="text-align:center;padding:16px;color:var(--gr);font-size:.8rem">Sin ventas</div>`; return; }
+  const efectivo = sales.filter(s=>s.payMethod!=="qr");
+  const qr = sales.filter(s=>s.payMethod==="qr");
+  const totalEf = efectivo.reduce((s,x)=>s+(x.total||0),0);
+  const totalQr = qr.reduce((s,x)=>s+(x.total||0),0);
+  const totalGen = totalEf+totalQr || 1;
+  el.innerHTML = `
+    <div class="ticket" style="border-left:3px solid #2d7a45">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-weight:900;font-size:.95rem">💵 Efectivo</span>
+        <span style="font-weight:900;color:var(--v);font-size:.95rem">Bs.${totalEf.toFixed(2)}</span>
+      </div>
+      <div style="background:var(--vbg);border-radius:6px;height:10px;overflow:hidden;margin:8px 0 4px">
+        <div style="background:#2d7a45;height:100%;width:${(totalEf/totalGen*100).toFixed(0)}%"></div>
+      </div>
+      <div style="font-size:.75rem;color:var(--gr)">${efectivo.length} transacciones · ${(totalEf/totalGen*100).toFixed(0)}% del total</div>
+    </div>
+    <div class="ticket" style="border-left:3px solid #1565c0">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-weight:900;font-size:.95rem">📱 QR</span>
+        <span style="font-weight:900;color:#1565c0;font-size:.95rem">Bs.${totalQr.toFixed(2)}</span>
+      </div>
+      <div style="background:var(--vbg);border-radius:6px;height:10px;overflow:hidden;margin:8px 0 4px">
+        <div style="background:#1565c0;height:100%;width:${(totalQr/totalGen*100).toFixed(0)}%"></div>
+      </div>
+      <div style="font-size:.75rem;color:var(--gr)">${qr.length} transacciones · ${(totalQr/totalGen*100).toFixed(0)}% del total</div>
+    </div>`;
 }
 
 function renderDayGastos() {
@@ -1977,14 +2118,14 @@ function downloadDayReportDialog() {
       const t=g.createdAt?.seconds?new Date(g.createdAt.seconds*1000):new Date();
       rows.push([t.toLocaleDateString("es"),"Gasto",g.desc.replace(/,/g," "),"","",(g.monto||0).toFixed(2),""]);
     });
-    const csv="﻿"+rows.map(r=>r.join(",")).join("\n");
+    const csv="\ufeff"+rows.map(r=>r.join(",")).join("\n");
     const a=document.createElement("a");
     a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
     a.download=`reporte-tienda-${period}-${new Date().toISOString().slice(0,10)}.csv`;
     a.click();
   } else {
     const w=window.open("","_blank");
-    const periodoLabel={today:"Hoy",week:"Esta semana",month:"Este mes"}[period];
+    const periodoLabel={today:"Hoy",week:"Esta semana",month:"Este mes",custom:"Rango personalizado"}[period];
     let html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Reporte Tienda COQUETTE</title>
     <style>body{font-family:Arial,sans-serif;font-size:11px;margin:15px;}
     h1{color:#2d7a45;font-size:14px;}h2{color:#2d7a45;font-size:12px;margin:12px 0 5px;}
@@ -2070,31 +2211,6 @@ async function cobrarFiado(id,monto){
 // ════════════════════════════════════
 // COMPRAS
 // ════════════════════════════════════
-function renderCompras(){
-  const el=document.getElementById("compraList");
-  if(!compras.length){el.innerHTML=`<div style="text-align:center;padding:20px;color:var(--gr);font-size:.82rem">Sin compras</div>`;return;}
-  el.innerHTML=compras.map(c=>{
-    const t=c.createdAt?.seconds?new Date(c.createdAt.seconds*1000):new Date();
-    return `<div class="compra-item">
-      <div style="font-weight:800;font-size:.85rem">${c.nombre}</div>
-      <div style="font-size:.75rem;color:var(--gr);display:flex;gap:10px;margin-top:3px;flex-wrap:wrap">
-        ${c.cant?`<span>📦 ${c.cant}</span>`:""}
-        <span>💰 Bs.${(c.costo||0).toFixed(2)}</span>
-        ${c.proveedor?`<span>📍 ${c.proveedor}</span>`:""}
-        <span>${t.toLocaleDateString("es",{day:"numeric",month:"short"})}</span>
-      </div>
-    </div>`;
-  }).join("");
-}
-function openAddCompra(){["compraNombre","compraCant","compraCosto","compraProveedor"].forEach(id=>document.getElementById(id).value="");openModal("compraModal");}
-async function saveCompra(){
-  const nombre=document.getElementById("compraNombre").value.trim();
-  const costo=parseFloat(document.getElementById("compraCosto").value)||0;
-  if(!nombre||!costo){showToast("Completá nombre y costo",true);return;}
-  await fs.addDoc(fs.collection(db,"compras_physical"),{nombre,cant:parseFloat(document.getElementById("compraCant").value)||0,costo,proveedor:document.getElementById("compraProveedor").value.trim(),createdAt:fs.serverTimestamp()});
-  closeModal("compraModal");showToast("✅ Compra registrada");
-}
-
 // ════════════════════════════════════
 // VOICE SEARCH
 // ════════════════════════════════════
@@ -2548,9 +2664,9 @@ window.saveFiado = saveFiado;
 window.cobrarFiado = cobrarFiado;
 window.openAddGasto = openAddGasto;
 window.saveGasto = saveGasto;
-window.openAddCompra = openAddCompra;
-window.saveCompra = saveCompra;
 window.downloadDayReportDialog = downloadDayReportDialog;
+window.onDayPeriodChange = onDayPeriodChange;
+window.setDayView = setDayView;
 window.openFiarCheckout = openFiarCheckout;
 window.buscarDeudor = buscarDeudor;
 window.seleccionarDeudor = seleccionarDeudor;
@@ -2606,6 +2722,39 @@ function showToast(msg,error=false){
   t.textContent=msg; t.className="toast show"+(error?" error":"");
   clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),2600);
 }
+
+// ── Resize panel derecho ─────────────────────────────────────
+(function(){
+  const resizer = document.getElementById('sellRightResizer');
+  const panel   = document.getElementById('sellRight');
+  if(!resizer || !panel) return;
+  let startX, startW;
+  resizer.addEventListener('mousedown', e => {
+    startX = e.clientX;
+    startW = panel.offsetWidth;
+    resizer.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    const onMove = ev => {
+      const delta = startX - ev.clientX;
+      const newW = Math.min(600, Math.max(220, startW + delta));
+      panel.style.width = newW + 'px';
+    };
+    const onUp = () => {
+      resizer.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      localStorage.setItem('sellRightW', panel.offsetWidth);
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    e.preventDefault();
+  });
+  const saved = localStorage.getItem('sellRightW');
+  if(saved) panel.style.width = Math.min(600, Math.max(220, parseInt(saved))) + 'px';
+})();
 </script>
 </body>
 </html>
