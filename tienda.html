@@ -399,6 +399,7 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
         <option value="libras">⚖️ Libras (cuartilla, kg, etc.) — por peso</option>
         <option value="kilos">🐔 Kilos — precio por kilo</option>
         <option value="unidades">🔢 Unidades (docena, huevo, pan, etc.)</option>
+        <option value="combo">🥖 Combo (ej: pan, 3 por Bs.2, resto a precio unitario)</option>
       </select>
     </div>
     <div class="fld"><label>Unidad de venta</label><input type="text" id="cqUnidad" placeholder="Ej: cuartilla, docena, kg..."></div>
@@ -429,6 +430,22 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
       <div style="font-size:.78rem;font-weight:800;color:var(--v);margin-bottom:6px">🔢 Equivalencia en unidades</div>
       <div class="fld"><label>Unidades por docena (ej: 12)</label>
         <input type="number" id="cqUnidsPorDocena" step="1" min="1" onwheel="this.blur()" placeholder="12">
+      </div>
+    </div>
+
+    <!-- Extra field: combo — bulk pricing -->
+    <div id="cqComboFields" style="display:none;background:#fff3e0;border-radius:10px;padding:10px;margin-bottom:10px">
+      <div style="font-size:.78rem;font-weight:800;color:var(--or);margin-bottom:6px">🥖 Precio por lote</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="fld"><label>Cantidad por lote (ej: 3)</label>
+          <input type="number" id="cqComboCant" step="1" min="1" placeholder="3"></div>
+        <div class="fld"><label>Precio del lote (Bs.)</label>
+          <input type="number" id="cqComboPrecio" step="0.1" min="0" placeholder="2.00"></div>
+      </div>
+      <div class="fld"><label>Precio unitario del restante (Bs.)</label>
+        <input type="number" id="cqComboPrecioUnit" step="0.05" min="0" placeholder="0.70"></div>
+      <div style="font-size:.72rem;color:var(--gr);margin-top:2px">
+        Ej: 3 panes por Bs.2 = lote. Si vendés cantidades que no son múltiplo de 3, el resto se cobra a precio unitario (Bs.0.70 c/u).
       </div>
     </div>
 
@@ -1596,13 +1613,17 @@ function renderVendProds() {
 function makeCqCard(p) {
   const icon = p.img
     ? `<img class="pcard-img" src="${p.img}" alt="${p.nombre}" loading="lazy">`
-    : `<div class="pcard-icon">${p.tipo==='libras'?'🥬':p.tipo==='kilos'?'🐔':'🔢'}</div>`;
+    : `<div class="pcard-icon">${p.tipo==='libras'?'🥬':p.tipo==='kilos'?'🐔':p.tipo==='combo'?'🥖':'🔢'}</div>`;
+  const priceHtml = p.tipo === 'combo'
+    ? `<div class="pcard-price">${p.comboCant||3} × Bs.${(p.comboPrecio||0).toFixed(2)}</div>
+       <div style="font-size:.68rem;color:var(--gr)">suelto Bs.${(p.comboPrecioUnit||0).toFixed(2)} c/u</div>`
+    : `<div class="pcard-price">Bs. ${(p.precioVenta||0).toFixed(2)}</div>`;
   return `<div class="pcard" onclick="window.openCqSelector('${p.id}')" style="cursor:pointer">
     <div class="pcard-img-wrap">${icon}</div>
     <div class="pcard-body">
       <div class="pcard-name">${p.nombre}</div>
       <div class="pcard-unit">por ${p.unidad||'unidad'}</div>
-      <div class="pcard-price">Bs. ${(p.precioVenta||0).toFixed(2)}</div>
+      ${priceHtml}
       <button class="abtn" style="margin-top:6px" onclick="event.stopPropagation();window.openCqSelector('${p.id}')">+ Agregar</button>
     </div>
   </div>`;
@@ -2467,7 +2488,7 @@ function renderCoquetteProds() {
   el.innerHTML = list.map(p=>`
     <div style="background:#fff;border-radius:12px;padding:10px 12px;margin-bottom:8px;box-shadow:var(--sh);display:flex;align-items:center;gap:10px;${p.oculto?'opacity:.5':''}">
       <div style="width:52px;height:52px;border-radius:8px;background:var(--vbg);flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:1.4rem">
-        ${p.img ? `<img src="${p.img}" style="width:100%;height:100%;object-fit:cover">` : (p.tipo==='libras'?'🥬':p.tipo==='kilos'?'🐔':'🔢')}
+        ${p.img ? `<img src="${p.img}" style="width:100%;height:100%;object-fit:cover">` : (p.tipo==='libras'?'🥬':p.tipo==='kilos'?'🐔':p.tipo==='combo'?'🥖':'🔢')}
       </div>
       <div style="flex:1;min-width:0">
         <div style="font-weight:800;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.nombre}${p.oculto?' <span style="font-size:.65rem;color:var(--gr);font-weight:700">(oculto)</span>':''}</div>
@@ -2494,7 +2515,7 @@ async function toggleHideCq(id) {
 }
 
 function tipoLabel(t) {
-  return {libras:'⚖️ Libras', kilos:'🐔 Kilos', unidades:'🔢 Unidades'}[t] || t;
+  return {libras:'⚖️ Libras', kilos:'🐔 Kilos', unidades:'🔢 Unidades', combo:'🥖 Combo'}[t] || t;
 }
 
 function openAddProdCoquette(id) {
@@ -2510,6 +2531,9 @@ function openAddProdCoquette(id) {
   document.getElementById('cqPrecioVenta').value = p?.precioVenta||'';
   document.getElementById('cqLbPorUnidad').value = p?.lbPorUnidad||'';
   document.getElementById('cqUnidsPorDocena').value = p?.unidsPorDocena||12;
+  document.getElementById('cqComboCant').value = p?.comboCant||3;
+  document.getElementById('cqComboPrecio').value = p?.comboPrecio||'';
+  document.getElementById('cqComboPrecioUnit').value = p?.comboPrecioUnit||'';
   // Image
   cqImgTemp = p?.img||'';
   const prev = document.getElementById('cqImgPrev');
@@ -2525,9 +2549,10 @@ function updateCqFields() {
   const t = document.getElementById('cqTipo').value;
   document.getElementById('cqLibrasFields').style.display = t==='libras' ? 'block' : 'none';
   document.getElementById('cqUnidadesFields').style.display = t==='unidades' ? 'block' : 'none';
+  document.getElementById('cqComboFields').style.display = t==='combo' ? 'block' : 'none';
   // Suggest unit
   if(!document.getElementById('cqUnidad').value) {
-    const hints = {libras:'cuartilla', kilos:'kilo', unidades:'docena'};
+    const hints = {libras:'cuartilla', kilos:'kilo', unidades:'docena', combo:'unidad'};
     if(hints[t]) document.getElementById('cqUnidad').placeholder = hints[t];
   }
 }
@@ -2554,6 +2579,9 @@ async function saveCoquetteProd() {
     precioVenta,
     lbPorUnidad: parseFloat(document.getElementById('cqLbPorUnidad').value)||6,
     unidsPorDocena: parseInt(document.getElementById('cqUnidsPorDocena').value)||12,
+    comboCant: parseInt(document.getElementById('cqComboCant').value)||3,
+    comboPrecio: parseFloat(document.getElementById('cqComboPrecio').value)||0,
+    comboPrecioUnit: parseFloat(document.getElementById('cqComboPrecioUnit').value)||0,
     img: cqImgTemp||'',
     updatedAt: fs.serverTimestamp()
   };
@@ -2616,6 +2644,24 @@ function renderCqSelector(p) {
         </div>
       </div>
       <div id="cqTotalRow" style="background:var(--vbg);border-radius:10px;padding:10px;font-size:.9rem;font-weight:800;color:var(--v)">Total: Bs. —</div>`;
+  } else if(p.tipo === 'combo') {
+    const cant = p.comboCant || 3;
+    const precioLote = p.comboPrecio || 0;
+    const precioU = p.comboPrecioUnit || 0;
+    body.innerHTML = `
+      <div style="margin-bottom:10px">
+        <div style="font-size:.78rem;color:var(--gr);margin-bottom:4px">Cantidad de ${p.unidad||'unidades'}</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button onclick="cqAdjustQty(-1)" style="background:var(--vbg);border:none;border-radius:8px;width:34px;height:34px;font-size:1.1rem;font-weight:900;cursor:pointer">−</button>
+          <input type="number" id="cqQtyUnidad" value="${cant}" min="1" step="1" onwheel="this.blur()" oninput="cqCalcTotal()" style="width:70px;text-align:center;padding:6px;border:1.5px solid #d0e8d8;border-radius:8px;font-size:.9rem;font-weight:800;outline:none">
+          <button onclick="cqAdjustQty(1)" style="background:var(--vbg);border:none;border-radius:8px;width:34px;height:34px;font-size:1.1rem;font-weight:900;cursor:pointer">+</button>
+        </div>
+        <div style="font-size:.7rem;color:var(--gr);margin-top:4px">
+          🥖 Precio: cada ${cant} ${p.unidad||'unid.'} = Bs.${precioLote.toFixed(2)} · sueltos a Bs.${precioU.toFixed(2)} c/u
+        </div>
+      </div>
+      <div id="cqComboBreakdown" style="font-size:.78rem;color:var(--gr);margin-bottom:8px"></div>
+      <div id="cqTotalRow" style="background:var(--vbg);border-radius:10px;padding:10px;font-size:.9rem;font-weight:800;color:var(--v)">Total: Bs. —</div>`;
   } else { // unidades
     const unidsPorDoc = p.unidsPorDocena || 12;
     body.innerHTML = `
@@ -2664,6 +2710,11 @@ function cqCalcTotal() {
   let total = 0;
   if(p.tipo === 'kilos') {
     total = qty * (p.precioVenta||0);
+  } else if(p.tipo === 'combo') {
+    const { total: t, breakdown } = calcComboPrecio(p, qty);
+    total = t;
+    const bd = document.getElementById('cqComboBreakdown');
+    if(bd) bd.innerHTML = breakdown;
   } else if(p.tipo === 'unidades') {
     const doc = p.unidsPorDocena||12;
     total = qty * (p.precioVenta||0); // docenas
@@ -2672,6 +2723,27 @@ function cqCalcTotal() {
   }
   const row = document.getElementById('cqTotalRow');
   if(row) row.textContent = `Total: Bs. ${total.toFixed(2)}`;
+}
+
+// ── Lógica de precio combo (ej: pan, 3 por Bs.2, resto a precio unitario) ──
+function calcComboPrecio(p, qty) {
+  const cant = p.comboCant || 3;
+  const precioLote = p.comboPrecio || 0;
+  const precioU = p.comboPrecioUnit || 0;
+  const lotesCompletos = Math.floor(qty / cant);
+  const sueltos = qty % cant;
+  const totalLotes = lotesCompletos * precioLote;
+  const totalSueltos = sueltos * precioU;
+  const total = totalLotes + totalSueltos;
+
+  let breakdown = '';
+  if(qty > 0) {
+    const partes = [];
+    if(lotesCompletos > 0) partes.push(`${lotesCompletos * cant} ${p.unidad||'unid.'} (${lotesCompletos} lote${lotesCompletos!==1?'s':''}) = Bs.${totalLotes.toFixed(2)}`);
+    if(sueltos > 0) partes.push(`${sueltos} ${p.unidad||'unid.'} sueltas × Bs.${precioU.toFixed(2)} = Bs.${totalSueltos.toFixed(2)}`);
+    breakdown = partes.join(' + ');
+  }
+  return { total, breakdown, lotesCompletos, sueltos, totalLotes, totalSueltos };
 }
 
 function cqCalcFromMonto() {
@@ -2729,6 +2801,15 @@ function confirmCqAdd() {
     const qty = parseFloat(document.getElementById('cqQtyUnidad')?.value)||0;
     total = qty * (p.precioVenta||0);
     detalle = `${qty} kg`;
+  } else if(p.tipo === 'combo') {
+    const qty = parseFloat(document.getElementById('cqQtyUnidad')?.value)||0;
+    const { total: t, lotesCompletos, sueltos } = calcComboPrecio(p, qty);
+    total = t;
+    if(sueltos > 0) {
+      detalle = `${qty} ${p.unidad||'unid.'} (${lotesCompletos} lote${lotesCompletos!==1?'s':''} + ${sueltos} suelta${sueltos!==1?'s':''})`;
+    } else {
+      detalle = `${qty} ${p.unidad||'unid.'}`;
+    }
   } else {
     const unids = parseFloat(document.getElementById('cqUnidadesDirectas')?.value)||0;
     const monto = parseFloat(document.getElementById('cqMonto')?.value)||0;
@@ -2813,6 +2894,7 @@ window.openCqSelector = openCqSelector;
 window.confirmCqAdd = confirmCqAdd;
 window.cqAdjustQty = cqAdjustQty;
 window.cqCalcTotal = cqCalcTotal;
+window.calcComboPrecio = calcComboPrecio;
 window.cqCalcFromMonto = cqCalcFromMonto;
 window.cqCalcFromUnids = cqCalcFromUnids;
 window.updateCqFields = updateCqFields;
