@@ -1183,10 +1183,11 @@ async function savePagoParc() {
   const f = fiados.find(x=>x.id===id);
   if(!f) return;
   try {
+    const nota = document.getElementById('pagoParcNota').value.trim();
     // Save pago
     await fs.addDoc(fs.collection(db,'pagos_fiado'), {
       fiadoId: id, monto,
-      nota: document.getElementById('pagoParcNota').value.trim(),
+      nota,
       createdAt: fs.serverTimestamp()
     });
     // Update fiado total pagado
@@ -1197,9 +1198,16 @@ async function savePagoParc() {
       cobrado: saldo <= 0,
       lastPagoAt: fs.serverTimestamp()
     });
+    // El monto del pago parcial SÍ entra a la caja ahora — se registra como venta real
+    await fs.addDoc(fs.collection(db,'sales_physical'), {
+      items: [{prodNombre:'Abono fiado: '+(f.nombre||''), qty:1, precio:monto, subtotal:monto, costoUnit:0, costoTotal:0, ganancia:monto}],
+      total: monto, payMethod: 'efectivo',
+      nota: 'Pago parcial de fiado'+(nota?': '+nota:''),
+      createdAt: fs.serverTimestamp()
+    });
     closeModal('pagoParcModal');
     closeModal('fiadoDetalleModal');
-    showToast(`✅ Pago de Bs.${monto.toFixed(2)} registrado`);
+    showToast(`✅ Pago de Bs.${monto.toFixed(2)} registrado en caja`);
   } catch(e) { showToast('Error: '+e.message, true); }
 }
 
@@ -1283,33 +1291,40 @@ async function confirmarFiar() {
 
   // Build detail string
   const detalle = items.map(e=>`${e.qty}× ${e.prod.nombre} Bs.${((e.prod.precio||0)*e.qty).toFixed(2)}`).join(' | ');
-  const itemsArr = items.map(e=>({
-    nombre: e.prod.nombre, qty: e.qty,
-    precio: e.prod.precio||0,
-    subtotal: (e.prod.precio||0)*e.qty,
-    tipo: e.tipo||'catalogo'
-  }));
+  const itemsArr = items.map(e=>{
+    const costoUnit = e.tipo === "coquette" && e.costoTotal != null
+      ? (e.qty>0 ? e.costoTotal/e.qty : 0)
+      : e.tipo === "catalogo" ? (DB.products[e.prod.id]?.costoUnit||0)
+      : e.tipo === "temporal" ? (e.prod.costoUnit||0)
+      : 0;
+    const costoTotal = e.tipo === "coquette" && e.costoTotal != null ? e.costoTotal : costoUnit*e.qty;
+    return {
+      prodId: e.prod.id, prodNombre: e.prod.nombre, qty: e.qty,
+      precio: e.prod.precio||0, subtotal: (e.prod.precio||0)*e.qty,
+      tipo: e.tipo||'catalogo',
+      costoUnit, costoTotal, ganancia: ((e.prod.precio||0)*e.qty)-costoTotal
+    };
+  });
 
   let nombre, fiadoId;
 
   if(fiarDeudorSeleccionado) {
-    // Add to existing deudor
+    // Nuevo fiado para un deudor existente — se crea como documento separado
+    // (mantiene cada fiado con su propio detalle de artículos, en vez de mezclar texto)
     nombre = fiarDeudorSeleccionado.nombre;
-    fiadoId = fiarDeudorSeleccionado.id;
-    const montoAnterior = fiarDeudorSeleccionado.monto||0;
-    const pagadoAnterior = fiarDeudorSeleccionado.pagado||0;
-    const detalleAnterior = fiarDeudorSeleccionado.detalle||'';
-    await fs.updateDoc(fs.doc(db,'fiados',fiadoId), {
-      monto: montoAnterior + saldo,
-      pagado: pagadoAnterior + aCuenta,
-      detalle: detalleAnterior ? detalleAnterior + '\n' + detalle : detalle,
-      cobrado: false,
-      updatedAt: fs.serverTimestamp()
+    const celularExist = fiarDeudorSeleccionado.celular||'';
+    const docRef = await fs.addDoc(fs.collection(db,'fiados'), {
+      nombre, celular: celularExist,
+      monto: saldo, pagado: aCuenta,
+      detalle, items: itemsArr,
+      cobrado: saldo<=0,
+      createdAt: fs.serverTimestamp()
     });
+    fiadoId = docRef.id;
     if(aCuenta > 0) {
       await fs.addDoc(fs.collection(db,'pagos_fiado'), {
         fiadoId, monto: aCuenta,
-        nota: 'Pago a cuenta',
+        nota: 'Pago a cuenta al momento del fiado',
         createdAt: fs.serverTimestamp()
       });
     }
@@ -1349,13 +1364,8 @@ async function confirmarFiar() {
     }
   }
 
-  // Register in sales_physical
-  await fs.addDoc(fs.collection(db,'sales_physical'), {
-    items: itemsArr, total,
-    payMethod: 'fiado',
-    fiadoId, fiadoNombre: nombre,
-    createdAt: fs.serverTimestamp()
-  });
+  // NOTA: el fiado NO se registra en sales_physical acá — todavía no entró dinero a la caja.
+  // Se registrará como venta real recién cuando se cobre (parcial o totalmente), ver cobrarFiado/savePagoParc.
 
   closeModal('fiarModal');
   cart = {}; renderCart();
@@ -2414,20 +2424,23 @@ async function saveGasto() {
 // ════════════════════════════════════
 function renderFiados() {
   const el=document.getElementById("fiadoList");
-  const total=fiados.reduce((s,f)=>s+(f.monto||0),0);
-  document.getElementById("fiadoTotal").textContent="Total pendiente: Bs. "+total.toFixed(2);
+  const totalPendiente=fiados.reduce((s,f)=>s+Math.max(0,(f.monto||0)-(f.pagado||0)),0);
+  document.getElementById("fiadoTotal").textContent="Total pendiente: Bs. "+totalPendiente.toFixed(2);
   if(!fiados.length){el.innerHTML=`<div style="text-align:center;padding:20px;color:var(--gr);font-size:.82rem">Sin fiados pendientes 🎉</div>`;return;}
   el.innerHTML=fiados.map(f=>{
     const t=f.createdAt?.seconds?new Date(f.createdAt.seconds*1000):new Date();
-    return `<div class="fiado-card">
+    const saldo = Math.max(0,(f.monto||0)-(f.pagado||0));
+    const pagado = f.pagado||0;
+    return `<div class="fiado-card" onclick="verDetalleFiado('${f.id}')" style="cursor:pointer">
       <div style="flex:1">
         <div class="fiado-name">${f.nombre}</div>
         ${f.detalle?`<div style="font-size:.72rem;color:var(--gr)">${f.detalle}</div>`:""}
-        <div style="font-size:.7rem;color:var(--gr)">${t.toLocaleDateString("es",{day:"numeric",month:"short"})}</div>
+        <div style="font-size:.7rem;color:var(--gr)">${t.toLocaleDateString("es",{day:"numeric",month:"short"})}${pagado>0?` · Abonado: Bs.${pagado.toFixed(2)}`:""}</div>
       </div>
       <div style="text-align:right">
-        <div class="fiado-amount">Bs.${(f.monto||0).toFixed(2)}</div>
-        <button onclick="cobrarFiado('${f.id}',${f.monto})" style="background:var(--v);color:#fff;border:none;border-radius:8px;padding:4px 10px;font-size:.7rem;font-weight:800;cursor:pointer;margin-top:4px">Cobrado ✓</button>
+        <div class="fiado-amount">Bs.${saldo.toFixed(2)}</div>
+        <div style="font-size:.65rem;color:var(--gr)">saldo pendiente</div>
+        <button onclick="event.stopPropagation();verDetalleFiado('${f.id}')" style="background:var(--v);color:#fff;border:none;border-radius:8px;padding:4px 10px;font-size:.7rem;font-weight:800;cursor:pointer;margin-top:4px">Ver / Cobrar</button>
       </div>
     </div>`;
   }).join("");
@@ -2440,10 +2453,22 @@ async function saveFiado(){
   await fs.addDoc(fs.collection(db,"fiados"),{nombre,monto,detalle:document.getElementById("fiadoDetalle").value.trim(),cobrado:false,createdAt:fs.serverTimestamp()});
   closeModal("fiadoModal");showToast("📋 Fiado registrado");
 }
-async function cobrarFiado(id,monto){
-  if(!confirm(`¿Marcar como cobrado Bs.${monto}?`))return;
-  await fs.updateDoc(fs.doc(db,"fiados",id),{cobrado:true,cobradoAt:fs.serverTimestamp()});
-  showToast("✅ Fiado cobrado");
+async function cobrarFiado(id,saldoPendiente){
+  if(!confirm(`¿Marcar como cobrado el saldo de Bs.${saldoPendiente.toFixed(2)}?`))return;
+  const f = fiados.find(x=>x.id===id);
+  try {
+    await fs.updateDoc(fs.doc(db,"fiados",id),{cobrado:true,pagado:(f?.monto)||saldoPendiente,cobradoAt:fs.serverTimestamp()});
+    // El saldo cobrado ahora SÍ entra a la caja — se registra como venta real
+    if(saldoPendiente > 0) {
+      await fs.addDoc(fs.collection(db,'sales_physical'), {
+        items: [{prodNombre:'Saldo cobrado fiado: '+(f?.nombre||''), qty:1, precio:saldoPendiente, subtotal:saldoPendiente, costoUnit:0, costoTotal:0, ganancia:saldoPendiente}],
+        total: saldoPendiente, payMethod: 'efectivo',
+        nota: 'Cobro de fiado: '+(f?.nombre||''),
+        createdAt: fs.serverTimestamp()
+      });
+    }
+    showToast("✅ Fiado cobrado y registrado en caja");
+  } catch(e) { showToast('Error: '+e.message, true); }
 }
 
 // ════════════════════════════════════
