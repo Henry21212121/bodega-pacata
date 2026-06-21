@@ -2114,20 +2114,21 @@ function renderDayPorVenta() {
     const items = s.items||[{prodNombre:s.prodNombre,qty:s.qty,precio:s.precio}];
 
     const rowsHtml = items.map((i,iIdx)=>{
-      const { costoUnit, ganancia } = resolveItemCost(i);
+      const { ganancia } = resolveItemCost(i);
       const esLibre = !!i.esLibre;
       // Para items COQUETTE el precio cobrado (i.precio) es el TOTAL de esa venta puntual (qty=1),
-      // y pventaRef es el precio de referencia por unidad base (ej: Bs.15/cuartilla).
+      // pventaRef/costoUnitRef son los precios de referencia por unidad base (ej: Bs.15/cuartilla o Bs.2.5/lb).
       const pventaMostrar = i.pventaRef != null ? i.pventaRef : (i.precio||0);
+      const costoUnitMostrar = i.costoUnitRef != null ? i.costoUnitRef : (resolveItemCost(i).costoUnit||0);
       const parcial = (i.precio||0)*(i.qty||0);
       return `<tr>
         <td style="padding:4px 6px;font-size:.76rem">${i.qty}× ${i.prodNombre}</td>
         <td style="padding:4px 6px;font-size:.76rem;text-align:right;${esLibre?'color:var(--ro)':''}">
           ${esLibre
-            ? `<input type="number" value="${costoUnit?costoUnit.toFixed(2):''}" placeholder="0.00" step="0.01" min="0"
+            ? `<input type="number" value="${costoUnitMostrar?costoUnitMostrar.toFixed(2):''}" placeholder="0.00" step="0.01" min="0"
                  onchange="editarCostoLibre('${s.id}',${iIdx},this.value)"
                  style="width:62px;text-align:right;padding:2px 4px;border:1.5px solid var(--ro);border-radius:6px;font-size:.74rem;color:var(--ro)">`
-            : `Bs.${costoUnit.toFixed(2)}`}
+            : `Bs.${costoUnitMostrar.toFixed(2)}`}
         </td>
         <td style="padding:4px 6px;font-size:.76rem;text-align:right">Bs.${pventaMostrar.toFixed(2)}</td>
         <td style="padding:4px 6px;font-size:.76rem;text-align:right;color:var(--v)">Bs.${parcial.toFixed(2)}</td>
@@ -2887,24 +2888,42 @@ function confirmCqAdd() {
 
   if(!total) { showToast('Ingresá una cantidad',true); return; }
 
-  // ── Calcular costo real de adquisición para esta venta ──
+  // ── Calcular costo real y precio de referencia para el reporte ──
   // p.precioUnit = costo de adquisición por unidad de venta (cuartilla, kilo, docena, lote combo, etc.)
   // p.precioVenta = precio de venta de esa misma unidad de venta
   // El "total" cobrado siempre es una fracción/múltiplo de p.precioVenta,
   // y esa misma proporción aplica al costo: costoTotal = (total / precioVenta) * precioUnit
   let costoTotal = 0;
+  let pventaRef = p.precioVenta || 0;     // precio de venta de referencia a mostrar en el reporte
+  let costoUnitRef = p.precioUnit || 0;   // costo de adquisición de referencia a mostrar en el reporte
+
   if(p.tipo === 'combo') {
     // El combo no usa precioVenta de forma proporcional (tiene precio de lote + precio suelto),
     // así que el costo se calcula directo: cantidad vendida × costo unitario de adquisición
     const qty = parseFloat(document.getElementById('cqQtyUnidad')?.value)||0;
     costoTotal = qty * (p.precioUnit||0);
+    pventaRef = p.precioVenta||0;
+    costoUnitRef = p.precioUnit||0;
+  } else if(p.tipo === 'libras') {
+    const monto = parseFloat(document.getElementById('cqMonto')?.value)||0;
+    if(monto > 0) {
+      // Venta por monto: la unidad real vendida es la LIBRA, no la cuartilla.
+      // Hay que convertir el precio de referencia a "por libra" para que el reporte sea coherente.
+      const lbPorUnidad = p.lbPorUnidad || 6;
+      pventaRef = lbPorUnidad > 0 ? (p.precioVenta||0)/lbPorUnidad : 0;
+      costoUnitRef = lbPorUnidad > 0 ? (p.precioUnit||0)/lbPorUnidad : 0;
+      const lbVendidas = lbPorUnidad*monto/(p.precioVenta||1);
+      costoTotal = lbVendidas * costoUnitRef;
+    } else if(p.precioVenta > 0) {
+      // Venta en cuartillas directas: la proporción es exacta, el precio de referencia sigue siendo por cuartilla
+      const proporcion = total / p.precioVenta;
+      costoTotal = proporcion * (p.precioUnit||0);
+    }
   } else if(p.precioVenta > 0) {
     const proporcion = total / p.precioVenta;
     costoTotal = proporcion * (p.precioUnit||0);
   }
   const ganancia = total - costoTotal;
-  // Precio de venta "unitario" de referencia para mostrar en el reporte (precio por unidad base del producto)
-  const pventaRef = p.precioVenta || 0;
 
   // Add to cart as free item with coquette marker
   const freeId = 'cq_'+p.id+'_'+Date.now();
@@ -2912,7 +2931,7 @@ function confirmCqAdd() {
     prod: {id:freeId, nombre:`${nombre} (${detalle})`, precio:total},
     qty:1, tipo:'coquette', subtotal:total,
     costoUnit: costoTotal, costoTotal, ganancia,
-    pventaRef, costoUnitRef: p.precioUnit||0 // referencia informativa para el reporte
+    pventaRef, costoUnitRef // referencia informativa para el reporte
   };
   renderCart();
   closeModal('cqSelectorModal');
