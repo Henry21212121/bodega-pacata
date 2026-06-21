@@ -252,7 +252,6 @@ input[type=file]{display:none;}
             <input type="date" id="dashFrom" style="padding:4px 8px;border:1.5px solid #d0e8d8;border-radius:7px;font-size:.75rem;outline:none">
             <input type="date" id="dashTo" style="padding:4px 8px;border:1.5px solid #d0e8d8;border-radius:7px;font-size:.75rem;outline:none">
             <button class="btn btn-v btn-sm" onclick="setDashRange('custom',null)">Filtrar</button>
-            <button class="btn btn-ro btn-sm" onclick="abrirResetPedidos()" title="Borrar pedidos y movimientos">🔄 Resetear datos</button>
           </div>
         </div>
         <div class="panel-grid" id="dashStats">
@@ -360,8 +359,8 @@ input[type=file]{display:none;}
           </select>
           <button class="btn btn-v btn-sm" onclick="openProdEditor(null)">+ Nuevo producto</button>
           <button class="btn btn-sec btn-sm" onclick="openNewCat()" title="Agregar categoría">🗂️ + Categoría</button>
-          <button class="btn btn-ro btn-sm" onclick="confirmarResetStock()">🗑️ Resetear stock</button>
           <button class="btn btn-or btn-sm" onclick="bulkGenDescriptions()" id="bulkDescBtn" title="Genera descripciones con IA para todos los productos que no tienen una">✨ Descripciones masivas</button>
+          <button class="btn btn-ro btn-sm" onclick="confirmarResetStock()">🗑️ Resetear stock</button>
         </div>
         <div id="bulkDescProgress" style="display:none;background:#fff8ec;border:1px solid #fde19a;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:.82rem"></div>
         <div class="filter-pills" id="catFilterPills"></div>
@@ -386,7 +385,13 @@ input[type=file]{display:none;}
     <!-- REPORTES -->
     <div id="tab-reportes" class="tab-content" style="display:none">
       <div class="panel">
-        <h2>📈 Reportes de ventas</h2>
+        <h2>📈 Reportes</h2>
+        <div style="display:flex;gap:4px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px">
+          <button class="rep-source-tab active" onclick="setReportSource('online',this)" style="flex:1;min-width:110px;padding:9px 6px;font-size:.8rem;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:var(--v);color:#fff">🛒 Online</button>
+          <button class="rep-source-tab" onclick="setReportSource('fisica',this)" style="flex:1;min-width:110px;padding:9px 6px;font-size:.8rem;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#eee;color:#555">🏪 Tienda física</button>
+          <button class="rep-source-tab" onclick="setReportSource('consumo',this)" style="flex:1;min-width:110px;padding:9px 6px;font-size:.8rem;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#eee;color:#555">👨‍👩‍👧 Consumo propio</button>
+          <button class="rep-source-tab" onclick="setReportSource('conjunto',this)" style="flex:1;min-width:110px;padding:9px 6px;font-size:.8rem;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#eee;color:#555">📊 Conjunto</button>
+        </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center">
           <select id="reportPeriod" style="padding:7px 12px;border:1.5px solid #d0e8d8;border-radius:8px;font-size:.85rem;outline:none">
             <option value="day">Hoy</option>
@@ -398,8 +403,8 @@ input[type=file]{display:none;}
             <option value="clients">Por clientes</option>
           </select>
           <button class="btn btn-v btn-sm" onclick="genReport()">Generar</button>
-          <button class="btn btn-or btn-sm" onclick="exportReportPDF()">📄 PDF Ventas</button>
-          <button class="btn btn-sec btn-sm" onclick="exportReportCSV()">📊 CSV Ventas</button>
+          <button class="btn btn-or btn-sm" onclick="exportReportPDF()">📄 PDF</button>
+          <button class="btn btn-sec btn-sm" onclick="exportReportCSV()">📊 CSV</button>
           <button class="btn btn-sec btn-sm" onclick="showCatalogDialog()">🏷️ Catálogo precios</button>
           <button class="btn btn-sec btn-sm" onclick="showCostsDialog()">💰 Detalle costos</button>
         </div>
@@ -519,17 +524,6 @@ input[type=file]{display:none;}
           <div class="fld"><label>Velocidad promedio delivery (km/h)</label><input type="number" id="cfgDeliverySpeed" min="5" step="5" placeholder="20" value="20"></div>
           <div class="fld"><label>Factor tráfico (1.0-2.0)</label><input type="number" id="cfgTrafficFactor" min="1" max="3" step="0.1" placeholder="1.5" value="1.5"></div>
         </div>
-        <div style="background:#fff8ec;border:1.5px solid #fde19a;border-radius:10px;padding:12px;margin-bottom:12px">
-          <div style="font-size:.82rem;font-weight:800;color:#e07b00;margin-bottom:6px">⏰ Pedido programado</div>
-          <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
-            <div onclick="togCfg('cfgScheduledEnabled')" id="cfgScheduledEnabled-wrap" style="width:44px;height:24px;border-radius:12px;background:#ccc;position:relative;transition:background .2s;flex-shrink:0;cursor:pointer">
-              <div id="cfgScheduledEnabled-knob" style="position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s"></div>
-            </div>
-            <input type="checkbox" id="cfgScheduledEnabled" style="display:none">
-            <span style="font-size:.82rem">Permitir que clientes programen pedidos para otro horario</span>
-          </label>
-          <p style="font-size:.75rem;color:#888;margin:6px 0 0 54px">Desactivado = no aparece la opción de programar pedido en la tienda.</p>
-        </div>
         <div class="form-row">
           <div class="fld"><label>🕐 Hora cierre delivery (pedidos presenciales)</label><input type="time" id="cfgDeliveryClose" value="16:00"></div>
           <div class="fld"><label>⏰ Duración franja programada (min)</label><input type="number" id="cfgDeliverySlotMins" min="15" step="15" value="30" placeholder="30"></div>
@@ -609,87 +603,82 @@ input[type=file]{display:none;}
   </div><!-- adm-main -->
 </div><!-- adm-wrap -->
 
-<!-- MODAL: Reset de stock -->
-<div class="confirm-ov" id="resetStockModal">
-  <div class="confirm-box" style="width:min(400px,96vw);position:relative">
-    <button class="modal-close-btn" onclick="close2('resetStockModal')">✕</button>
-    <div style="text-align:center;margin-bottom:16px">
-      <div style="font-size:2.5rem">⚠️</div>
-      <h3 style="color:var(--ro);margin:8px 0 4px">Resetear todo el stock</h3>
-      <p style="font-size:.85rem;color:var(--gr);margin:0">Pondrá el stock de <b>todos los productos</b> en <b>0</b>. No se borrará ningún producto.</p>
-    </div>
-    <div id="resetStockPaso1">
-      <p style="font-size:.9rem;text-align:center;margin-bottom:16px">¿Estás seguro?</p>
-      <div style="display:flex;gap:10px">
-        <button class="btn btn-sec" style="flex:1" onclick="close2('resetStockModal')">Cancelar</button>
-        <button class="btn btn-ro" style="flex:1" onclick="resetStockPaso2()">Sí, continuar →</button>
-      </div>
-    </div>
-    <div id="resetStockPaso2" style="display:none">
-      <p style="font-size:.9rem;text-align:center;margin-bottom:10px;color:var(--ro);font-weight:800">Segunda confirmación</p>
-      <p style="font-size:.82rem;text-align:center;color:var(--gr);margin-bottom:16px">Escribí <b>RESETEAR</b> para confirmar:</p>
-      <input type="text" id="resetStockConfirmInput" placeholder="Escribí RESETEAR"
-        style="width:100%;padding:12px;border:2px solid var(--ro);border-radius:10px;font-size:1rem;text-align:center;box-sizing:border-box;margin-bottom:12px;font-weight:800"
-        oninput="document.getElementById('btnConfirmarReset').disabled=this.value!=='RESETEAR'">
-      <div style="display:flex;gap:10px">
-        <button class="btn btn-sec" style="flex:1" onclick="close2('resetStockModal')">Cancelar</button>
-        <button class="btn btn-ro" style="flex:2" id="btnConfirmarReset" disabled onclick="ejecutarResetStock()">🗑️ Resetear</button>
-      </div>
-    </div>
-    <div id="resetStockProgreso" style="display:none;text-align:center;padding:10px 0">
-      <div class="adm-loading" style="margin-bottom:8px">Reseteando stock...</div>
-      <div id="resetStockMsg" style="font-size:.82rem;color:var(--gr)"></div>
-    </div>
-  </div>
-</div>
+<!-- MODAL: EDITAR PRODUCTO COQUETTE (espejo del formulario de tienda.html) -->
+<div class="confirm-ov" id="admCqModal">
+  <div class="confirm-box" style="width:min(480px,96vw);max-height:88vh;overflow-y:auto;position:relative">
+    <button class="modal-close-btn" onclick="close2('admCqModal')">✕</button>
+    <h3 id="admCqTitle" style="margin-bottom:10px">➕ Nuevo producto COQUETTE</h3>
 
-<!-- MODAL: Reset pedidos -->
-<div class="confirm-ov" id="resetPedidosModal">
-  <div class="confirm-box" style="width:min(440px,96vw);position:relative;max-height:88vh;overflow-y:auto">
-    <button class="modal-close-btn" onclick="close2('resetPedidosModal')">✕</button>
-    <div id="rp-paso1">
-      <div style="text-align:center;margin-bottom:16px">
-        <div style="font-size:2.5rem">⚠️</div>
-        <h3 style="color:var(--ro);margin:8px 0 4px">Resetear pedidos y movimientos</h3>
-        <div style="text-align:left;background:#fff8ec;border:1.5px solid #fde19a;border-radius:10px;padding:12px;font-size:.82rem;margin-bottom:12px">
-          <div>🛒 orders · 🏪 sales_physical · 💸 gastos_physical</div>
-          <div>📦 compras_physical</div>
-          <div>📋 fiados · pagos_fiado · calificaciones</div>
-          <div>💬 suggestions · 📊 stats · consumo_api</div>
-          <div>👥 clients · ubicaciones_verificadas · tempProducts</div>
-        </div>
-        <div style="background:#e8f5e9;border:1.5px solid #a5d6a7;border-radius:10px;padding:10px;font-size:.82rem;color:#2e7d32;margin-bottom:16px">
-          ✅ Se guardará un respaldo en Firestore antes de borrar.
+    <div class="fld">
+      <label>Foto del producto (opcional)</label>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div id="admCqImgPrev" onclick="document.getElementById('admCqImgFile').click()"
+          style="width:72px;height:72px;border-radius:10px;background:var(--vbg);border:2px dashed var(--v);display:flex;align-items:center;justify-content:center;font-size:1.6rem;cursor:pointer;overflow:hidden;flex-shrink:0">📷</div>
+        <div>
+          <button type="button" onclick="document.getElementById('admCqImgFile').click()"
+            style="background:var(--vbg);color:var(--v);border:1.5px solid var(--v);border-radius:8px;padding:7px 12px;font-size:.8rem;font-weight:800;cursor:pointer">📷 Elegir foto</button>
+          <div style="font-size:.68rem;color:var(--gr);margin-top:4px">Tocá la foto o el botón para cambiarla</div>
+          <button type="button" id="admCqImgRemoveBtn" onclick="removeAdmCqImg()" style="display:none;background:none;border:none;color:var(--ro);font-size:.72rem;cursor:pointer;margin-top:2px">✕ Quitar foto</button>
         </div>
       </div>
-      <div style="display:flex;gap:10px">
-        <button class="btn btn-sec" style="flex:1" onclick="close2('resetPedidosModal')">Cancelar</button>
-        <button class="btn btn-ro" style="flex:1" onclick="rpPaso2()">Sí, continuar →</button>
+      <input type="file" id="admCqImgFile" accept="image/*" style="display:none" onchange="onAdmCqImgSelected(event)">
+    </div>
+
+    <div class="fld"><label>Nombre *</label><input type="text" id="admCqNombre" placeholder="Ej: Tomate, Plátano, Pollo..."></div>
+    <div class="fld">
+      <label>Tipo de unidad *</label>
+      <select id="admCqTipo" onchange="updateAdmCqFields()" style="width:100%;padding:9px;border:1.5px solid #d0e8d8;border-radius:10px;outline:none;font-size:.9rem">
+        <option value="">-- Elegir tipo --</option>
+        <option value="libras">⚖️ Libras (cuartilla, kg, etc.) — por peso</option>
+        <option value="kilos">🐔 Kilos — precio por kilo</option>
+        <option value="unidades">🔢 Unidades (docena, huevo, pan, etc.)</option>
+        <option value="combo">🥖 Combo (ej: pan, 3 por Bs.2, resto a precio unitario)</option>
+      </select>
+    </div>
+    <div class="fld"><label>Unidad de venta</label><input type="text" id="admCqUnidad" placeholder="Ej: cuartilla, docena, kg..."></div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="fld"><label>Cantidad adquirida</label><input type="number" id="admCqCantAdq" step="0.5" min="0" oninput="calcAdmCqPrecioUnit()" placeholder="0"></div>
+      <div class="fld"><label>Precio por lote (Bs.)</label><input type="number" id="admCqCostoLote" step="0.5" min="0" oninput="calcAdmCqPrecioUnit()" placeholder="0.00"></div>
+    </div>
+    <div class="fld" style="background:var(--vbg);border-radius:10px;padding:10px">
+      <label>Precio unitario (calculado)</label>
+      <input type="number" id="admCqPrecioUnit" step="0.01" min="0" readonly tabindex="-1" placeholder="0.00" style="background:#eee;color:#555;cursor:not-allowed">
+      <div style="font-size:.68rem;color:var(--gr);margin-top:3px">= Precio por lote ÷ Cantidad adquirida (automático)</div>
+    </div>
+    <div class="fld"><label>Precio de venta (Bs.) *</label><input type="number" id="admCqPrecioVenta" step="0.5" min="0" placeholder="0.00"></div>
+
+    <div id="admCqLibrasFields" style="display:none;background:#fff3e0;border-radius:10px;padding:10px;margin-bottom:10px">
+      <div style="font-size:.78rem;font-weight:800;color:var(--or);margin-bottom:6px">⚖️ Equivalencia en libras</div>
+      <div class="fld"><label>Libras por unidad (ej: 6 lb por cuartilla)</label>
+        <input type="number" id="admCqLbPorUnidad" step="0.1" min="0" placeholder="6.0">
       </div>
     </div>
-    <div id="rp-paso2" style="display:none">
-      <div style="text-align:center;margin-bottom:16px">
-        <div style="font-size:2rem">🔐</div>
-        <h3 style="color:var(--ro)">Segunda confirmación</h3>
-        <p style="font-size:.84rem;color:var(--gr)">Escribí <b>BORRAR TODO</b> para confirmar:</p>
-      </div>
-      <input type="text" id="rpConfirmInput" placeholder="Escribí BORRAR TODO"
-        style="width:100%;padding:14px;border:2px solid var(--ro);border-radius:10px;font-size:1rem;text-align:center;box-sizing:border-box;margin-bottom:12px;font-weight:800"
-        oninput="document.getElementById('btnConfirmarRp').disabled=this.value!=='BORRAR TODO'">
-      <div style="display:flex;gap:10px">
-        <button class="btn btn-sec" style="flex:1" onclick="close2('resetPedidosModal')">Cancelar</button>
-        <button class="btn btn-ro" style="flex:2" id="btnConfirmarRp" disabled onclick="ejecutarResetPedidos()">🗑️ Borrar todo</button>
+
+    <div id="admCqUnidadesFields" style="display:none;background:#e8f5e9;border-radius:10px;padding:10px;margin-bottom:10px">
+      <div style="font-size:.78rem;font-weight:800;color:var(--v);margin-bottom:6px">🔢 Equivalencia en unidades</div>
+      <div class="fld"><label>Unidades por docena (ej: 12)</label>
+        <input type="number" id="admCqUnidsPorDocena" step="1" min="1" placeholder="12">
       </div>
     </div>
-    <div id="rp-progreso" style="display:none;text-align:center;padding:16px 0">
-      <div style="font-size:1.5rem;margin-bottom:8px">⏳</div>
-      <div style="font-weight:800;margin-bottom:8px" id="rp-progreso-titulo">Guardando respaldo...</div>
-      <div style="font-size:.82rem;color:var(--gr);margin-bottom:12px" id="rp-progreso-msg"></div>
-      <div style="background:var(--vbg);border-radius:8px;height:8px;overflow:hidden">
-        <div id="rp-progreso-bar" style="background:var(--v);height:100%;width:0%;transition:width .3s"></div>
+
+    <div id="admCqComboFields" style="display:none;background:#fff3e0;border-radius:10px;padding:10px;margin-bottom:10px">
+      <div style="font-size:.78rem;font-weight:800;color:var(--or);margin-bottom:6px">🥖 Precio por lote</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="fld"><label>Cantidad por lote (ej: 3)</label><input type="number" id="admCqComboCant" step="1" min="1" placeholder="3"></div>
+        <div class="fld"><label>Precio del lote (Bs.)</label><input type="number" id="admCqComboPrecio" step="0.1" min="0" placeholder="2.00"></div>
+      </div>
+      <div class="fld"><label>Precio unitario del restante (Bs.)</label>
+        <input type="number" id="admCqComboPrecioUnit" step="0.05" min="0" placeholder="0.70"></div>
+      <div style="font-size:.72rem;color:var(--gr);margin-top:2px">
+        Ej: 3 panes por Bs.2 = lote. El resto se cobra a precio unitario.
       </div>
     </div>
-    <div id="rp-resultado" style="display:none"></div>
+
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn btn-sec" style="flex:1" onclick="close2('admCqModal')">Cancelar</button>
+      <button class="btn btn-or" style="flex:2" onclick="saveAdmCqProd()">💾 Guardar</button>
+    </div>
   </div>
 </div>
 
@@ -862,26 +851,12 @@ const CLOUD_NAME = "db9s1kpcf";
 const CLOUD_PRESET = "bodega_unsigned";
 
 // ─── STATE ─────────────────────────
-let DB = { categories:{}, products:{}, orders:[], clients:[], suggestions:[], config:{} };
+let DB = { categories:{}, products:{}, coquetteProducts:{}, orders:[], clients:[], suggestions:[], config:{}, salesFisica:[], consumoPropio:[] };
 let db, fs;
 let isAuth = false;
 let editProdId = null;
 let deleteProdId = null;
 let pedImgTemp = "";
-
-function setPedImg(src) {
-  pedImgTemp = src || "";
-  const prev = document.getElementById("pedImgPrev");
-  const btn  = document.getElementById("pedImgClearBtn");
-  if(src) {
-    prev.innerHTML = `<img src="${src}" style="width:100%;height:100%;object-fit:cover">`;
-    if(btn) btn.style.display = "flex";
-  } else {
-    prev.innerHTML = "📷";
-    if(btn) btn.style.display = "none";
-  }
-}
-function clearPedImg() { setPedImg(""); }
 let currentOrderFilter = "all";
 let currentProdCat = "all";
 let currentOrderDetail = null;
@@ -1019,6 +994,23 @@ async function loadAdminData() {
       renderAdmProds();
       renderLowStock();
       buildCatFilterPills();
+    });
+
+    // Coquette Products (productos propios de la tienda física) — real-time
+    fs.onSnapshot(fs.collection(db,"coquette_products"), snap => {
+      DB.coquetteProducts = {};
+      snap.forEach(d => { DB.coquetteProducts[d.id] = {...d.data(), id:d.id}; });
+      if(currentProdCat === "COQUETTE") renderAdmProds();
+    });
+
+    // Ventas tienda física (real-time, últimas 500)
+    fs.onSnapshot(fs.query(fs.collection(db,"sales_physical"), fs.orderBy("createdAt","desc"), fs.limit(500)), snap => {
+      DB.salesFisica = snap.docs.map(d=>({...d.data(), id:d.id}));
+    });
+
+    // Consumo propio (real-time, últimos 500)
+    fs.onSnapshot(fs.query(fs.collection(db,"consumo_propio"), fs.orderBy("createdAt","desc"), fs.limit(500)), snap => {
+      DB.consumoPropio = snap.docs.map(d=>({...d.data(), id:d.id}));
     });
 
     // Orders (real-time last 200)
@@ -1587,7 +1579,6 @@ function buildCatFilterPills() {
     b.onclick = () => filterProdCat(c.name, b);
     wrap.appendChild(b);
   });
-  // Pill fijo de COQUETTE (productos propios de la tienda física)
   const cqBtn = document.createElement("button");
   cqBtn.className = "fpill"; cqBtn.dataset.cat = "COQUETTE";
   cqBtn.textContent = "🌸 COQUETTE";
@@ -1606,11 +1597,7 @@ function renderAdmProds() {
   const q      = (document.getElementById("prodSearch")?.value||"").toLowerCase().trim();
   const sortBy = document.getElementById("prodSortBy")?.value || "nombre";
 
-  // ── Categoría especial COQUETTE: lee de otra colección ──
-  if(currentProdCat === "COQUETTE") {
-    renderCoquetteAdminList(q);
-    return;
-  }
+  if(currentProdCat === "COQUETTE") { renderCoquetteAdminList(q); return; }
 
   let prods = Object.values(DB.products);
   if(currentProdCat !== "all") prods = prods.filter(p => p.cat === currentProdCat);
@@ -1664,41 +1651,46 @@ function renderAdmProds() {
   }).join("");
 }
 
-// ── Lista de productos propios COQUETTE (solo lectura desde admin) ──
-// Estos productos se cargan/editan desde la app de Tienda física (tienda.html).
-// Acá solo se muestran para tener visibilidad centralizada del inventario.
+// ── Lista editable de productos propios COQUETTE (espejo de tienda.html) ──
 function renderCoquetteAdminList(q) {
   let prods = Object.values(DB.coquetteProducts || {});
   if(q) prods = prods.filter(p => (p.nombre||"").toLowerCase().includes(q));
   prods.sort((a,b) => (a.nombre||"").localeCompare(b.nombre||""));
 
   const list = document.getElementById("prodList");
+  const tipoLbl = {libras:"⚖️ Libras", kilos:"🐔 Kilos", unidades:"🔢 Unidades", combo:"🥖 Combo"};
+
+  const header = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <div style="font-size:.78rem;color:var(--gr);background:#fff8ec;border:1px solid #fde19a;border-radius:8px;padding:6px 10px">
+      🌸 Productos propios — visibles también en la app Tienda · ${prods.length} producto${prods.length!==1?"s":""}
+    </div>
+    <button class="btn btn-or btn-sm" onclick="openAdmCqProd(null)">+ Nuevo producto</button>
+  </div>`;
+
   if(!prods.length) {
-    list.innerHTML = `<div style="text-align:center;padding:24px;color:var(--gr)">
-      <p style="font-size:.85rem">Sin productos propios de COQUETTE todavía.</p>
-      <p style="font-size:.78rem">Estos productos se cargan desde la app de la <b>Tienda física</b> (pestaña Productos → COQUETTE).</p>
-    </div>`;
+    list.innerHTML = header + `<div style="text-align:center;padding:20px;color:var(--gr);font-size:.82rem">Sin productos. Tocá + Nuevo producto.</div>`;
     return;
   }
 
-  const tipoLabel = {libras:"📦 por libra", kilos:"⚖️ por kilo", unidades:"🔢 por unidad"};
-  list.innerHTML = `
-    <div style="font-size:.75rem;color:var(--gr);margin-bottom:8px;background:#fff8ec;border:1px solid #fde19a;border-radius:8px;padding:8px 10px">
-      🌸 Productos propios de la tienda física COQUETTE — gestión desde la app Tienda · ${prods.length} producto${prods.length!==1?"s":""}
-    </div>` +
-    prods.map(p => {
-      const imgEl = p.img ? `<img src="${p.img}">` : "🌸";
-      return `<div class="prod-item">
-        <div class="prod-thumb">${imgEl}</div>
-        <div class="prod-inf">
-          <div class="prod-nm">${p.nombre}</div>
-          <div class="prod-meta">COQUETTE · <b>Venta:Bs.${(p.precioVenta||0).toFixed(2)}</b> ${tipoLabel[p.tipo]||""}</div>
-        </div>
-      </div>`;
-    }).join("");
+  list.innerHTML = header + prods.map(p => {
+    const imgEl = p.img ? `<img src="${p.img}">` : (p.tipo==="libras"?"🥬":p.tipo==="kilos"?"🐔":p.tipo==="combo"?"🥖":"🔢");
+    return `<div class="prod-item" style="${p.oculto?"opacity:.5":""}">
+      <div class="prod-thumb">${imgEl}</div>
+      <div class="prod-inf">
+        <div class="prod-nm">${p.nombre}${p.oculto?' <span style="font-size:.65rem;color:var(--gr)">(oculto)</span>':""}</div>
+        <div class="prod-meta">${tipoLbl[p.tipo]||p.tipo} · ${p.unidad||""} · <b>Venta:Bs.${(p.precioVenta||0).toFixed(2)}</b> · Costo:Bs.${(p.precioUnit||0).toFixed(2)}</div>
+      </div>
+      <div class="prod-acts">
+        <button class="btn btn-v btn-sm" onclick="openAdmCqProd('${p.id}')">✏️</button>
+        <button class="btn btn-sec btn-sm" onclick="toggleHideAdmCq('${p.id}')">${p.oculto?"👁️":"🙈"}</button>
+        <button class="btn btn-ro btn-sm" onclick="deleteAdmCqProd('${p.id}')">🗑️</button>
+      </div>
+    </div>`;
+  }).join("");
 }
 
 async function toggleHide(id) {
+
   const p = DB.products[id]; if(!p) return;
   const newState = p.estado==="oculto" ? "ok" : "oculto";
   await fs.updateDoc(fs.doc(db,"products",id), {estado:newState});
@@ -1945,12 +1937,14 @@ async function handlePedImg(ev) {
   const file = ev.target.files[0]; if(!file) return;
   try {
     const url = await uploadToCloudinary(file);
-    setPedImg(url);
+    pedImgTemp = url;
+    document.getElementById("pedImgPrev").innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover">`;
   } catch(e) {
     // Fallback: base64 resize
     const r = new FileReader();
     r.onload = e2 => resizeImg(e2.target.result, 500, data => {
-      setPedImg(data);
+      pedImgTemp = data;
+      document.getElementById("pedImgPrev").innerHTML = `<img src="${data}" style="width:100%;height:100%;object-fit:cover">`;
     });
     r.readAsDataURL(file);
   }
@@ -2109,6 +2103,74 @@ function sendMsgClient(phone, name) {
 }
 
 // ─── REPORTS ───────────────────────
+let reportSource = "online"; // online | fisica | consumo | conjunto
+
+function setReportSource(src, btn) {
+  reportSource = src;
+  document.querySelectorAll(".rep-source-tab").forEach(b=>{b.style.background="#eee";b.style.color="#555";});
+  if(btn) { btn.style.background="var(--v)"; btn.style.color="#fff"; }
+  // En consumo propio no aplica "por clientes"
+  const groupSel = document.getElementById("reportGroup");
+  if(groupSel) {
+    groupSel.querySelector('option[value="clients"]').style.display = (src==="online") ? "" : "none";
+    if(src!=="online" && groupSel.value==="clients") groupSel.value="products";
+  }
+  genReport();
+}
+
+// ── Normaliza cada fuente a un formato común: {fecha, total, costo, items:[{nombre,qty,total,costo}]} ──
+function getReportTransacciones(from, src) {
+  if(src === "online") {
+    return DB.orders.filter(o=>{
+      if(!o.createdAt) return false;
+      const d = new Date(o.createdAt.seconds*1000);
+      return d >= from && o.status !== "cancelled";
+    }).map(o=>({
+      fecha: o.createdAt, total: o.total||0,
+      costo: (o.items||[]).reduce((s,i)=>s+((DB.products[i.id]?.costoUnit||0)*i.qty),0),
+      cliente: o.clientName, clienteKey: o.clientPhone||o.clientId||"?",
+      items: (o.items||[]).map(i=>({
+        nombre:i.nombre, qty:i.qty, total:i.subtotal||0,
+        costo:(DB.products[i.id]?.costoUnit||0)*i.qty
+      }))
+    }));
+  }
+  if(src === "fisica") {
+    return (DB.salesFisica||[]).filter(s=>{
+      if(!s.createdAt) return false;
+      const d = new Date(s.createdAt.seconds*1000);
+      return d >= from;
+    }).map(s=>({
+      fecha: s.createdAt, total: s.total||0,
+      costo: (s.items||[]).reduce((sum,i)=>sum+(i.costoTotal!=null?i.costoTotal:(i.costoUnit||0)*i.qty),0),
+      cliente: null, clienteKey: null,
+      items: (s.items||[]).map(i=>({
+        nombre:i.prodNombre, qty:i.qty, total:(i.precio||0)*i.qty,
+        costo: i.costoTotal!=null?i.costoTotal:(i.costoUnit||0)*i.qty
+      }))
+    }));
+  }
+  if(src === "consumo") {
+    return (DB.consumoPropio||[]).filter(c=>{
+      if(!c.createdAt) return false;
+      const d = new Date(c.createdAt.seconds*1000);
+      return d >= from;
+    }).map(c=>({
+      fecha: c.createdAt, total: c.total||0, costo: c.total||0, // en consumo propio, venta = costo (no hay ganancia)
+      cliente: null, clienteKey: null,
+      items: (c.items||[]).map(i=>({
+        nombre:i.prodNombre, qty:i.qty, total:i.costoTotal||0, costo:i.costoTotal||0
+      }))
+    }));
+  }
+  // conjunto: junta las 3 fuentes
+  return [
+    ...getReportTransacciones(from,"online"),
+    ...getReportTransacciones(from,"fisica"),
+    ...getReportTransacciones(from,"consumo")
+  ];
+}
+
 function genReport() {
   const period = document.getElementById("reportPeriod").value;
   const group = document.getElementById("reportGroup").value;
@@ -2118,49 +2180,42 @@ function genReport() {
   else if(period==="week") { from = new Date(); from.setDate(from.getDate()-7); }
   else { from = new Date(); from.setDate(1); from.setHours(0,0,0,0); }
 
-  const orders = DB.orders.filter(o => {
-    if(!o.createdAt) return false;
-    const d = new Date(o.createdAt.seconds*1000);
-    return d >= from && o.status !== "cancelled";
-  });
+  const trans = getReportTransacciones(from, reportSource);
+  const totalVentas = trans.reduce((s,t)=>s+t.total,0);
+  const totalCosto  = trans.reduce((s,t)=>s+t.costo,0);
 
-  const totalVentas = orders.reduce((s,o)=>s+(o.total||0),0);
-  const totalCosto = orders.reduce((s,o)=>{
-    return s + (o.items||[]).reduce((ss,i)=>{
-      const p = DB.products[i.id];
-      return ss + ((p?.costoUnit||0)*i.qty);
-    },0);
-  },0);
+  const sourceLabel = {online:"🛒 Tienda Online", fisica:"🏪 Tienda Física", consumo:"👨‍👩‍👧 Consumo Propio", conjunto:"📊 Conjunto (las 3 fuentes)"}[reportSource];
+  const utilLabel = reportSource==="consumo" ? "Costo total (sin venta, es consumo interno)" : "Utilidad estimada";
 
   let html = `<div class="report-section">
-    <h3>📊 Resumen ${period==="day"?"de hoy":period==="week"?"de la semana":"del mes"}</h3>
-    <div class="report-row"><span>Total pedidos</span><b>${orders.length}</b></div>
-    <div class="report-row"><span>Ventas brutas</span><b>Bs. ${totalVentas.toFixed(2)}</b></div>
-    <div class="report-row"><span>Costo estimado</span><b>Bs. ${totalCosto.toFixed(2)}</b></div>
-    <div class="report-row"><span>Utilidad estimada</span><b style="color:var(--v)">Bs. ${(totalVentas-totalCosto).toFixed(2)}</b></div>
+    <h3>${sourceLabel} — ${period==="day"?"Hoy":period==="week"?"Esta semana":"Este mes"}</h3>
+    <div class="report-row"><span>Total transacciones</span><b>${trans.length}</b></div>
+    <div class="report-row"><span>Ventas / Costo brutas</span><b>Bs. ${totalVentas.toFixed(2)}</b></div>
+    <div class="report-row"><span>Costo de adquisición</span><b>Bs. ${totalCosto.toFixed(2)}</b></div>
+    <div class="report-row"><span>${utilLabel}</span><b style="color:${reportSource==="consumo"?"#e65100":"var(--v)"}">Bs. ${(totalVentas-totalCosto).toFixed(2)}</b></div>
   </div>`;
 
   if(group==="products") {
     const prodMap = {};
-    orders.forEach(o=>(o.items||[]).forEach(i=>{
-      if(!prodMap[i.id]) prodMap[i.id] = {nombre:i.nombre,qty:0,total:0,costo:0};
-      prodMap[i.id].qty += i.qty;
-      prodMap[i.id].total += i.subtotal||0;
-      const p = DB.products[i.id];
-      prodMap[i.id].costo += (p?.costoUnit||0)*i.qty;
+    trans.forEach(t=>t.items.forEach(i=>{
+      if(!prodMap[i.nombre]) prodMap[i.nombre] = {nombre:i.nombre,qty:0,total:0,costo:0};
+      prodMap[i.nombre].qty += i.qty;
+      prodMap[i.nombre].total += i.total;
+      prodMap[i.nombre].costo += i.costo;
     }));
     const sorted = Object.values(prodMap).sort((a,b)=>b.total-a.total);
     html += `<div class="report-section"><h3>🛍️ Por productos</h3>
-      <table class="tbl"><thead><tr><th>Producto</th><th>Cant.</th><th>Venta</th><th>Costo</th><th>Utilidad</th></tr></thead><tbody>` +
-      sorted.map(p=>`<tr><td>${p.nombre}</td><td>${p.qty}</td><td>Bs.${p.total.toFixed(2)}</td><td>Bs.${p.costo.toFixed(2)}</td><td style="color:var(--v);font-weight:700">Bs.${(p.total-p.costo).toFixed(2)}</td></tr>`).join("") +
+      <table class="tbl"><thead><tr><th>Producto</th><th>Cant.</th><th>Total</th><th>Costo</th><th>${reportSource==="consumo"?"—":"Utilidad"}</th></tr></thead><tbody>` +
+      sorted.map(p=>`<tr><td>${p.nombre}</td><td>${p.qty}</td><td>Bs.${p.total.toFixed(2)}</td><td>Bs.${p.costo.toFixed(2)}</td><td style="color:var(--v);font-weight:700">${reportSource==="consumo"?"—":"Bs."+(p.total-p.costo).toFixed(2)}</td></tr>`).join("") +
       `</tbody></table></div>`;
   } else {
+    // Por clientes solo tiene sentido para online (es el único con datos de cliente)
     const cliMap = {};
-    orders.forEach(o=>{
-      const k = o.clientPhone||o.clientId||"?";
-      if(!cliMap[k]) cliMap[k]={nombre:o.clientName,pedidos:0,total:0};
-      cliMap[k].pedidos++;
-      cliMap[k].total+=o.total||0;
+    trans.forEach(t=>{
+      if(!t.clienteKey) return;
+      if(!cliMap[t.clienteKey]) cliMap[t.clienteKey]={nombre:t.cliente,pedidos:0,total:0};
+      cliMap[t.clienteKey].pedidos++;
+      cliMap[t.clienteKey].total+=t.total;
     });
     const sorted = Object.values(cliMap).sort((a,b)=>b.total-a.total);
     html += `<div class="report-section"><h3>👥 Por clientes</h3>
@@ -2245,15 +2300,6 @@ function loadConfig() {
   set("cfgDeliveryClose", c.deliveryClose||"16:00");
   set("cfgDeliverySlotMins", c.deliverySlotMins||30);
   set("cfgPin", "");
-  // Toggle pedido programado
-  const schedCb = document.getElementById("cfgScheduledEnabled");
-  if(schedCb) {
-    schedCb.checked = c.scheduledEnabled === true;
-    const wrap = document.getElementById("cfgScheduledEnabled-wrap");
-    const knob = document.getElementById("cfgScheduledEnabled-knob");
-    if(wrap) wrap.style.background = schedCb.checked ? 'var(--v)' : '#ccc';
-    if(knob) knob.style.left = schedCb.checked ? '23px' : '3px';
-  }
   // Voice toggle
   const voiceCb = document.getElementById("cfgVoiceEnabled");
   if(voiceCb) {
@@ -2327,7 +2373,6 @@ async function saveConfig() {
     storeLat: window._storeLat || DB.config.storeLat || -17.3895,
     storeLng: window._storeLng || DB.config.storeLng || -66.1568,
     voiceEnabled: document.getElementById("cfgVoiceEnabled")?.checked !== false,
-    scheduledEnabled: document.getElementById("cfgScheduledEnabled")?.checked === true,
     pwdSet: true
   };
   if(pin && pin.length>=4) data.pin = pin;
@@ -2796,7 +2841,7 @@ function exportReportCSV() {
 
 // ── ADMIN MAPS (MAPBOX) ────────────────────────────────
 // Mapbox token set in initMap functions
-const MAPBOX_TOKEN = 'pk.eyJ1IjoiaGVucnktY3J1eiIsImEiOiJjbXA2YWFkcnAxZHJ0MnRxODQ4c2x3aTFyIn0.guMvzWsMYbMQfsydJaACpA';
+const MAPBOX_TOKEN = 'pk.eyJ1IjoiaGVucnktY3J1eiIsImEiOiJjbXBub3NyMnIwNDR1MnBvcTJxZG4xMjN4In0.QK_5VeiKi76DIOn0Ib6jxQ';
 let storeMap = null, storeMarker = null, ordersMap = null;
 
 function initStoreMap() {
@@ -3815,110 +3860,194 @@ async function trackApiUsage(type, count=1) {
 }
 
 // ════════════════════════════════════════════════════════
+// IMAGEN DE PRODUCTO — botón X eliminar foto
+// ════════════════════════════════════════════════════════
+function setPedImg(src) {
+  pedImgTemp = src || "";
+  const prev = document.getElementById("pedImgPrev");
+  const btn  = document.getElementById("pedImgClearBtn");
+  if(src) {
+    prev.innerHTML = `<img src="${src}" style="width:100%;height:100%;object-fit:cover">`;
+    if(btn) btn.style.display = "flex";
+  } else {
+    prev.innerHTML = "📷";
+    if(btn) btn.style.display = "none";
+  }
+}
+function clearPedImg() { setPedImg(""); }
+
+// ════════════════════════════════════════════════════════
 // RESET DE STOCK
 // ════════════════════════════════════════════════════════
 function confirmarResetStock() {
-  document.getElementById('resetStockPaso1').style.display='block';
-  document.getElementById('resetStockPaso2').style.display='none';
-  document.getElementById('resetStockProgreso').style.display='none';
-  document.getElementById('resetStockConfirmInput').value='';
-  document.getElementById('btnConfirmarReset').disabled=true;
-  open2('resetStockModal');
-}
-function resetStockPaso2() {
-  document.getElementById('resetStockPaso1').style.display='none';
-  document.getElementById('resetStockPaso2').style.display='block';
-  setTimeout(()=>document.getElementById('resetStockConfirmInput').focus(),200);
+  const ok = confirm("¿Resetear el stock de TODOS los productos a 0?\n\nNo se borra ningún producto, solo el stock.\n\nEscribí OK para confirmar.");
+  if(!ok) return;
+  ejecutarResetStock();
 }
 async function ejecutarResetStock() {
-  document.getElementById('resetStockPaso2').style.display='none';
-  document.getElementById('resetStockProgreso').style.display='block';
-  const prods=Object.values(DB.products); const total=prods.length;
-  let procesados=0,errores=0;
-  const msgEl=document.getElementById('resetStockMsg');
+  const prods = Object.values(DB.products);
+  let procesados = 0, errores = 0;
   for(let i=0;i<prods.length;i+=20){
-    const lote=prods.slice(i,i+20);
-    const batch=fs.writeBatch(db);
+    const lote = prods.slice(i,i+20);
+    const batch = fs.writeBatch(db);
     lote.forEach(p=>batch.update(fs.doc(db,'products',p.id),{stock:0,updatedAt:fs.serverTimestamp()}));
-    try{await batch.commit();procesados+=lote.length;}catch(e){errores+=lote.length;}
-    if(msgEl) msgEl.textContent=`${procesados} de ${total} productos procesados...`;
+    try{ await batch.commit(); procesados += lote.length; } catch(e){ errores += lote.length; }
   }
-  document.getElementById('resetStockProgreso').innerHTML=`
-    <div style="font-size:1.5rem;margin-bottom:8px">${errores===0?'✅':'⚠️'}</div>
-    <div style="font-weight:800;margin-bottom:6px">${errores===0?'Stock reseteado':'Completado con errores'}</div>
-    <div style="font-size:.82rem;color:var(--gr);margin-bottom:16px">${procesados} productos · ${errores} errores</div>
-    <button class="btn btn-v" onclick="close2('resetStockModal')" style="width:100%">Cerrar</button>`;
-  showToast('✅ Stock de '+procesados+' productos reseteado a 0');
+  showToast(errores===0 ? `✅ Stock de ${procesados} productos reseteado a 0` : `⚠️ ${procesados} OK · ${errores} errores`, errores>0);
 }
 
+window.confirmarResetStock = confirmarResetStock;
+window.setPedImg = setPedImg;
+window.clearPedImg = clearPedImg;
+
 // ════════════════════════════════════════════════════════
-// RESET DE PEDIDOS Y MOVIMIENTOS
+// PRODUCTOS COQUETTE — editable desde Admin (espejo de tienda.html)
 // ════════════════════════════════════════════════════════
-function abrirResetPedidos() {
-  document.getElementById('rp-paso1').style.display='block';
-  document.getElementById('rp-paso2').style.display='none';
-  document.getElementById('rp-progreso').style.display='none';
-  document.getElementById('rp-resultado').style.display='none';
-  document.getElementById('rpConfirmInput').value='';
-  document.getElementById('btnConfirmarRp').disabled=true;
-  open2('resetPedidosModal');
-}
-function rpPaso2() {
-  document.getElementById('rp-paso1').style.display='none';
-  document.getElementById('rp-paso2').style.display='block';
-  setTimeout(()=>document.getElementById('rpConfirmInput').focus(),200);
-}
-async function rpBorrarColeccion(nombre) {
-  let total=0;
-  while(true){
-    const snap=await fs.getDocs(fs.query(fs.collection(db,nombre),fs.limit(100)));
-    if(snap.empty) break;
-    const batch=fs.writeBatch(db);
-    snap.docs.forEach(d=>batch.delete(fs.doc(db,nombre,d.id)));
-    await batch.commit(); total+=snap.docs.length;
-  }
-  return total;
-}
-async function ejecutarResetPedidos() {
-  document.getElementById('rp-paso2').style.display='none';
-  document.getElementById('rp-progreso').style.display='block';
-  const colecciones=['orders','sales_physical','gastos_physical','compras_physical','fiados','pagos_fiado','calificaciones','suggestions','stats','consumo_api','clients','ubicaciones_verificadas','tempProducts'];
-  const fechaBackup=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
-  const resumen={};
-  let paso=0;
-  document.getElementById('rp-progreso-titulo').textContent='Guardando respaldo...';
-  for(const col of colecciones){
-    document.getElementById('rp-progreso-msg').textContent='Respaldando '+col+'...';
-    document.getElementById('rp-progreso-bar').style.width=(5+(paso/colecciones.length)*35)+'%';
-    try{const snap=await fs.getDocs(fs.query(fs.collection(db,col),fs.limit(400)));resumen[col]=snap.docs.length+' registros';}catch(e){resumen[col]='error';}
-    paso++;
-  }
-  try{await fs.setDoc(fs.doc(db,'backups',fechaBackup),{fecha:fechaBackup,createdAt:fs.serverTimestamp(),resumen});}catch(e){}
-  const resultados={};
-  paso=0;
-  document.getElementById('rp-progreso-titulo').textContent='Borrando datos...';
-  for(const col of colecciones){
-    document.getElementById('rp-progreso-msg').textContent='Limpiando '+col+'...';
-    document.getElementById('rp-progreso-bar').style.width=(42+(paso/colecciones.length)*55)+'%';
-    resultados[col]=await rpBorrarColeccion(col); paso++;
-  }
-  document.getElementById('rp-progreso-bar').style.width='100%';
-  const totalBorrados=Object.values(resultados).reduce((s,n)=>s+n,0);
-  document.getElementById('rp-progreso').style.display='none';
-  document.getElementById('rp-resultado').style.display='block';
-  document.getElementById('rp-resultado').innerHTML=`
-    <div style="text-align:center;margin-bottom:16px"><div style="font-size:2rem">✅</div><h3 style="color:var(--v)">¡Sistema reseteado!</h3><p style="font-size:.82rem;color:var(--gr)">Respaldo: <b>${fechaBackup}</b></p></div>
-    <div style="background:#f0fff4;border:1.5px solid var(--vbg);border-radius:10px;padding:12px;font-size:.82rem;margin-bottom:16px">
-      ${Object.entries(resultados).map(([col,n])=>`<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--vbg)"><span style="color:var(--gr)">${col}</span><span style="color:${n>0?'var(--ro)':'#aaa'};font-weight:700">${n} eliminados</span></div>`).join('')}
-      <div style="display:flex;justify-content:space-between;padding:6px 0;font-weight:900"><span>Total</span><span style="color:var(--ro)">${totalBorrados} registros</span></div>
-    </div>
-    <button class="btn btn-v" style="width:100%;padding:12px;font-size:.95rem" onclick="close2('resetPedidosModal');location.reload()">🚀 Empezar desde 0</button>`;
-  showToast('✅ '+totalBorrados+' registros eliminados.');
+let admCqImgTemp = '';
+let admCqEditId = null;
+
+function openAdmCqProd(id) {
+  admCqEditId = id || null;
+  const p = id ? DB.coquetteProducts[id] : null;
+  document.getElementById('admCqTitle').textContent = id ? '✏️ Editar producto COQUETTE' : '➕ Nuevo producto COQUETTE';
+  document.getElementById('admCqNombre').value = p?.nombre||'';
+  document.getElementById('admCqTipo').value = p?.tipo||'';
+  document.getElementById('admCqUnidad').value = p?.unidad||'';
+  document.getElementById('admCqCantAdq').value = p?.cantAdq||'';
+  document.getElementById('admCqCostoLote').value = p?.costoLote||'';
+  document.getElementById('admCqPrecioUnit').value = p?.precioUnit||'';
+  document.getElementById('admCqPrecioVenta').value = p?.precioVenta||'';
+  document.getElementById('admCqLbPorUnidad').value = p?.lbPorUnidad||'';
+  document.getElementById('admCqUnidsPorDocena').value = p?.unidsPorDocena||12;
+  document.getElementById('admCqComboCant').value = p?.comboCant||3;
+  document.getElementById('admCqComboPrecio').value = p?.comboPrecio||'';
+  document.getElementById('admCqComboPrecioUnit').value = p?.comboPrecioUnit||'';
+
+  admCqImgTemp = p?.img || '';
+  const prev = document.getElementById('admCqImgPrev');
+  const rmBtn = document.getElementById('admCqImgRemoveBtn');
+  if(prev) prev.innerHTML = admCqImgTemp ? `<img src="${admCqImgTemp}" style="width:100%;height:100%;object-fit:cover">` : '📷';
+  if(rmBtn) rmBtn.style.display = admCqImgTemp ? 'block' : 'none';
+  document.getElementById('admCqImgFile').value = '';
+
+  updateAdmCqFields();
+  open2('admCqModal');
 }
 
-window.confirmarResetStock=confirmarResetStock;window.resetStockPaso2=resetStockPaso2;window.ejecutarResetStock=ejecutarResetStock;
-window.abrirResetPedidos=abrirResetPedidos;window.rpPaso2=rpPaso2;window.ejecutarResetPedidos=ejecutarResetPedidos;
-window.setPedImg=setPedImg;window.clearPedImg=clearPedImg;
+function updateAdmCqFields() {
+  const t = document.getElementById('admCqTipo').value;
+  document.getElementById('admCqLibrasFields').style.display = t==='libras' ? 'block' : 'none';
+  document.getElementById('admCqUnidadesFields').style.display = t==='unidades' ? 'block' : 'none';
+  document.getElementById('admCqComboFields').style.display = t==='combo' ? 'block' : 'none';
+  if(!document.getElementById('admCqUnidad').value) {
+    const hints = {libras:'cuartilla', kilos:'kilo', unidades:'docena', combo:'unidad'};
+    if(hints[t]) document.getElementById('admCqUnidad').placeholder = hints[t];
+  }
+}
+
+function calcAdmCqPrecioUnit() {
+  const cant = parseFloat(document.getElementById('admCqCantAdq').value)||0;
+  const lote = parseFloat(document.getElementById('admCqCostoLote').value)||0;
+  if(cant>0 && lote>0) document.getElementById('admCqPrecioUnit').value = (lote/cant).toFixed(2);
+}
+
+function onAdmCqImgSelected(event) {
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    admCqImgTemp = e.target.result;
+    const prev = document.getElementById('admCqImgPrev');
+    if(prev) prev.innerHTML = `<img src="${admCqImgTemp}" style="width:100%;height:100%;object-fit:cover">`;
+    const rmBtn = document.getElementById('admCqImgRemoveBtn');
+    if(rmBtn) rmBtn.style.display = 'block';
+    uploadAdmCqImgToCloudinary(file);
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeAdmCqImg() {
+  admCqImgTemp = '';
+  const prev = document.getElementById('admCqImgPrev');
+  if(prev) prev.innerHTML = '📷';
+  const rmBtn = document.getElementById('admCqImgRemoveBtn');
+  if(rmBtn) rmBtn.style.display = 'none';
+  document.getElementById('admCqImgFile').value = '';
+}
+
+async function uploadAdmCqImgToCloudinary(file) {
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('upload_preset', 'bodega_unsigned');
+    fd.append('folder', 'coquette');
+    const res = await fetch('https://api.cloudinary.com/v1_1/db9s1kpcf/image/upload', {method:'POST', body:fd});
+    const data = await res.json();
+    if(data.secure_url) { admCqImgTemp = data.secure_url; showToast('✅ Foto subida'); }
+  } catch(e) {}
+}
+
+async function saveAdmCqProd() {
+  const nombre = document.getElementById('admCqNombre').value.trim();
+  const tipo = document.getElementById('admCqTipo').value;
+  const precioVenta = parseFloat(document.getElementById('admCqPrecioVenta').value)||0;
+  if(!nombre) { showToast('Nombre obligatorio', true); return; }
+  if(!tipo) { showToast('Elegí un tipo de unidad', true); return; }
+  if(!precioVenta) { showToast('Precio de venta obligatorio', true); return; }
+  const data = {
+    nombre, tipo,
+    unidad: document.getElementById('admCqUnidad').value.trim()||tipo,
+    cantAdq: parseFloat(document.getElementById('admCqCantAdq').value)||0,
+    costoLote: parseFloat(document.getElementById('admCqCostoLote').value)||0,
+    precioUnit: parseFloat(document.getElementById('admCqPrecioUnit').value)||0,
+    precioVenta,
+    lbPorUnidad: parseFloat(document.getElementById('admCqLbPorUnidad').value)||6,
+    unidsPorDocena: parseInt(document.getElementById('admCqUnidsPorDocena').value)||12,
+    comboCant: parseInt(document.getElementById('admCqComboCant').value)||3,
+    comboPrecio: parseFloat(document.getElementById('admCqComboPrecio').value)||0,
+    comboPrecioUnit: parseFloat(document.getElementById('admCqComboPrecioUnit').value)||0,
+    img: admCqImgTemp||'',
+    updatedAt: fs.serverTimestamp()
+  };
+  try {
+    if(admCqEditId) {
+      await fs.updateDoc(fs.doc(db,'coquette_products',admCqEditId), data);
+    } else {
+      data.createdAt = fs.serverTimestamp();
+      await fs.addDoc(fs.collection(db,'coquette_products'), data);
+    }
+    close2('admCqModal');
+    showToast('✅ Producto COQUETTE guardado');
+  } catch(e) { showToast('Error: '+e.message, true); }
+}
+
+async function toggleHideAdmCq(id) {
+  const p = DB.coquetteProducts[id];
+  if(!p) return;
+  try {
+    await fs.updateDoc(fs.doc(db,'coquette_products',id), { oculto: !p.oculto });
+    showToast(!p.oculto ? '🙈 Producto ocultado' : '👁️ Producto visible');
+  } catch(e) { showToast('Error: '+e.message, true); }
+}
+
+async function deleteAdmCqProd(id) {
+  if(!confirm('¿Eliminar este producto COQUETTE? Esta acción no se puede deshacer.')) return;
+  try {
+    await fs.deleteDoc(fs.doc(db,'coquette_products',id));
+    showToast('🗑️ Producto eliminado');
+  } catch(e) { showToast('Error: '+e.message, true); }
+}
+
+window.openAdmCqProd = openAdmCqProd;
+window.updateAdmCqFields = updateAdmCqFields;
+window.calcAdmCqPrecioUnit = calcAdmCqPrecioUnit;
+window.onAdmCqImgSelected = onAdmCqImgSelected;
+window.removeAdmCqImg = removeAdmCqImg;
+window.saveAdmCqProd = saveAdmCqProd;
+window.toggleHideAdmCq = toggleHideAdmCq;
+window.deleteAdmCqProd = deleteAdmCqProd;
+window.setReportSource = setReportSource;
+window.renderCoquetteAdminList = renderCoquetteAdminList;
 </script>
 
 <!-- MODAL: ASIGNAR REPARTIDOR -->
