@@ -411,8 +411,8 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
     </div>
     <div class="fld" style="background:var(--vbg);border-radius:10px;padding:10px">
       <label>Precio unitario (calculado)</label>
-      <input type="number" id="cqPrecioUnit" step="0.01" min="0" onwheel="this.blur()" placeholder="0.00" style="background:#fff">
-      <div style="font-size:.68rem;color:var(--gr);margin-top:3px">Se calcula solo o podés editarlo</div>
+      <input type="number" id="cqPrecioUnit" step="0.01" min="0" readonly tabindex="-1" placeholder="0.00" style="background:#eee;color:#555;cursor:not-allowed">
+      <div style="font-size:.68rem;color:var(--gr);margin-top:3px">= Precio por lote ÷ Cantidad adquirida (automático)</div>
     </div>
     <div class="fld"><label>Precio de venta (Bs.) *</label><input type="number" id="cqPrecioVenta" step="0.5" min="0" onwheel="this.blur()" placeholder="0.00"></div>
 
@@ -497,8 +497,7 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 
     <!-- Selector de modo de vista del detalle -->
     <div style="display:flex;gap:4px;margin:14px 0 10px;overflow-x:auto;padding-bottom:2px">
-      <button class="day-view-tab active" onclick="setDayView('cronologico',this)" style="flex:1;min-width:110px;padding:8px 6px;font-size:.78rem;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:var(--v);color:#fff">🕐 Cronológico</button>
-      <button class="day-view-tab" onclick="setDayView('porventa',this)" style="flex:1;min-width:110px;padding:8px 6px;font-size:.78rem;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#eee;color:#555">🧾 Por venta</button>
+      <button class="day-view-tab active" onclick="setDayView('porventa',this)" style="flex:1;min-width:110px;padding:8px 6px;font-size:.78rem;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:var(--v);color:#fff">🧾 Por venta</button>
       <button class="day-view-tab" onclick="setDayView('porarticulo',this)" style="flex:1;min-width:110px;padding:8px 6px;font-size:.78rem;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#eee;color:#555">📦 Más vendidos</button>
       <button class="day-view-tab" onclick="setDayView('porpago',this)" style="flex:1;min-width:110px;padding:8px 6px;font-size:.78rem;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#eee;color:#555">💳 Por pago</button>
     </div>
@@ -1845,15 +1844,33 @@ async function confirmSale() {
   }
 
   const saleItems = items.map(([,e])=>{
-    const costoUnit = e.tipo==="catalogo" ? (DB.products[e.prod.id]?.costoUnit||0)
-                     : e.tipo==="temporal" ? (e.prod.costoUnit||0)
-                     : (e.prod.precioUnit||0); // coquette
+    let costoUnit, costoTotal, ganancia;
+    if(e.tipo === "coquette" && e.costoTotal != null) {
+      // Ya viene calculado desde confirmCqAdd (libras/kilos/unidades/combo)
+      costoTotal = e.costoTotal;
+      ganancia = e.ganancia;
+      costoUnit = e.qty>0 ? costoTotal/e.qty : 0;
+    } else if(e.tipo === "catalogo") {
+      costoUnit = DB.products[e.prod.id]?.costoUnit||0;
+      costoTotal = costoUnit*e.qty;
+      ganancia = ((e.prod.precio||0)-costoUnit)*e.qty;
+    } else if(e.tipo === "temporal") {
+      costoUnit = e.prod.costoUnit||0;
+      costoTotal = costoUnit*e.qty;
+      ganancia = ((e.prod.precio||0)-costoUnit)*e.qty;
+    } else if(e.tipo === "libre") {
+      // Producto libre: costo desconocido, ganancia 0 por defecto (editable luego en el reporte)
+      costoUnit = 0; costoTotal = 0; ganancia = 0;
+    } else {
+      costoUnit = 0; costoTotal = 0;
+      ganancia = (e.prod.precio||0)*e.qty;
+    }
     return {
       prodId:e.prod.id, prodNombre:e.prod.nombre,
       qty:e.qty, precio:e.prod.precio||0,
       subtotal:(e.prod.precio||0)*e.qty, tipo:e.tipo,
-      costoUnit, costoTotal: costoUnit*e.qty,
-      ganancia: ((e.prod.precio||0)-costoUnit)*e.qty
+      costoUnit, costoTotal, ganancia,
+      esLibre: e.tipo==="libre"
     };
   });
 
@@ -1970,7 +1987,7 @@ async function saveTempProd() {
 // ════════════════════════════════════
 // MI DÍA — Reportes avanzados
 // ════════════════════════════════════
-let dayViewMode = "cronologico";
+let dayViewMode = "porventa";
 
 function onDayPeriodChange() {
   const period = document.getElementById("dayPeriod")?.value;
@@ -2033,6 +2050,14 @@ function fmtFechaCorta(d) {
 // Las ventas guardadas antes de este cambio no tienen costoUnit/ganancia guardados,
 // así que si faltan, los recalculamos consultando el producto en DB.products / cqProds.
 function resolveItemCost(i) {
+  // Productos libres: el costo es desconocido salvo que el usuario lo haya editado a mano.
+  if(i.esLibre) {
+    const costoUnit = i.costoUnitEditado != null ? i.costoUnitEditado : (i.costoUnit||0);
+    const qty = i.qty || 0;
+    const costoTotal = i.costoTotal != null && i.costoUnitEditado != null ? i.costoTotal : costoUnit * qty;
+    const ganancia = i.ganancia != null && i.costoUnitEditado != null ? i.ganancia : (((i.precio||0)*qty) - costoTotal);
+    return { costoUnit, costoTotal, ganancia };
+  }
   if(i.costoUnit != null && i.costoTotal != null && i.ganancia != null && (i.costoUnit > 0 || i.ganancia !== 0)) {
     return { costoUnit: i.costoUnit, costoTotal: i.costoTotal, ganancia: i.ganancia };
   }
@@ -2072,79 +2097,65 @@ function renderDayStats() {
 }
 
 function renderDayDetail() {
-  if(dayViewMode === "cronologico") renderDayTickets();
-  else if(dayViewMode === "porventa") renderDayPorVenta();
+  if(dayViewMode === "porventa") renderDayPorVenta();
   else if(dayViewMode === "porarticulo") renderDayPorArticulo();
   else if(dayViewMode === "porpago") renderDayPorPago();
-}
-
-function renderDayTickets() {
-  document.getElementById("dayDetailTitle").textContent = "🕐 Ventas en orden cronológico";
-  const period = document.getElementById("dayPeriod")?.value||"today";
-  const sales = filterByPeriod(allSales, period)
-    .sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
-  const el = document.getElementById("dayTickets");
-  if(!sales.length) { el.innerHTML=`<div style="text-align:center;padding:16px;color:var(--gr);font-size:.8rem">Sin ventas</div>`; return; }
-  el.innerHTML = sales.map(s=>{
-    const t = s.createdAt?.seconds ? new Date(s.createdAt.seconds*1000) : new Date();
-    const items = s.items||[{prodNombre:s.prodNombre,qty:s.qty,precio:s.precio}];
-    const itemsHtml = items.map(i=>{
-      const { ganancia: gan } = resolveItemCost(i);
-      return `<div style="display:flex;justify-content:space-between;font-size:.76rem;color:var(--gr);padding:2px 0">
-        <span>${i.qty}× ${i.prodNombre} — Bs.${((i.precio||0)*i.qty).toFixed(2)}</span>
-        <span style="color:var(--v);font-weight:700;white-space:nowrap;margin-left:8px">+Bs.${gan.toFixed(2)}</span>
-      </div>`;
-    }).join("");
-    const totalGanancia = items.reduce((s2,i)=>s2+resolveItemCost(i).ganancia,0);
-    const totalCosto = items.reduce((s2,i)=>s2+resolveItemCost(i).costoTotal,0);
-    return `<div class="ticket">
-      <div class="ticket-header">
-        <span class="ticket-code">${s.payMethod==="qr"?"📱 QR":"💵 Efectivo"}</span>
-        <span class="ticket-time">${fmtFechaCorta(t)}</span>
-      </div>
-      ${itemsHtml}
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;padding-top:6px;border-top:1px solid var(--vbg)">
-        <button onclick="revertirVenta('${s.id}')" title="Cancelar / revertir esta venta"
-          style="background:none;border:1.5px solid var(--ro);color:var(--ro);border-radius:8px;padding:4px 9px;font-size:.68rem;font-weight:800;cursor:pointer;white-space:nowrap">
-          ↩️ Revertir
-        </button>
-        <div style="text-align:right">
-          <div style="font-size:.68rem;color:var(--gr)">Costo: Bs.${totalCosto.toFixed(2)} · Ganancia: <span style="color:var(--v);font-weight:800">Bs.${totalGanancia.toFixed(2)}</span></div>
-          <div style="font-weight:900;font-size:.9rem;color:var(--v)">Total: Bs.${(s.total||0).toFixed(2)}</div>
-        </div>
-      </div>
-    </div>`;
-  }).join("");
 }
 
 function renderDayPorVenta() {
   document.getElementById("dayDetailTitle").textContent = "🧾 Detalle por venta";
   const period = document.getElementById("dayPeriod")?.value||"today";
-  const sales = filterByPeriod(allSales, period).sort((a,b)=>(b.total||0)-(a.total||0));
+  const sales = filterByPeriod(allSales, period)
+    .sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
   const el = document.getElementById("dayTickets");
   if(!sales.length) { el.innerHTML=`<div style="text-align:center;padding:16px;color:var(--gr);font-size:.8rem">Sin ventas</div>`; return; }
   el.innerHTML = sales.map((s,idx)=>{
     const t = s.createdAt?.seconds ? new Date(s.createdAt.seconds*1000) : new Date();
     const items = s.items||[{prodNombre:s.prodNombre,qty:s.qty,precio:s.precio}];
-    const itemsHtml = items.map(i=>{
-      const { ganancia: gan } = resolveItemCost(i);
-      return `<div style="font-size:.78rem;display:flex;justify-content:space-between;padding:3px 0">
-        <span>${i.qty}× ${i.prodNombre}</span>
-        <span style="text-align:right">
-          <span style="color:var(--gr)">Bs.${((i.precio||0)*i.qty).toFixed(2)}</span>
-          <span style="color:var(--v);font-weight:700;margin-left:6px">+Bs.${gan.toFixed(2)}</span>
-        </span>
-      </div>`;
+
+    const rowsHtml = items.map((i,iIdx)=>{
+      const { costoUnit, ganancia } = resolveItemCost(i);
+      const pventa = i.precio||0;
+      const parcial = pventa*(i.qty||0);
+      const esLibre = !!i.esLibre;
+      return `<tr>
+        <td style="padding:4px 6px;font-size:.76rem">${i.qty}× ${i.prodNombre}</td>
+        <td style="padding:4px 6px;font-size:.76rem;text-align:right;${esLibre?'color:var(--ro)':''}">
+          ${esLibre
+            ? `<input type="number" value="${costoUnit?costoUnit.toFixed(2):''}" placeholder="0.00" step="0.01" min="0"
+                 onchange="editarCostoLibre('${s.id}',${iIdx},this.value)"
+                 style="width:62px;text-align:right;padding:2px 4px;border:1.5px solid var(--ro);border-radius:6px;font-size:.74rem;color:var(--ro)">`
+            : `Bs.${costoUnit.toFixed(2)}`}
+        </td>
+        <td style="padding:4px 6px;font-size:.76rem;text-align:right">Bs.${pventa.toFixed(2)}</td>
+        <td style="padding:4px 6px;font-size:.76rem;text-align:right;color:var(--v)">Bs.${parcial.toFixed(2)}</td>
+        <td style="padding:4px 6px;font-size:.76rem;text-align:right;font-weight:700;color:${ganancia>=0?'var(--v)':'var(--ro)'}">Bs.${ganancia.toFixed(2)}</td>
+      </tr>`;
     }).join("");
+
     const totalGanancia = items.reduce((s2,i)=>s2+resolveItemCost(i).ganancia,0);
     const totalCosto = items.reduce((s2,i)=>s2+resolveItemCost(i).costoTotal,0);
-    return `<div class="ticket" style="border-left:3px solid var(--v)">
-      <div class="ticket-header">
+
+    return `<div class="ticket" style="border-left:3px solid var(--v);padding:10px 12px">
+      <div class="ticket-header" style="margin-bottom:6px">
         <span style="font-weight:900;color:var(--v)">Venta #${idx+1} — ${items.length} artículo${items.length!==1?"s":""}</span>
         <span class="ticket-time">${fmtFechaCorta(t)}</span>
       </div>
-      ${itemsHtml}
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;padding-top:6px;border-top:1px solid var(--vbg)">
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;min-width:420px">
+          <thead>
+            <tr style="border-bottom:1.5px solid var(--vbg)">
+              <th style="text-align:left;padding:4px 6px;font-size:.68rem;color:var(--gr)">Producto</th>
+              <th style="text-align:right;padding:4px 6px;font-size:.68rem;color:var(--gr)">PU Adq.</th>
+              <th style="text-align:right;padding:4px 6px;font-size:.68rem;color:var(--gr)">PU Venta</th>
+              <th style="text-align:right;padding:4px 6px;font-size:.68rem;color:var(--gr)">Parcial</th>
+              <th style="text-align:right;padding:4px 6px;font-size:.68rem;color:var(--gr)">Ganancia</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--vbg)">
         <button onclick="revertirVenta('${s.id}')" title="Cancelar / revertir esta venta"
           style="background:none;border:1.5px solid var(--ro);color:var(--ro);border-radius:8px;padding:4px 9px;font-size:.68rem;font-weight:800;cursor:pointer;white-space:nowrap">
           ↩️ Revertir
@@ -2156,6 +2167,25 @@ function renderDayPorVenta() {
       </div>
     </div>`;
   }).join("");
+}
+
+async function editarCostoLibre(saleId, itemIdx, valor) {
+  const costoUnit = parseFloat(valor)||0;
+  const sale = allSales.find(s=>s.id===saleId);
+  if(!sale) return;
+  const items = [...(sale.items||[])];
+  const item = items[itemIdx];
+  if(!item) return;
+  const qty = item.qty||0;
+  const costoTotal = costoUnit*qty;
+  const ganancia = ((item.precio||0)*qty) - costoTotal;
+  items[itemIdx] = {...item, costoUnit, costoTotal, ganancia, costoUnitEditado: costoUnit};
+  try {
+    await fs.updateDoc(fs.doc(db,"sales_physical",saleId), {items});
+    showToast("✅ Costo actualizado, ganancia recalculada");
+  } catch(e) {
+    showToast("Error al guardar: "+e.message, true);
+  }
 }
 
 function renderDayPorArticulo() {
@@ -2855,9 +2885,41 @@ function confirmCqAdd() {
 
   if(!total) { showToast('Ingresá una cantidad',true); return; }
 
+  // ── Calcular costo real de adquisición para esta venta ──
+  // p.precioUnit = costo de adquisición por unidad base (lb, kg, unidad, pan, etc.)
+  let costoTotal = 0;
+  if(p.tipo === 'libras') {
+    const monto = parseFloat(document.getElementById('cqMonto')?.value)||0;
+    const qty = parseFloat(document.getElementById('cqQtyUnidad')?.value)||0;
+    const cantidadVendida = monto > 0 ? ((p.lbPorUnidad||6)*monto/(p.precioVenta||1)) : (qty * (p.lbPorUnidad||6));
+    // costo por libra = precioUnit / lbPorUnidad
+    const costoPorLb = (p.lbPorUnidad||6) > 0 ? (p.precioUnit||0)/(p.lbPorUnidad||6) : 0;
+    costoTotal = cantidadVendida * costoPorLb;
+  } else if(p.tipo === 'kilos') {
+    const qty = parseFloat(document.getElementById('cqQtyUnidad')?.value)||0;
+    costoTotal = qty * (p.precioUnit||0);
+  } else if(p.tipo === 'combo') {
+    const qty = parseFloat(document.getElementById('cqQtyUnidad')?.value)||0;
+    costoTotal = qty * (p.precioUnit||0); // costo de adquisición por unidad × cantidad real vendida
+  } else { // unidades
+    const unids = parseFloat(document.getElementById('cqUnidadesDirectas')?.value)||0;
+    const monto = parseFloat(document.getElementById('cqMonto')?.value)||0;
+    const docenas = parseFloat(document.getElementById('cqQtyUnidad')?.value)||0;
+    const unidsPorDoc = p.unidsPorDocena||12;
+    const cantidadVendida = unids > 0 ? unids : (monto > 0 ? (unidsPorDoc*monto/(p.precioVenta||1)) : (docenas*unidsPorDoc));
+    // costo por unidad = precioUnit / unidsPorDocena
+    const costoPorUnid = unidsPorDoc > 0 ? (p.precioUnit||0)/unidsPorDoc : 0;
+    costoTotal = cantidadVendida * costoPorUnid;
+  }
+  const ganancia = total - costoTotal;
+
   // Add to cart as free item with coquette marker
   const freeId = 'cq_'+p.id+'_'+Date.now();
-  cart[freeId] = { prod: {id:freeId, nombre:`${nombre} (${detalle})`, precio:total}, qty:1, tipo:'coquette', subtotal:total };
+  cart[freeId] = {
+    prod: {id:freeId, nombre:`${nombre} (${detalle})`, precio:total},
+    qty:1, tipo:'coquette', subtotal:total,
+    costoUnit: costoTotal, costoTotal, ganancia
+  };
   renderCart();
   closeModal('cqSelectorModal');
   showToast(`✅ ${nombre} — Bs.${total.toFixed(2)}`);
@@ -2892,6 +2954,7 @@ window.selectPayMethod = selectPayMethod;
 window.calcCheckoutVuelto = calcCheckoutVuelto;
 window.confirmSale = confirmSale;
 window.revertirVenta = revertirVenta;
+window.editarCostoLibre = editarCostoLibre;
 window.saveTempProd = saveTempProd;
 window.openAddFiado = openAddFiado;
 window.saveFiado = saveFiado;
