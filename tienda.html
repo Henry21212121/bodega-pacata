@@ -289,6 +289,7 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
   <button class="tab-btn" onclick="showTab('productos',this)"><span class="tab-icon">🥬</span><span>Productos</span></button>
   <button class="tab-btn" onclick="showTab('mi-dia',this)"><span class="tab-icon">📊</span><span>Mi Día</span></button>
   <button class="tab-btn" onclick="showTab('fiados',this)"><span class="tab-icon">📋</span><span>Fiados</span></button>
+  <button class="tab-btn" onclick="showTab('consumo',this)"><span class="tab-icon">👨‍👩‍👧</span><span>Consumo propio</span></button>
   <button class="tab-btn" onclick="showTab('configuracion',this)"><span class="tab-icon">⚙️</span><span>Config</span></button>
 </div>
 <button class="mic-fab" id="micFab" onclick="toggleVoiceSearch()" title="Búsqueda por voz">
@@ -536,6 +537,43 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
       </table>
     </div>
     <div id="fiadoList"></div>
+  </div>
+</div>
+
+<!-- ══ TAB CONSUMO PROPIO ══ -->
+<div class="tab-content" id="tab-consumo">
+  <div class="inner">
+    <div style="background:#fff3e0;border:1.5px solid #ffcc80;border-radius:12px;padding:10px 12px;margin:10px 0">
+      <div style="font-weight:800;font-size:.85rem;color:#e65100">👨‍👩‍👧 Consumo propio / familiar</div>
+      <div style="font-size:.75rem;color:#a36420;margin-top:3px">
+        Los productos acá se cobran a <b>precio de adquisición (costo)</b>, no al precio de venta al público.
+        El stock se descuenta igual que una venta normal, pero se registra en un reporte separado.
+      </div>
+    </div>
+
+    <div class="search-bar" style="margin-bottom:8px">
+      <span style="color:var(--gr)">🔍</span>
+      <input type="text" id="consumoSearch" placeholder="Buscar producto..." oninput="onConsumoSearch()" autocomplete="off">
+      <button onclick="clearConsumoSearch()" style="background:none;border:none;color:var(--gr);cursor:pointer;padding:0 2px">✕</button>
+    </div>
+    <div id="consumoSearchResults" style="margin-bottom:10px"></div>
+
+    <div class="section-title" style="margin-top:4px">🧺 Selección actual</div>
+    <div id="consumoCartItems">
+      <div style="text-align:center;padding:16px;color:var(--gr);font-size:.8rem">Buscá y agregá productos arriba</div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0;padding:10px 12px;background:var(--vbg);border-radius:10px">
+      <span style="font-weight:700;color:var(--gr)">Costo total a registrar</span>
+      <span style="font-weight:900;color:#e65100;font-size:1.1rem" id="consumoCartTotal">Bs. 0.00</span>
+    </div>
+
+    <button class="btn btn-or" id="consumoConfirmBtn" onclick="confirmConsumoPropio()" disabled style="width:100%;padding:12px;font-size:.92rem;border-radius:10px;margin-bottom:16px">
+      👨‍👩‍👧 Registrar consumo propio
+    </button>
+
+    <div class="section-title">📋 Historial reciente</div>
+    <div id="consumoHistorial"><div style="text-align:center;padding:16px;color:var(--gr);font-size:.8rem">Sin registros aún</div></div>
   </div>
 </div>
 
@@ -1445,6 +1483,11 @@ async function loadAll() {
   fs.onSnapshot(fs.query(fs.collection(db,"gastos_physical"), fs.orderBy("createdAt","desc"), fs.limit(100)), snap => {
     allGastos = snap.docs.map(d=>({...d.data(),id:d.id}));
     renderDayStats(); renderDayGastos();
+  });
+
+  fs.onSnapshot(fs.query(fs.collection(db,"consumo_propio"), fs.orderBy("createdAt","desc"), fs.limit(100)), snap => {
+    allConsumo = snap.docs.map(d=>({...d.data(),id:d.id}));
+    renderConsumoHistorial();
   });
 
   fs.onSnapshot(fs.collection(db,"fiados"), snap => {
@@ -2972,6 +3015,179 @@ window.saveTempProd = saveTempProd;
 window.openAddFiado = openAddFiado;
 window.saveFiado = saveFiado;
 window.cobrarFiado = cobrarFiado;
+
+// ════════════════════════════════════════════════════════
+// CONSUMO PROPIO — venta a precio de costo, reporte aparte
+// ════════════════════════════════════════════════════════
+let consumoCart = {}; // key -> {prod, qty, tipo, costoUnit}
+let allConsumo = [];
+
+function onConsumoSearch() {
+  const q = document.getElementById("consumoSearch").value.toLowerCase().trim();
+  const el = document.getElementById("consumoSearchResults");
+  if(!q) { el.innerHTML = ""; return; }
+
+  const candidatos = [
+    ...Object.values(DB.products||{}).filter(p=>p.estado!=="oculto").map(p=>({...p,_tipo:"catalogo"})),
+    ...(DB.tempProds||[]).map(p=>({...p,_tipo:"temporal"})),
+    ...(cqProds||[]).filter(p=>!p.oculto).map(p=>({...p,_tipo:"coquette"})),
+  ].filter(p => p.nombre?.toLowerCase().includes(q)).slice(0, 12);
+
+  if(!candidatos.length) { el.innerHTML = `<div style="font-size:.78rem;color:var(--gr);padding:8px">Sin resultados</div>`; return; }
+
+  el.innerHTML = candidatos.map(p => {
+    const costo = p._tipo==="coquette" ? (p.precioUnit||0) : (p.costoUnit||0);
+    return `<div onclick="addConsumoItem('${p.id}','${p._tipo}')"
+      style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid var(--vbg);cursor:pointer">
+      ${p.img?`<img src="${p.img}" style="width:38px;height:38px;object-fit:cover;border-radius:7px;flex-shrink:0">`:`<div style="width:38px;height:38px;background:var(--vbg);border-radius:7px;flex-shrink:0"></div>`}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.84rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.nombre}</div>
+        <div style="font-size:.7rem;color:var(--gr)">Costo: Bs.${costo.toFixed(2)}</div>
+      </div>
+      <span style="color:#e65100;font-size:1.2rem;font-weight:900">+</span>
+    </div>`;
+  }).join("");
+}
+
+function clearConsumoSearch() {
+  document.getElementById("consumoSearch").value = "";
+  document.getElementById("consumoSearchResults").innerHTML = "";
+}
+
+function addConsumoItem(id, tipo) {
+  let prod, costoUnit;
+  if(tipo === "catalogo") {
+    prod = DB.products[id];
+    costoUnit = prod?.costoUnit||0;
+  } else if(tipo === "temporal") {
+    prod = (DB.tempProds||[]).find(p=>p.id===id);
+    costoUnit = prod?.costoUnit||0;
+  } else { // coquette — solo soportamos costo simple (unidades/kilos); libras/combo se ajustan manual si hace falta
+    prod = (cqProds||[]).find(p=>p.id===id);
+    costoUnit = prod?.precioUnit||0;
+  }
+  if(!prod) return;
+
+  const key = tipo+"_"+id;
+  if(consumoCart[key]) consumoCart[key].qty++;
+  else consumoCart[key] = { prod, qty:1, tipo, costoUnit };
+
+  renderConsumoCart();
+  clearConsumoSearch();
+  showToast("✅ "+prod.nombre+" agregado");
+}
+
+function changeConsumoQty(key, delta) {
+  if(!consumoCart[key]) return;
+  consumoCart[key].qty += delta;
+  if(consumoCart[key].qty <= 0) delete consumoCart[key];
+  renderConsumoCart();
+}
+
+function removeConsumoItem(key) {
+  delete consumoCart[key];
+  renderConsumoCart();
+}
+
+function renderConsumoCart() {
+  const items = Object.entries(consumoCart);
+  const el = document.getElementById("consumoCartItems");
+  const btn = document.getElementById("consumoConfirmBtn");
+  if(!items.length) {
+    el.innerHTML = `<div style="text-align:center;padding:16px;color:var(--gr);font-size:.8rem">Buscá y agregá productos arriba</div>`;
+    document.getElementById("consumoCartTotal").textContent = "Bs. 0.00";
+    if(btn) btn.disabled = true;
+    return;
+  }
+  if(btn) btn.disabled = false;
+  let total = 0;
+  el.innerHTML = items.map(([key,e])=>{
+    const subtotal = e.costoUnit*e.qty;
+    total += subtotal;
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#fff;border:1px solid var(--vbg);border-radius:10px;margin-bottom:6px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.84rem;font-weight:700">${e.prod.nombre}</div>
+        <div style="font-size:.7rem;color:var(--gr)">Costo unit: Bs.${e.costoUnit.toFixed(2)}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <button onclick="changeConsumoQty('${key}',-1)" style="background:var(--vbg);border:none;border-radius:6px;width:26px;height:26px;font-weight:900;cursor:pointer">−</button>
+        <span style="min-width:20px;text-align:center;font-weight:800">${e.qty}</span>
+        <button onclick="changeConsumoQty('${key}',1)" style="background:var(--vbg);border:none;border-radius:6px;width:26px;height:26px;font-weight:900;cursor:pointer">+</button>
+      </div>
+      <div style="font-weight:900;color:#e65100;min-width:60px;text-align:right">Bs.${subtotal.toFixed(2)}</div>
+      <button onclick="removeConsumoItem('${key}')" style="background:none;border:none;color:var(--ro);font-size:1rem;cursor:pointer">✕</button>
+    </div>`;
+  }).join("");
+  document.getElementById("consumoCartTotal").textContent = "Bs. "+total.toFixed(2);
+}
+
+let _consumoEnProceso = false;
+async function confirmConsumoPropio() {
+  if(_consumoEnProceso) return;
+  const items = Object.entries(consumoCart);
+  if(!items.length) return;
+
+  const btn = document.getElementById("consumoConfirmBtn");
+  _consumoEnProceso = true;
+  if(btn) { btn.disabled = true; btn.textContent = "⏳ Procesando..."; }
+
+  const consumoItems = items.map(([,e])=>({
+    prodId: e.prod.id, prodNombre: e.prod.nombre,
+    qty: e.qty, costoUnit: e.costoUnit, costoTotal: e.costoUnit*e.qty, tipo: e.tipo
+  }));
+  const total = consumoItems.reduce((s,i)=>s+i.costoTotal,0);
+
+  try {
+    await fs.addDoc(fs.collection(db,"consumo_propio"), {
+      items: consumoItems, total, createdAt: fs.serverTimestamp()
+    });
+    // Descontar stock real (sale del inventario igual que una venta)
+    for(const [,e] of items) {
+      if(e.tipo==="catalogo" && DB.products[e.prod.id]?.stock>0) {
+        await fs.updateDoc(fs.doc(db,"products",e.prod.id), {stock:fs.increment(-Math.ceil(e.qty))});
+      }
+      if(e.tipo==="temporal" && e.prod.stock!=null) {
+        const ns = Math.max(0,(e.prod.stock||0)-e.qty);
+        await fs.updateDoc(fs.doc(db,"tempProducts",e.prod.id), {stock:ns});
+      }
+    }
+    consumoCart = {};
+    renderConsumoCart();
+    showToast("✅ Consumo propio registrado — Bs."+total.toFixed(2));
+  } catch(e) {
+    showToast("❌ Error: "+e.message, true);
+  } finally {
+    _consumoEnProceso = false;
+    if(btn) { btn.disabled = false; btn.textContent = "👨‍👩‍👧 Registrar consumo propio"; }
+  }
+}
+
+function renderConsumoHistorial() {
+  const el = document.getElementById("consumoHistorial");
+  if(!el) return;
+  if(!allConsumo.length) { el.innerHTML = `<div style="text-align:center;padding:16px;color:var(--gr);font-size:.8rem">Sin registros aún</div>`; return; }
+  el.innerHTML = allConsumo.slice(0,30).map(c=>{
+    const t = c.createdAt?.seconds ? new Date(c.createdAt.seconds*1000) : new Date();
+    const itemsHtml = (c.items||[]).map(i=>`<div style="font-size:.74rem;color:var(--gr)">${i.qty}× ${i.prodNombre} — Bs.${i.costoTotal.toFixed(2)}</div>`).join("");
+    return `<div class="ticket" style="border-left:3px solid #e65100">
+      <div class="ticket-header">
+        <span style="font-weight:900;color:#e65100">👨‍👩‍👧 Consumo</span>
+        <span class="ticket-time">${fmtFechaCorta(t)}</span>
+      </div>
+      ${itemsHtml}
+      <div style="display:flex;justify-content:space-between;margin-top:5px;font-weight:900;font-size:.88rem;color:#e65100">
+        <span>Total costo</span><span>Bs.${(c.total||0).toFixed(2)}</span>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+window.onConsumoSearch = onConsumoSearch;
+window.clearConsumoSearch = clearConsumoSearch;
+window.addConsumoItem = addConsumoItem;
+window.changeConsumoQty = changeConsumoQty;
+window.removeConsumoItem = removeConsumoItem;
+window.confirmConsumoPropio = confirmConsumoPropio;
 window.openAddGasto = openAddGasto;
 window.saveGasto = saveGasto;
 window.downloadDayReportDialog = downloadDayReportDialog;
