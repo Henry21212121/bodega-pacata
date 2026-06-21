@@ -354,6 +354,7 @@ input[type=file]{display:none;}
             <option value="sin_foto">📷 Sin foto primero</option>
             <option value="con_vencimiento">📅 Con vencimiento</option>
             <option value="sin_desc">📝 Sin descripción</option>
+            <option value="sin_costo">💸 Sin precio unitario (PU)</option>
             <option value="margen_asc">💰 Menor margen primero</option>
             <option value="precio_desc">💲 Mayor precio primero</option>
           </select>
@@ -736,7 +737,7 @@ input[type=file]{display:none;}
     <input type="file" id="pedImgFile" accept="image/*" onchange="handlePedImg(event)">
 
     <div class="form-row">
-      <div class="fld"><label>Precio de venta (Bs.)</label><input type="number" id="pedPrecio" step="0.1" min="0"></div>
+      <div class="fld"><label>Precio de venta (Bs.)</label><input type="number" id="pedPrecio" step="0.1" min="0" oninput="calcCostoUnit();syncTier1WithPrecio()"></div>
       <div class="fld"><label>Estado</label>
         <select id="pedEstado">
           <option value="ok">✅ Disponible</option>
@@ -1608,6 +1609,7 @@ function renderAdmProds() {
   else if(sortBy==="sin_stock")    prods = [...prods.filter(p=>p.stock===0),...prods.filter(p=>p.stock!==0)];
   else if(sortBy==="bajo_stock")   prods = [...prods.filter(p=>p.stock>0&&p.stockMin>0&&p.stock<=p.stockMin),...prods.filter(p=>!(p.stock>0&&p.stockMin>0&&p.stock<=p.stockMin))];
   else if(sortBy==="sin_desc")     prods = [...prods.filter(p=>!p.desc),...prods.filter(p=>!!p.desc)];
+  else if(sortBy==="sin_costo")    prods = prods.filter(p=>!p.costoUnit||p.costoUnit<=0);
   else if(sortBy==="updated")      prods = prods.sort((a,b)=>(b.updatedAt?.seconds||0)-(a.updatedAt?.seconds||0));
   else if(sortBy==="stock_asc")    prods = prods.sort((a,b)=>(a.stock||0)-(b.stock||0));
   else if(sortBy==="margen_asc")   prods = prods.sort((a,b)=>{ const ma=a.costoUnit>0?(a.precio-a.costoUnit)/a.precio:1; const mb=b.costoUnit>0?(b.precio-b.costoUnit)/b.precio:1; return ma-mb; });
@@ -1618,7 +1620,7 @@ function renderAdmProds() {
   const list = document.getElementById("prodList");
   if(!prods.length) { list.innerHTML='<p style="color:var(--gr);font-size:.82rem;padding:10px">Sin productos para este filtro</p>'; return; }
 
-  const sortLabels = {sin_foto:"📷 Sin foto",con_vencimiento:"📅 Con vencimiento",sin_stock:"🔴 Agotados primero",bajo_stock:"⚠️ Bajo mínimo primero",sin_desc:"📝 Sin descripción",updated:"🕐 Recién modificados",stock_asc:"📦 Menor stock",margen_asc:"💰 Menor margen",precio_desc:"💲 Mayor precio"};
+  const sortLabels = {sin_foto:"📷 Sin foto",con_vencimiento:"📅 Con vencimiento",sin_stock:"🔴 Agotados primero",bajo_stock:"⚠️ Bajo mínimo primero",sin_desc:"📝 Sin descripción",sin_costo:"💸 Sin precio unitario (PU)",updated:"🕐 Recién modificados",stock_asc:"📦 Menor stock",margen_asc:"💰 Menor margen",precio_desc:"💲 Mayor precio"};
   const badge = sortLabels[sortBy]
     ? `<div style="font-size:.75rem;color:var(--or);font-weight:700;margin-bottom:6px;padding:3px 10px;background:#fff8ec;border-radius:20px;display:inline-block">Ordenado: ${sortLabels[sortBy]} · ${prods.length} prods</div><br>`
     : `<div style="font-size:.75rem;color:var(--gr);margin-bottom:6px">${prods.length} productos</div>`;
@@ -1629,6 +1631,7 @@ function renderAdmProds() {
     const margen     = p.costoUnit>0?(((p.precio-p.costoUnit)/p.precio)*100).toFixed(0)+"%":"—";
     const imgEl      = p.img?`<img src="${p.img}">`:(DB.categories[p.cat]?.emoji||"📦");
     const sinFoto    = !p.img?'· <span class="chip" style="background:#fce4ec;color:#c62828;font-size:.65rem">📷 Sin foto</span>':"";
+    const sinCosto   = (!p.costoUnit||p.costoUnit<=0)?'· <span class="chip" style="background:#fff3cd;color:#856404;font-size:.65rem">💸 Sin PU</span>':"";
     const venc       = p.expiry?`· <span class="chip" style="background:#e3f2fd;color:#1565c0;font-size:.65rem">📅 ${p.expiry}</span>`:"";
     const upd        = p.updatedAt?.seconds?`· <span style="font-size:.65rem;color:#bbb">${new Date(p.updatedAt.seconds*1000).toLocaleDateString("es",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}</span>`:"";
     return `<div class="prod-item">
@@ -1639,7 +1642,7 @@ function renderAdmProds() {
       <div class="prod-thumb" onclick="quickImg('${p.id}')">${imgEl}</div>
       <div class="prod-inf">
         <div class="prod-nm">${p.nombre}</div>
-        <div class="prod-meta">${p.cat} · <b>Venta:Bs.${p.precio.toFixed(2)}</b> · Costo:Bs.${(p.costoUnit||0).toFixed(2)} · Margen:${margen} · <span class="chip ${stockClass}">${stockLbl}</span>${p.estado==="oculto"?'· <span class="chip" style="background:#f5f5f5;color:#999">Oculto</span>':""}${!p.desc?'· <span class="chip" style="background:#fff3e0;color:#f07d10;font-size:.65rem">Sin desc.</span>':""}${sinFoto}${venc}${upd}</div>
+        <div class="prod-meta">${p.cat} · <b>Venta:Bs.${p.precio.toFixed(2)}</b> · Costo:Bs.${(p.costoUnit||0).toFixed(2)} · Margen:${margen} · <span class="chip ${stockClass}">${stockLbl}</span>${p.estado==="oculto"?'· <span class="chip" style="background:#f5f5f5;color:#999">Oculto</span>':""}${!p.desc?'· <span class="chip" style="background:#fff3e0;color:#f07d10;font-size:.65rem">Sin desc.</span>':""}${sinFoto}${sinCosto}${venc}${upd}</div>
       </div>
       <div class="prod-acts">
         <button class="btn btn-v btn-sm" onclick="openProdEditor('${p.id}')">✏️</button>
@@ -1889,16 +1892,31 @@ function calcCostoUnit() {
   document.getElementById("pedCostoUnit").value = unit.toFixed(4);
   const margen = precio > 0 && unit > 0 ? (((precio-unit)/precio)*100).toFixed(1) : 0;
   document.getElementById("pedMargen").textContent = unit > 0 ? `Margen: ${margen}% | Ganancia por unidad: Bs. ${(precio-unit).toFixed(2)}` : "";
+  if(typeof validateAllTiers === "function") validateAllTiers();
+}
+
+function syncTier1WithPrecio() {
+  const t = getCurrentTiers();
+  if(!t.length) return;
+  const pv = parseFloat(document.getElementById("pedPrecio")?.value) || 0;
+  t[0] = [1, pv];
+  renderTiers(t);
 }
 
 function renderTiers(tiers) {
+  // El primer tramo (cantidad 1) siempre refleja el precio de venta — no es un tramo editable independiente
+  const pvActual = parseFloat(document.getElementById("pedPrecio")?.value) || tiers[0]?.[1] || 0;
+  if(tiers[0]) tiers[0] = [1, pvActual];
+
   document.getElementById("pedTiers").innerHTML = tiers.map((t,i) => `
     <div class="tier-row" id="tier-${i}">
-      <div><label>Cantidad</label><input type="number" value="${t[0]}" min="1" step="1" data-i="${i}" data-f="0" oninput="updateTierPU(${i})" onwheel="this.blur()"></div>
-      <div><label>Precio total (Bs.)</label><input type="number" value="${t[1]}" min="0" step="0.1" data-i="${i}" data-f="1" oninput="updateTierPU(${i})" onwheel="this.blur()"></div>
+      <div><label>Cantidad</label><input type="number" value="${t[0]}" min="${i===0?1:2}" step="1" data-i="${i}" data-f="0" ${i===0?'readonly style="background:#f5f5f5"':''} oninput="updateTierPU(${i})" onwheel="this.blur()"></div>
+      <div><label>Precio total (Bs.)</label><input type="number" value="${t[1]}" min="0" step="0.1" data-i="${i}" data-f="1" ${i===0?'readonly style="background:#f5f5f5"':''} oninput="updateTierPU(${i})" onwheel="this.blur()"></div>
       <div><label>P.U.</label><input type="number" id="tier-pu-${i}" value="${t[0]>0?(t[1]/t[0]).toFixed(2):0}" readonly style="background:#f0fff4;color:var(--v);font-weight:800"></div>
       ${i>0 ? `<button class="tier-del" onclick="removeTier(${i})">✕</button>` : "<div></div>"}
-    </div>`).join("");
+    </div>
+    <div id="tier-warn-${i}" style="font-size:.68rem;color:var(--ro);font-weight:700;margin:-4px 0 6px;display:none"></div>`).join("");
+  validateAllTiers();
 }
 
 function updateTierPU(i) {
@@ -1910,6 +1928,44 @@ function updateTierPU(i) {
   const pu = qty > 0 ? (total/qty).toFixed(2) : "0.00";
   const puEl = document.getElementById("tier-pu-"+i);
   if(puEl) puEl.value = pu;
+  validateAllTiers();
+}
+
+// ── Valida: 1) tramo 1 = precio de venta, 2) PU decreciente, 3) PU >= costo unitario ──
+function validateAllTiers() {
+  const tiers = getCurrentTiers();
+  const costoUnit = parseFloat(document.getElementById("pedCostoUnit")?.value) || 0;
+  let prevPU = Infinity;
+  let hayError = false;
+
+  tiers.forEach((t, i) => {
+    const qty = t[0] || 1;
+    const pu = qty > 0 ? t[1]/qty : 0;
+    const warnEl = document.getElementById("tier-warn-"+i);
+    if(!warnEl) return;
+    let msg = "";
+
+    if(pu > prevPU + 0.001) {
+      msg = `⚠️ El precio unitario (Bs.${pu.toFixed(2)}) no puede ser mayor al del tramo anterior (Bs.${prevPU.toFixed(2)})`;
+    } else if(costoUnit > 0 && pu < costoUnit - 0.001) {
+      msg = `⚠️ El precio unitario (Bs.${pu.toFixed(2)}) está por debajo del costo de adquisición (Bs.${costoUnit.toFixed(2)}) — estarías vendiendo a pérdida`;
+    }
+
+    if(msg) {
+      warnEl.textContent = msg;
+      warnEl.style.display = "block";
+      hayError = true;
+    } else {
+      warnEl.style.display = "none";
+    }
+    prevPU = pu;
+  });
+
+  const saveBtn = document.querySelector('button[onclick="saveProd()"]');
+  if(saveBtn) {
+    saveBtn.dataset.tiersInvalid = hayError ? "1" : "0";
+  }
+  return !hayError;
 }
 
 function getCurrentTiers() {
@@ -1923,7 +1979,9 @@ function getCurrentTiers() {
 function addTier() {
   const t = getCurrentTiers();
   const last = t[t.length-1];
-  t.push([last[0]+1, 0]);
+  const lastPU = last[0]>0 ? last[1]/last[0] : 0;
+  // Sugerir cantidad+1 con el mismo PU como punto de partida (el usuario lo ajusta)
+  t.push([last[0]+1, +(lastPU*(last[0]+1)).toFixed(2)]);
   renderTiers(t);
 }
 
@@ -1953,7 +2011,12 @@ async function handlePedImg(ev) {
 async function saveProd() {
   const nombre = document.getElementById("pedNombre").value.trim();
   if(!nombre) { showToast("⚠️ El nombre es obligatorio", true); return; }
-  
+
+  if(!validateAllTiers()) {
+    showToast("⚠️ Hay precios por cantidad incoherentes — revisá las advertencias en rojo antes de guardar", true);
+    return;
+  }
+
   // Get code from field
   const codeField = document.getElementById("pedCodigo").value.trim();
   const id = codeField || editProdId || ("P-" + Date.now().toString(36).toUpperCase().slice(-5));
