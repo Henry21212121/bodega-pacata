@@ -2119,6 +2119,31 @@ function setReportSource(src, btn) {
 }
 
 // ── Normaliza cada fuente a un formato común: {fecha, total, costo, items:[{nombre,qty,total,costo}]} ──
+// Misma lógica de tienda.html — mantiene los reportes consistentes entre ambas apps.
+function resolveItemCostAdmin(i) {
+  if(i.esLibre) {
+    const costoUnit = i.costoUnitEditado != null ? i.costoUnitEditado : (i.costoUnit||0);
+    const qty = i.qty || 0;
+    const costoTotal = i.costoTotal != null && i.costoUnitEditado != null ? i.costoTotal : costoUnit * qty;
+    return { costoUnit, costoTotal };
+  }
+  if(i.costoUnit != null && i.costoTotal != null && (i.costoUnit > 0 || i.costoTotal !== 0)) {
+    return { costoUnit: i.costoUnit, costoTotal: i.costoTotal };
+  }
+  let costoUnit = 0;
+  if(i.tipo === "catalogo") {
+    costoUnit = DB.products[i.prodId]?.costoUnit || 0;
+  } else if(i.tipo === "temporal") {
+    costoUnit = DB.products[i.prodId]?.costoUnit || 0; // tempProducts no se cargan en admin; fallback razonable
+  } else if(i.tipo === "coquette") {
+    const cp = DB.coquetteProducts?.[i.prodId];
+    costoUnit = cp?.precioUnit || 0;
+  }
+  const qty = i.qty || 0;
+  const costoTotal = costoUnit * qty;
+  return { costoUnit, costoTotal };
+}
+
 function getReportTransacciones(from, src) {
   if(src === "online") {
     return DB.orders.filter(o=>{
@@ -2142,11 +2167,11 @@ function getReportTransacciones(from, src) {
       return d >= from;
     }).map(s=>({
       fecha: s.createdAt, total: s.total||0,
-      costo: (s.items||[]).reduce((sum,i)=>sum+(i.costoTotal!=null?i.costoTotal:(i.costoUnit||0)*i.qty),0),
+      costo: (s.items||[]).reduce((sum,i)=>sum+resolveItemCostAdmin(i).costoTotal,0),
       cliente: null, clienteKey: null,
       items: (s.items||[]).map(i=>({
         nombre:i.prodNombre, qty:i.qty, total:(i.precio||0)*i.qty,
-        costo: i.costoTotal!=null?i.costoTotal:(i.costoUnit||0)*i.qty
+        costo: resolveItemCostAdmin(i).costoTotal
       }))
     }));
   }
