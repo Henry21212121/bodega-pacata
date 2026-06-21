@@ -2140,8 +2140,9 @@ function resolveItemCost(i) {
 function ventaNecesitaReparo(s) {
   if(!s.items || !s.items.length) return false;
   return s.items.some(i =>
-    !i.prodNombre ||                                  // falta el nombre correcto
-    (i.costoUnit == null && i.costoTotal == null)      // nunca se calculó costo
+    !i.prodNombre ||                                          // falta el nombre correcto
+    (i.costoUnit == null && i.costoTotal == null) ||           // nunca se calculó costo
+    ((i.costoUnit||0) === 0 && (i.precio||0) > 0 && !i.esLibre) // costo en 0 con precio real y no es producto libre
   );
 }
 
@@ -2173,31 +2174,43 @@ async function repararVentasAntiguas() {
       const itemsFixed = s.items.map(i => {
         // 1) Corregir el nombre: puede venir como "nombre" (bug viejo) en vez de "prodNombre"
         const prodNombre = i.prodNombre || i.nombre || '—';
-        const tipo = i.tipo || 'catalogo';
+        const tipoGuardado = i.tipo || 'catalogo';
         const qty = i.qty || 0;
         const precio = i.precio != null ? i.precio : (i.subtotal && qty ? i.subtotal/qty : 0);
 
-        // 2) Recalcular costo si falta, usando el catálogo actual
+        // 2) Recalcular costo si falta. El "tipo" guardado en datos viejos no siempre es confiable
+        // (el bug original guardaba 'catalogo' por defecto sin importar el origen real),
+        // así que probamos por prodId en las 3 fuentes y, si no aparece, por nombre.
         let costoUnit = i.costoUnit;
-        if(costoUnit == null) {
-          if(tipo === 'catalogo') costoUnit = DB.products[i.prodId]?.costoUnit || 0;
-          else if(tipo === 'temporal') {
-            const tp = (DB.tempProds||[]).find(p=>p.id===i.prodId);
-            costoUnit = tp?.costoUnit || 0;
-          } else if(tipo === 'coquette') {
-            const cp = (cqProds||[]).find(p=>p.id===i.prodId) ||
-                       (cqProds||[]).find(p=>i.prodId?.startsWith?.('cq_'+p.id));
-            costoUnit = cp?.precioUnit || 0;
-          } else costoUnit = 0;
+        let tipoFinal = tipoGuardado;
+        if(costoUnit == null || costoUnit === 0) {
+          // a) Catálogo bodega por id
+          let prodCat = DB.products[i.prodId];
+          // b) Producto temporal (verduras/frutas) por id
+          let prodTmp = !prodCat ? (DB.tempProds||[]).find(p=>p.id===i.prodId) : null;
+          // c) Producto Coquette por id (directo o con prefijo cq_)
+          let prodCq = (!prodCat && !prodTmp)
+            ? ((cqProds||[]).find(p=>p.id===i.prodId) || (cqProds||[]).find(p=>i.prodId?.startsWith?.('cq_'+p.id)))
+            : null;
+          // d) Si nada coincidió por id, buscar por nombre exacto en las 3 fuentes (último recurso)
+          if(!prodCat && !prodTmp && !prodCq && prodNombre !== '—') {
+            prodCat = Object.values(DB.products||{}).find(p=>p.nombre===prodNombre);
+            if(!prodCat) prodTmp = (DB.tempProds||[]).find(p=>p.nombre===prodNombre);
+            if(!prodCat && !prodTmp) prodCq = (cqProds||[]).find(p=>p.nombre===prodNombre || prodNombre.startsWith(p.nombre));
+          }
+          if(prodCat) { costoUnit = prodCat.costoUnit||0; tipoFinal='catalogo'; }
+          else if(prodTmp) { costoUnit = prodTmp.costoUnit||0; tipoFinal='temporal'; }
+          else if(prodCq) { costoUnit = prodCq.precioUnit||0; tipoFinal='coquette'; }
+          else costoUnit = 0;
         }
-        const costoTotal = i.costoTotal != null ? i.costoTotal : costoUnit*qty;
-        const ganancia = i.ganancia != null ? i.ganancia : (precio*qty - costoTotal);
+        const costoTotal = (i.costoTotal != null && i.costoTotal > 0) ? i.costoTotal : costoUnit*qty;
+        const ganancia = precio*qty - costoTotal; // siempre recalculada con el costo corregido
 
         return {
           ...i,
           prodNombre, qty, precio,
           subtotal: i.subtotal != null ? i.subtotal : precio*qty,
-          tipo, costoUnit, costoTotal, ganancia
+          tipo: tipoFinal, costoUnit, costoTotal, ganancia
         };
       });
       await fs.updateDoc(fs.doc(db,'sales_physical',s.id), {items: itemsFixed});
