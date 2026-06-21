@@ -355,6 +355,7 @@ input[type=file]{display:none;}
             <option value="con_vencimiento">📅 Con vencimiento</option>
             <option value="sin_desc">📝 Sin descripción</option>
             <option value="sin_costo">💸 Sin precio unitario (PU)</option>
+            <option value="promo_mal">🚨 Precios por cantidad incoherentes</option>
             <option value="margen_asc">💰 Menor margen primero</option>
             <option value="precio_desc">💲 Mayor precio primero</option>
           </select>
@@ -1594,6 +1595,23 @@ function filterProdCat(cat, btn) {
   renderAdmProds();
 }
 
+// Evalúa los promos de un producto (sin depender del DOM) — usado en el listado y en el editor
+function getPromoIssues(p) {
+  const tiers = p.promos || [];
+  if(!tiers.length) return [];
+  const costoUnit = p.costoUnit || 0;
+  const issues = [];
+  let prevPU = Infinity;
+  tiers.forEach((t, i) => {
+    const qty = t[0] || 1;
+    const pu = qty > 0 ? t[1]/qty : 0;
+    if(pu > prevPU + 0.001) issues.push(`Tramo ${i+1} (${qty}u): PU mayor al tramo anterior`);
+    else if(costoUnit > 0 && pu < costoUnit - 0.001) issues.push(`Tramo ${i+1} (${qty}u): PU por debajo del costo`);
+    prevPU = pu;
+  });
+  return issues;
+}
+
 function renderAdmProds() {
   const q      = (document.getElementById("prodSearch")?.value||"").toLowerCase().trim();
   const sortBy = document.getElementById("prodSortBy")?.value || "nombre";
@@ -1610,6 +1628,7 @@ function renderAdmProds() {
   else if(sortBy==="bajo_stock")   prods = [...prods.filter(p=>p.stock>0&&p.stockMin>0&&p.stock<=p.stockMin),...prods.filter(p=>!(p.stock>0&&p.stockMin>0&&p.stock<=p.stockMin))];
   else if(sortBy==="sin_desc")     prods = [...prods.filter(p=>!p.desc),...prods.filter(p=>!!p.desc)];
   else if(sortBy==="sin_costo")    prods = prods.filter(p=>!p.costoUnit||p.costoUnit<=0);
+  else if(sortBy==="promo_mal")    prods = prods.filter(p=>getPromoIssues(p).length>0);
   else if(sortBy==="updated")      prods = prods.sort((a,b)=>(b.updatedAt?.seconds||0)-(a.updatedAt?.seconds||0));
   else if(sortBy==="stock_asc")    prods = prods.sort((a,b)=>(a.stock||0)-(b.stock||0));
   else if(sortBy==="margen_asc")   prods = prods.sort((a,b)=>{ const ma=a.costoUnit>0?(a.precio-a.costoUnit)/a.precio:1; const mb=b.costoUnit>0?(b.precio-b.costoUnit)/b.precio:1; return ma-mb; });
@@ -1620,7 +1639,7 @@ function renderAdmProds() {
   const list = document.getElementById("prodList");
   if(!prods.length) { list.innerHTML='<p style="color:var(--gr);font-size:.82rem;padding:10px">Sin productos para este filtro</p>'; return; }
 
-  const sortLabels = {sin_foto:"📷 Sin foto",con_vencimiento:"📅 Con vencimiento",sin_stock:"🔴 Agotados primero",bajo_stock:"⚠️ Bajo mínimo primero",sin_desc:"📝 Sin descripción",sin_costo:"💸 Sin precio unitario (PU)",updated:"🕐 Recién modificados",stock_asc:"📦 Menor stock",margen_asc:"💰 Menor margen",precio_desc:"💲 Mayor precio"};
+  const sortLabels = {sin_foto:"📷 Sin foto",con_vencimiento:"📅 Con vencimiento",sin_stock:"🔴 Agotados primero",bajo_stock:"⚠️ Bajo mínimo primero",sin_desc:"📝 Sin descripción",sin_costo:"💸 Sin precio unitario (PU)",promo_mal:"🚨 Precios por cantidad incoherentes",updated:"🕐 Recién modificados",stock_asc:"📦 Menor stock",margen_asc:"💰 Menor margen",precio_desc:"💲 Mayor precio"};
   const badge = sortLabels[sortBy]
     ? `<div style="font-size:.75rem;color:var(--or);font-weight:700;margin-bottom:6px;padding:3px 10px;background:#fff8ec;border-radius:20px;display:inline-block">Ordenado: ${sortLabels[sortBy]} · ${prods.length} prods</div><br>`
     : `<div style="font-size:.75rem;color:var(--gr);margin-bottom:6px">${prods.length} productos</div>`;
@@ -1632,6 +1651,8 @@ function renderAdmProds() {
     const imgEl      = p.img?`<img src="${p.img}">`:(DB.categories[p.cat]?.emoji||"📦");
     const sinFoto    = !p.img?'· <span class="chip" style="background:#fce4ec;color:#c62828;font-size:.65rem">📷 Sin foto</span>':"";
     const sinCosto   = (!p.costoUnit||p.costoUnit<=0)?'· <span class="chip" style="background:#fff3cd;color:#856404;font-size:.65rem">💸 Sin PU</span>':"";
+    const promoIssues = getPromoIssues(p);
+    const promoMal   = promoIssues.length?`· <span class="chip" style="background:#ffebee;color:#c62828;font-size:.65rem" title="${promoIssues.join(' | ')}">🚨 Precios incoherentes</span>`:"";
     const venc       = p.expiry?`· <span class="chip" style="background:#e3f2fd;color:#1565c0;font-size:.65rem">📅 ${p.expiry}</span>`:"";
     const upd        = p.updatedAt?.seconds?`· <span style="font-size:.65rem;color:#bbb">${new Date(p.updatedAt.seconds*1000).toLocaleDateString("es",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}</span>`:"";
     return `<div class="prod-item">
@@ -1642,7 +1663,7 @@ function renderAdmProds() {
       <div class="prod-thumb" onclick="quickImg('${p.id}')">${imgEl}</div>
       <div class="prod-inf">
         <div class="prod-nm">${p.nombre}</div>
-        <div class="prod-meta">${p.cat} · <b>Venta:Bs.${p.precio.toFixed(2)}</b> · Costo:Bs.${(p.costoUnit||0).toFixed(2)} · Margen:${margen} · <span class="chip ${stockClass}">${stockLbl}</span>${p.estado==="oculto"?'· <span class="chip" style="background:#f5f5f5;color:#999">Oculto</span>':""}${!p.desc?'· <span class="chip" style="background:#fff3e0;color:#f07d10;font-size:.65rem">Sin desc.</span>':""}${sinFoto}${sinCosto}${venc}${upd}</div>
+        <div class="prod-meta">${p.cat} · <b>Venta:Bs.${p.precio.toFixed(2)}</b> · Costo:Bs.${(p.costoUnit||0).toFixed(2)} · Margen:${margen} · <span class="chip ${stockClass}">${stockLbl}</span>${p.estado==="oculto"?'· <span class="chip" style="background:#f5f5f5;color:#999">Oculto</span>':""}${!p.desc?'· <span class="chip" style="background:#fff3e0;color:#f07d10;font-size:.65rem">Sin desc.</span>':""}${sinFoto}${sinCosto}${promoMal}${venc}${upd}</div>
       </div>
       <div class="prod-acts">
         <button class="btn btn-v btn-sm" onclick="openProdEditor('${p.id}')">✏️</button>
