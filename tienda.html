@@ -2115,9 +2115,11 @@ function renderDayPorVenta() {
 
     const rowsHtml = items.map((i,iIdx)=>{
       const { costoUnit, ganancia } = resolveItemCost(i);
-      const pventa = i.precio||0;
-      const parcial = pventa*(i.qty||0);
       const esLibre = !!i.esLibre;
+      // Para items COQUETTE el precio cobrado (i.precio) es el TOTAL de esa venta puntual (qty=1),
+      // y pventaRef es el precio de referencia por unidad base (ej: Bs.15/cuartilla).
+      const pventaMostrar = i.pventaRef != null ? i.pventaRef : (i.precio||0);
+      const parcial = (i.precio||0)*(i.qty||0);
       return `<tr>
         <td style="padding:4px 6px;font-size:.76rem">${i.qty}× ${i.prodNombre}</td>
         <td style="padding:4px 6px;font-size:.76rem;text-align:right;${esLibre?'color:var(--ro)':''}">
@@ -2127,7 +2129,7 @@ function renderDayPorVenta() {
                  style="width:62px;text-align:right;padding:2px 4px;border:1.5px solid var(--ro);border-radius:6px;font-size:.74rem;color:var(--ro)">`
             : `Bs.${costoUnit.toFixed(2)}`}
         </td>
-        <td style="padding:4px 6px;font-size:.76rem;text-align:right">Bs.${pventa.toFixed(2)}</td>
+        <td style="padding:4px 6px;font-size:.76rem;text-align:right">Bs.${pventaMostrar.toFixed(2)}</td>
         <td style="padding:4px 6px;font-size:.76rem;text-align:right;color:var(--v)">Bs.${parcial.toFixed(2)}</td>
         <td style="padding:4px 6px;font-size:.76rem;text-align:right;font-weight:700;color:${ganancia>=0?'var(--v)':'var(--ro)'}">Bs.${ganancia.toFixed(2)}</td>
       </tr>`;
@@ -2886,39 +2888,31 @@ function confirmCqAdd() {
   if(!total) { showToast('Ingresá una cantidad',true); return; }
 
   // ── Calcular costo real de adquisición para esta venta ──
-  // p.precioUnit = costo de adquisición por unidad base (lb, kg, unidad, pan, etc.)
+  // p.precioUnit = costo de adquisición por unidad de venta (cuartilla, kilo, docena, lote combo, etc.)
+  // p.precioVenta = precio de venta de esa misma unidad de venta
+  // El "total" cobrado siempre es una fracción/múltiplo de p.precioVenta,
+  // y esa misma proporción aplica al costo: costoTotal = (total / precioVenta) * precioUnit
   let costoTotal = 0;
-  if(p.tipo === 'libras') {
-    const monto = parseFloat(document.getElementById('cqMonto')?.value)||0;
-    const qty = parseFloat(document.getElementById('cqQtyUnidad')?.value)||0;
-    const cantidadVendida = monto > 0 ? ((p.lbPorUnidad||6)*monto/(p.precioVenta||1)) : (qty * (p.lbPorUnidad||6));
-    // costo por libra = precioUnit / lbPorUnidad
-    const costoPorLb = (p.lbPorUnidad||6) > 0 ? (p.precioUnit||0)/(p.lbPorUnidad||6) : 0;
-    costoTotal = cantidadVendida * costoPorLb;
-  } else if(p.tipo === 'kilos') {
+  if(p.tipo === 'combo') {
+    // El combo no usa precioVenta de forma proporcional (tiene precio de lote + precio suelto),
+    // así que el costo se calcula directo: cantidad vendida × costo unitario de adquisición
     const qty = parseFloat(document.getElementById('cqQtyUnidad')?.value)||0;
     costoTotal = qty * (p.precioUnit||0);
-  } else if(p.tipo === 'combo') {
-    const qty = parseFloat(document.getElementById('cqQtyUnidad')?.value)||0;
-    costoTotal = qty * (p.precioUnit||0); // costo de adquisición por unidad × cantidad real vendida
-  } else { // unidades
-    const unids = parseFloat(document.getElementById('cqUnidadesDirectas')?.value)||0;
-    const monto = parseFloat(document.getElementById('cqMonto')?.value)||0;
-    const docenas = parseFloat(document.getElementById('cqQtyUnidad')?.value)||0;
-    const unidsPorDoc = p.unidsPorDocena||12;
-    const cantidadVendida = unids > 0 ? unids : (monto > 0 ? (unidsPorDoc*monto/(p.precioVenta||1)) : (docenas*unidsPorDoc));
-    // costo por unidad = precioUnit / unidsPorDocena
-    const costoPorUnid = unidsPorDoc > 0 ? (p.precioUnit||0)/unidsPorDoc : 0;
-    costoTotal = cantidadVendida * costoPorUnid;
+  } else if(p.precioVenta > 0) {
+    const proporcion = total / p.precioVenta;
+    costoTotal = proporcion * (p.precioUnit||0);
   }
   const ganancia = total - costoTotal;
+  // Precio de venta "unitario" de referencia para mostrar en el reporte (precio por unidad base del producto)
+  const pventaRef = p.precioVenta || 0;
 
   // Add to cart as free item with coquette marker
   const freeId = 'cq_'+p.id+'_'+Date.now();
   cart[freeId] = {
     prod: {id:freeId, nombre:`${nombre} (${detalle})`, precio:total},
     qty:1, tipo:'coquette', subtotal:total,
-    costoUnit: costoTotal, costoTotal, ganancia
+    costoUnit: costoTotal, costoTotal, ganancia,
+    pventaRef, costoUnitRef: p.precioUnit||0 // referencia informativa para el reporte
   };
   renderCart();
   closeModal('cqSelectorModal');
