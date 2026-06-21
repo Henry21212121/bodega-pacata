@@ -504,6 +504,9 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
     </div>
 
     <div class="section-title" id="dayDetailTitle">🧾 Ventas del período</div>
+    <button id="btnRepararVentas" onclick="repararVentasAntiguas()" style="display:none;width:100%;background:#fff3cd;color:#856404;border:1.5px solid #ffeeba;border-radius:10px;padding:9px;font-size:.78rem;font-weight:800;cursor:pointer;margin-bottom:10px">
+      🔧 <span id="repararVentasTexto">Reparar ventas antiguas</span>
+    </button>
     <div id="dayTickets"><div style="text-align:center;padding:20px;color:var(--gr);font-size:.82rem">Sin ventas</div></div>
 
     <div class="section-title">💸 Gastos</div>
@@ -536,7 +539,6 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
         <tbody id="fiadoTableBody"></tbody>
       </table>
     </div>
-    <div id="fiadoList"></div>
   </div>
 </div>
 
@@ -1488,6 +1490,7 @@ async function loadAll() {
   fs.onSnapshot(fs.query(fs.collection(db,"sales_physical"), fs.orderBy("createdAt","desc"), fs.limit(200)), snap => {
     allSales = snap.docs.map(d=>({...d.data(),id:d.id}));
     renderDayStats(); renderDayDetail();
+    checkVentasParaReparar();
   });
 
   fs.onSnapshot(fs.query(fs.collection(db,"gastos_physical"), fs.orderBy("createdAt","desc"), fs.limit(100)), snap => {
@@ -2131,6 +2134,83 @@ function resolveItemCost(i) {
   return { costoUnit, costoTotal, ganancia };
 }
 
+// ── Detectar y reparar ventas con datos viejos/incompletos ──────────
+// (productos sin nombre por usar el campo "nombre" en vez de "prodNombre",
+//  o sin costoUnit/costoTotal/ganancia calculados)
+function ventaNecesitaReparo(s) {
+  if(!s.items || !s.items.length) return false;
+  return s.items.some(i =>
+    !i.prodNombre ||                                  // falta el nombre correcto
+    (i.costoUnit == null && i.costoTotal == null)      // nunca se calculó costo
+  );
+}
+
+function checkVentasParaReparar() {
+  const btn = document.getElementById('btnRepararVentas');
+  const txt = document.getElementById('repararVentasTexto');
+  if(!btn) return;
+  const candidatas = (allSales||[]).filter(ventaNecesitaReparo);
+  if(candidatas.length) {
+    btn.style.display = 'block';
+    txt.textContent = `Reparar ${candidatas.length} venta${candidatas.length!==1?'s':''} con datos incompletos`;
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+async function repararVentasAntiguas() {
+  const candidatas = (allSales||[]).filter(ventaNecesitaReparo);
+  if(!candidatas.length) { showToast('No hay ventas para reparar', false); return; }
+  const ok = confirm(`Se van a corregir ${candidatas.length} venta(s) antigua(s):\n\n• Se completará el nombre de los productos\n• Se recalculará el costo/ganancia con los precios actuales del catálogo\n\nEsto no cambia los montos cobrados, solo arregla los datos del reporte.\n\n¿Continuar?`);
+  if(!ok) return;
+
+  const btn = document.getElementById('btnRepararVentas');
+  if(btn) { btn.disabled = true; btn.textContent = '⏳ Reparando...'; }
+
+  let reparadas = 0, errores = 0;
+  for(const s of candidatas) {
+    try {
+      const itemsFixed = s.items.map(i => {
+        // 1) Corregir el nombre: puede venir como "nombre" (bug viejo) en vez de "prodNombre"
+        const prodNombre = i.prodNombre || i.nombre || '—';
+        const tipo = i.tipo || 'catalogo';
+        const qty = i.qty || 0;
+        const precio = i.precio != null ? i.precio : (i.subtotal && qty ? i.subtotal/qty : 0);
+
+        // 2) Recalcular costo si falta, usando el catálogo actual
+        let costoUnit = i.costoUnit;
+        if(costoUnit == null) {
+          if(tipo === 'catalogo') costoUnit = DB.products[i.prodId]?.costoUnit || 0;
+          else if(tipo === 'temporal') {
+            const tp = (DB.tempProds||[]).find(p=>p.id===i.prodId);
+            costoUnit = tp?.costoUnit || 0;
+          } else if(tipo === 'coquette') {
+            const cp = (cqProds||[]).find(p=>p.id===i.prodId) ||
+                       (cqProds||[]).find(p=>i.prodId?.startsWith?.('cq_'+p.id));
+            costoUnit = cp?.precioUnit || 0;
+          } else costoUnit = 0;
+        }
+        const costoTotal = i.costoTotal != null ? i.costoTotal : costoUnit*qty;
+        const ganancia = i.ganancia != null ? i.ganancia : (precio*qty - costoTotal);
+
+        return {
+          ...i,
+          prodNombre, qty, precio,
+          subtotal: i.subtotal != null ? i.subtotal : precio*qty,
+          tipo, costoUnit, costoTotal, ganancia
+        };
+      });
+      await fs.updateDoc(fs.doc(db,'sales_physical',s.id), {items: itemsFixed});
+      reparadas++;
+    } catch(e) { errores++; }
+  }
+
+  if(btn) { btn.disabled = false; }
+  showToast(errores===0
+    ? `✅ ${reparadas} venta(s) reparada(s) correctamente`
+    : `⚠️ ${reparadas} reparadas, ${errores} con error`, errores>0);
+}
+
 function renderDayStats() {
   const period = document.getElementById("dayPeriod")?.value||"today";
   const sales = filterByPeriod(allSales, period);
@@ -2423,26 +2503,35 @@ async function saveGasto() {
 // FIADOS
 // ════════════════════════════════════
 function renderFiados() {
-  const el=document.getElementById("fiadoList");
+  const el=document.getElementById("fiadoTableBody");
   const totalPendiente=fiados.reduce((s,f)=>s+Math.max(0,(f.monto||0)-(f.pagado||0)),0);
   document.getElementById("fiadoTotal").textContent="Total pendiente: Bs. "+totalPendiente.toFixed(2);
-  if(!fiados.length){el.innerHTML=`<div style="text-align:center;padding:20px;color:var(--gr);font-size:.82rem">Sin fiados pendientes 🎉</div>`;return;}
+  if(!fiados.length){
+    el.innerHTML=`<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--gr);font-size:.82rem">Sin fiados pendientes 🎉</td></tr>`;
+    return;
+  }
   el.innerHTML=fiados.map(f=>{
     const t=f.createdAt?.seconds?new Date(f.createdAt.seconds*1000):new Date();
-    const saldo = Math.max(0,(f.monto||0)-(f.pagado||0));
+    const monto = f.monto||0;
     const pagado = f.pagado||0;
-    return `<div class="fiado-card" onclick="verDetalleFiado('${f.id}')" style="cursor:pointer">
-      <div style="flex:1">
-        <div class="fiado-name">${f.nombre}</div>
-        ${f.detalle?`<div style="font-size:.72rem;color:var(--gr)">${f.detalle}</div>`:""}
-        <div style="font-size:.7rem;color:var(--gr)">${t.toLocaleDateString("es",{day:"numeric",month:"short"})}${pagado>0?` · Abonado: Bs.${pagado.toFixed(2)}`:""}</div>
-      </div>
-      <div style="text-align:right">
-        <div class="fiado-amount">Bs.${saldo.toFixed(2)}</div>
-        <div style="font-size:.65rem;color:var(--gr)">saldo pendiente</div>
-        <button onclick="event.stopPropagation();verDetalleFiado('${f.id}')" style="background:var(--v);color:#fff;border:none;border-radius:8px;padding:4px 10px;font-size:.7rem;font-weight:800;cursor:pointer;margin-top:4px">Ver / Cobrar</button>
-      </div>
-    </div>`;
+    const saldo = Math.max(0, monto-pagado);
+    const ultPago = f.lastPagoAt?.seconds
+      ? new Date(f.lastPagoAt.seconds*1000).toLocaleDateString("es",{day:"numeric",month:"short"})
+      : "—";
+    return `<tr onclick="verDetalleFiado('${f.id}')" style="cursor:pointer;border-bottom:1px solid var(--vbg)">
+      <td style="padding:8px;text-align:left">
+        <div style="font-weight:800">${f.nombre}</div>
+        ${f.detalle?`<div style="font-size:.7rem;color:var(--gr);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.detalle}</div>`:""}
+        <div style="font-size:.66rem;color:var(--gr)">${t.toLocaleDateString("es",{day:"numeric",month:"short"})}</div>
+      </td>
+      <td style="padding:8px 4px;text-align:right">Bs.${monto.toFixed(2)}</td>
+      <td style="padding:8px 4px;text-align:right;color:var(--v)">Bs.${pagado.toFixed(2)}</td>
+      <td style="padding:8px 4px;text-align:right;font-weight:800;color:${saldo>0?'var(--ro)':'var(--v)'}">Bs.${saldo.toFixed(2)}</td>
+      <td style="padding:8px 4px;text-align:center;font-size:.7rem;color:var(--gr)">${ultPago}</td>
+      <td style="padding:8px 4px">
+        <button onclick="event.stopPropagation();verDetalleFiado('${f.id}')" style="background:var(--v);color:#fff;border:none;border-radius:8px;padding:5px 10px;font-size:.7rem;font-weight:800;cursor:pointer;white-space:nowrap">Ver / Cobrar</button>
+      </td>
+    </tr>`;
   }).join("");
 }
 function openAddFiado(){openModal("fiadoModal");["fiadoNombre","fiadoMonto","fiadoDetalle"].forEach(id=>document.getElementById(id).value="");}
@@ -3035,6 +3124,7 @@ window.selectPayMethod = selectPayMethod;
 window.calcCheckoutVuelto = calcCheckoutVuelto;
 window.confirmSale = confirmSale;
 window.revertirVenta = revertirVenta;
+window.repararVentasAntiguas = repararVentasAntiguas;
 window.editarCostoLibre = editarCostoLibre;
 window.saveTempProd = saveTempProd;
 window.openAddFiado = openAddFiado;
