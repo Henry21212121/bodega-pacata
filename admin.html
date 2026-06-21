@@ -853,7 +853,7 @@ const CLOUD_NAME = "db9s1kpcf";
 const CLOUD_PRESET = "bodega_unsigned";
 
 // ─── STATE ─────────────────────────
-let DB = { categories:{}, products:{}, coquetteProducts:{}, orders:[], clients:[], suggestions:[], config:{}, salesFisica:[], consumoPropio:[] };
+let DB = { categories:{}, products:{}, coquetteProducts:{}, orders:[], clients:[], suggestions:[], config:{}, salesFisica:[], consumoPropio:[], tempProducts:{} };
 let db, fs;
 let isAuth = false;
 let editProdId = null;
@@ -1013,6 +1013,12 @@ async function loadAdminData() {
     // Consumo propio (real-time, últimos 500)
     fs.onSnapshot(fs.query(fs.collection(db,"consumo_propio"), fs.orderBy("createdAt","desc"), fs.limit(500)), snap => {
       DB.consumoPropio = snap.docs.map(d=>({...d.data(), id:d.id}));
+    });
+
+    // Productos temporales de tienda física (verduras/frutas) — necesarios para calcular costo real
+    fs.onSnapshot(fs.collection(db,"tempProducts"), snap => {
+      DB.tempProducts = {};
+      snap.forEach(d => { DB.tempProducts[d.id] = {...d.data(), id:d.id}; });
     });
 
     // Orders (real-time last 200)
@@ -2211,14 +2217,14 @@ function resolveItemCostAdmin(i) {
     const costoTotal = i.costoTotal != null && i.costoUnitEditado != null ? i.costoTotal : costoUnit * qty;
     return { costoUnit, costoTotal };
   }
-  if(i.costoUnit != null && i.costoTotal != null && (i.costoUnit > 0 || i.costoTotal !== 0)) {
+  if(i.costoUnit != null && i.costoTotal != null && i.ganancia != null && (i.costoUnit > 0 || i.ganancia !== 0)) {
     return { costoUnit: i.costoUnit, costoTotal: i.costoTotal };
   }
   let costoUnit = 0;
   if(i.tipo === "catalogo") {
     costoUnit = DB.products[i.prodId]?.costoUnit || 0;
   } else if(i.tipo === "temporal") {
-    costoUnit = DB.products[i.prodId]?.costoUnit || 0; // tempProducts no se cargan en admin; fallback razonable
+    costoUnit = DB.tempProducts?.[i.prodId]?.costoUnit || 0;
   } else if(i.tipo === "coquette") {
     const cp = DB.coquetteProducts?.[i.prodId];
     costoUnit = cp?.precioUnit || 0;
