@@ -2804,7 +2804,11 @@ async function imprimirFiadosSeleccionados() {
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:Arial,sans-serif;font-size:13px;color:#111;padding:16px;max-width:680px;margin:auto}
     h1{font-size:1.15rem;font-weight:900;margin-bottom:2px}
-    .sub{font-size:.8rem;color:#555;margin-bottom:14px}
+    .sub{font-size:.8rem;color:#555;margin-bottom:10px}
+    .action-bar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+    .action-bar button{padding:8px 14px;border:none;border-radius:8px;font-size:.82rem;font-weight:800;cursor:pointer}
+    .btn-print{background:#1b5e20;color:#fff}
+    .btn-img{background:#0d47a1;color:#fff}
     .fiado-block{border:1px solid #ccc;border-radius:8px;margin-bottom:14px;overflow:hidden;page-break-inside:avoid}
     .fiado-header{background:#1b5e20;color:#fff;padding:8px 12px;display:flex;justify-content:space-between;align-items:center}
     .fiado-nombre{font-weight:900;font-size:1rem}
@@ -2822,8 +2826,17 @@ async function imprimirFiadosSeleccionados() {
     .totales td{padding:4px 6px;font-size:.88rem}
     .totales .gran-total td{font-weight:900;font-size:1.05rem;color:#c62828;border-top:2px solid #ccc;padding-top:8px}
     .print-footer{margin-top:20px;font-size:.72rem;color:#888;text-align:center;border-top:1px solid #eee;padding-top:8px}
-    @media print{body{padding:8px}.print-footer{position:fixed;bottom:0;width:100%}}
-  </style></head><body>
+    #statusMsg{display:none;font-size:.8rem;color:#555;padding:4px 0}
+    @media print{.action-bar{display:none!important}body{padding:8px}.print-footer{position:fixed;bottom:0;width:100%}}
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
+  </head><body>
+  <div class="action-bar">
+    <button class="btn-print" onclick="window.print()">🖨️ Imprimir / PDF</button>
+    <button class="btn-img" onclick="exportarImagen()">🖼️ Exportar imagen</button>
+  </div>
+  <div id="statusMsg"></div>
+  <div id="contenido">
   <h1>📋 Reporte de Fiados — ${storeName}</h1>
   <div class="sub">Generado el ${fecha} · ${seleccionados.length} fiado${seleccionados.length!==1?'s':''} seleccionado${seleccionados.length!==1?'s':''}</div>
   ${fiadosHtml}
@@ -2837,7 +2850,27 @@ async function imprimirFiadosSeleccionados() {
     </table>
   </div>
   <div class="print-footer">Tienda de Barrio COQUETTE · ${fecha}</div>
-  <script>window.onload=()=>{window.print();}<\/script>
+  </div>
+  <script>
+    function exportarImagen() {
+      const btn = document.querySelector('.btn-img');
+      const status = document.getElementById('statusMsg');
+      btn.disabled = true; btn.textContent = '⏳ Generando...';
+      status.style.display = 'block';
+      status.textContent = 'Procesando imagen, un momento...';
+      html2canvas(document.getElementById('contenido'), {scale:2, backgroundColor:'#ffffff', useCORS:true}).then(canvas => {
+        const link = document.createElement('a');
+        link.download = 'fiados-coquette-${new Date().toISOString().slice(0,10)}.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        btn.disabled = false; btn.textContent = '🖼️ Exportar imagen';
+        status.style.display = 'none';
+      }).catch(e => {
+        btn.disabled = false; btn.textContent = '🖼️ Exportar imagen';
+        status.textContent = 'Error: ' + e.message;
+      });
+    }
+  <\/script>
   </body></html>`;
 
   const win = window.open('','_blank');
