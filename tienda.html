@@ -522,7 +522,19 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
   <div class="inner">
     <div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0 8px">
       <div class="section-title" style="margin:0">📋 Fiados pendientes</div>
-      <button class="btn btn-or" onclick="openAddFiado()" style="padding:7px 13px;font-size:.78rem">+ Nuevo</button>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sec" id="btnToggleSeleccion" onclick="toggleModoSeleccion()" style="padding:7px 10px;font-size:.78rem;display:none">☑️ Seleccionar</button>
+        <button class="btn btn-or" onclick="openAddFiado()" style="padding:7px 13px;font-size:.78rem">+ Nuevo</button>
+      </div>
+    </div>
+    <!-- Barra de selección (visible solo en modo selección) -->
+    <div id="fiadoSelBar" style="display:none;background:var(--vbg);border-radius:10px;padding:9px 13px;margin-bottom:8px;display:none;align-items:center;gap:8px;flex-wrap:wrap">
+      <label style="display:flex;align-items:center;gap:5px;font-size:.78rem;font-weight:700;cursor:pointer">
+        <input type="checkbox" id="chkTodosFiados" onchange="toggleTodosFiados(this.checked)" style="width:16px;height:16px;accent-color:var(--v)"> Seleccionar todos
+      </label>
+      <span id="fiadoSelCount" style="font-size:.75rem;color:var(--gr);flex:1">0 seleccionados</span>
+      <button onclick="imprimirFiadosSeleccionados()" style="background:var(--v);color:#fff;border:none;border-radius:8px;padding:7px 13px;font-size:.78rem;font-weight:800;cursor:pointer">🖨️ Imprimir PDF</button>
+      <button onclick="toggleModoSeleccion()" style="background:#eee;color:#555;border:none;border-radius:8px;padding:7px 10px;font-size:.78rem;font-weight:700;cursor:pointer">Cancelar</button>
     </div>
     <div id="fiadoTotal" style="background:var(--vbg);border-radius:10px;padding:9px 13px;margin-bottom:10px;font-size:.8rem;font-weight:700;color:var(--v)">Total pendiente: Bs. 0.00</div>
     <button id="btnRepararFiados" onclick="repararFiadosAntiguos()" style="display:none;width:100%;background:#fff3cd;color:#856404;border:1.5px solid #ffeeba;border-radius:10px;padding:9px;font-size:.78rem;font-weight:800;cursor:pointer;margin-bottom:10px">
@@ -533,6 +545,7 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
       <table style="width:100%;border-collapse:collapse;font-size:.78rem">
         <thead>
           <tr style="background:var(--vbg)">
+            <th id="thChkFiado" style="padding:7px 6px;display:none"></th>
             <th style="padding:7px 8px;text-align:left;font-weight:800">Nombre</th>
             <th style="padding:7px 4px;text-align:right;font-weight:800">Total</th>
             <th style="padding:7px 4px;text-align:right;font-weight:800">Pagado</th>
@@ -2616,11 +2629,49 @@ async function saveGasto() {
 // ════════════════════════════════════
 // FIADOS
 // ════════════════════════════════════
+let modoSeleccionFiados = false;
+let fiadosSeleccionados = new Set();
+
+function toggleModoSeleccion() {
+  modoSeleccionFiados = !modoSeleccionFiados;
+  fiadosSeleccionados.clear();
+  const bar = document.getElementById("fiadoSelBar");
+  const thChk = document.getElementById("thChkFiado");
+  const btnToggle = document.getElementById("btnToggleSeleccion");
+  if(bar) bar.style.display = modoSeleccionFiados ? "flex" : "none";
+  if(thChk) thChk.style.display = modoSeleccionFiados ? "" : "none";
+  actualizarContadorSeleccion();
+  renderFiados();
+}
+
+function toggleTodosFiados(checked) {
+  fiadosSeleccionados.clear();
+  if(checked) fiados.forEach(f=>fiadosSeleccionados.add(f.id));
+  actualizarContadorSeleccion();
+  renderFiados();
+}
+
+function toggleFiadoSeleccion(id, checked) {
+  if(checked) fiadosSeleccionados.add(id);
+  else fiadosSeleccionados.delete(id);
+  actualizarContadorSeleccion();
+  const chkTodos = document.getElementById("chkTodosFiados");
+  if(chkTodos) chkTodos.checked = fiadosSeleccionados.size === fiados.length;
+}
+
+function actualizarContadorSeleccion() {
+  const el = document.getElementById("fiadoSelCount");
+  if(el) el.textContent = `${fiadosSeleccionados.size} seleccionado${fiadosSeleccionados.size!==1?'s':''}`;
+}
+
 function renderFiados() {
   const el=document.getElementById("fiadoTableBody");
   const totalPendiente=fiados.reduce((s,f)=>s+Math.max(0,(f.monto||0)-(f.pagado||0)),0);
   document.getElementById("fiadoTotal").textContent="Total pendiente: Bs. "+totalPendiente.toFixed(2);
-  // Detectar fiados con monto incorrecto (creados con bug de doble descuento)
+  // Mostrar botón seleccionar si hay fiados
+  const btnToggle = document.getElementById("btnToggleSeleccion");
+  if(btnToggle) btnToggle.style.display = fiados.length ? "inline-flex" : "none";
+  // Detectar fiados con monto incorrecto
   const fiadosMalos = fiados.filter(f => {
     if(!f.items || !f.items.length) return false;
     const realTotal = f.items.reduce((s,i)=>(s+(i.subtotal!=null?i.subtotal:(i.precio||0)*(i.qty||0))),0);
@@ -2632,7 +2683,7 @@ function renderFiados() {
     btnRep.textContent = `🔧 Reparar ${fiadosMalos.length} fiado${fiadosMalos.length!==1?'s':''} con deuda incorrecta`;
   }
   if(!fiados.length){
-    el.innerHTML=`<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--gr);font-size:.82rem">Sin fiados pendientes 🎉</td></tr>`;
+    el.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--gr);font-size:.82rem">Sin fiados pendientes 🎉</td></tr>`;
     return;
   }
   el.innerHTML=fiados.map(f=>{
@@ -2640,27 +2691,159 @@ function renderFiados() {
     const monto = f.monto||0;
     const pagado = f.pagado||0;
     const saldo = Math.max(0, monto-pagado);
-    // Indicar si este fiado tiene monto incorrecto
     const realTotal = (f.items||[]).reduce((s,i)=>(s+(i.subtotal!=null?i.subtotal:(i.precio||0)*(i.qty||0))),0);
     const montoMal = realTotal > 0 && Math.abs(realTotal - monto) > 0.01;
     const ultPago = f.lastPagoAt?.seconds
       ? new Date(f.lastPagoAt.seconds*1000).toLocaleDateString("es",{day:"numeric",month:"short"})
       : "—";
-    return `<tr onclick="verDetalleFiado('${f.id}')" style="cursor:pointer;border-bottom:1px solid var(--vbg)${montoMal?';background:#fff8e1':''}">
-      <td style="padding:8px;text-align:left">
+    const seleccionado = fiadosSeleccionados.has(f.id);
+    return `<tr style="cursor:pointer;border-bottom:1px solid var(--vbg)${montoMal?';background:#fff8e1':seleccionado?';background:#e8f5e9':''}">
+      ${modoSeleccionFiados
+        ? `<td style="padding:6px 6px" onclick="event.stopPropagation()">
+            <input type="checkbox" ${seleccionado?'checked':''} onchange="toggleFiadoSeleccion('${f.id}',this.checked)"
+              style="width:18px;height:18px;accent-color:var(--v);cursor:pointer">
+           </td>`
+        : ''}
+      <td onclick="verDetalleFiado('${f.id}')" style="padding:8px;text-align:left">
         <div style="font-weight:800">${f.nombre}${montoMal?` <span style="font-size:.65rem;color:#e65100;font-weight:900">⚠️</span>`:""}</div>
         ${f.detalle?`<div style="font-size:.7rem;color:var(--gr);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.detalle}</div>`:""}
         <div style="font-size:.66rem;color:var(--gr)">${t.toLocaleDateString("es",{day:"numeric",month:"short"})}</div>
       </td>
-      <td style="padding:8px 4px;text-align:right${montoMal?';color:#e65100':''}">Bs.${monto.toFixed(2)}</td>
-      <td style="padding:8px 4px;text-align:right;color:var(--v)">Bs.${pagado.toFixed(2)}</td>
-      <td style="padding:8px 4px;text-align:right;font-weight:800;color:${saldo>0?'var(--ro)':'var(--v)'}">Bs.${saldo.toFixed(2)}</td>
-      <td style="padding:8px 4px;text-align:center;font-size:.7rem;color:var(--gr)">${ultPago}</td>
+      <td onclick="verDetalleFiado('${f.id}')" style="padding:8px 4px;text-align:right${montoMal?';color:#e65100':''}">Bs.${monto.toFixed(2)}</td>
+      <td onclick="verDetalleFiado('${f.id}')" style="padding:8px 4px;text-align:right;color:var(--v)">Bs.${pagado.toFixed(2)}</td>
+      <td onclick="verDetalleFiado('${f.id}')" style="padding:8px 4px;text-align:right;font-weight:800;color:${saldo>0?'var(--ro)':'var(--v)'}">Bs.${saldo.toFixed(2)}</td>
+      <td onclick="verDetalleFiado('${f.id}')" style="padding:8px 4px;text-align:center;font-size:.7rem;color:var(--gr)">${ultPago}</td>
       <td style="padding:8px 4px">
         <button onclick="event.stopPropagation();verDetalleFiado('${f.id}')" style="background:var(--v);color:#fff;border:none;border-radius:8px;padding:5px 10px;font-size:.7rem;font-weight:800;cursor:pointer;white-space:nowrap">Ver / Cobrar</button>
       </td>
     </tr>`;
   }).join("");
+}
+
+async function imprimirFiadosSeleccionados() {
+  if(!fiadosSeleccionados.size) { showToast("Seleccioná al menos un fiado", true); return; }
+  const seleccionados = fiados.filter(f => fiadosSeleccionados.has(f.id));
+  showToast("⏳ Cargando pagos...");
+
+  // Cargar pagos parciales de todos los fiados seleccionados
+  const pagosMap = {};
+  for(const f of seleccionados) {
+    try {
+      const snap = await fs.getDocs(fs.query(
+        fs.collection(db,'pagos_fiado'),
+        fs.where('fiadoId','==',f.id),
+        fs.orderBy('createdAt','asc')
+      ));
+      pagosMap[f.id] = snap.docs.map(d=>({...d.data(),id:d.id}));
+    } catch(e) { pagosMap[f.id] = []; }
+  }
+
+  const fecha = new Date().toLocaleDateString('es',{day:'numeric',month:'long',year:'numeric'});
+  const storeName = document.getElementById('storeNameHeader')?.textContent || 'La Bodega';
+
+  // Totales globales
+  const totalDeuda  = seleccionados.reduce((s,f)=>s+(f.monto||0),0);
+  const totalPagado = seleccionados.reduce((s,f)=>s+(f.pagado||0),0);
+  const totalSaldo  = seleccionados.reduce((s,f)=>s+Math.max(0,(f.monto||0)-(f.pagado||0)),0);
+
+  // Generar HTML de cada fiado
+  const fiadosHtml = seleccionados.map(f => {
+    const t = f.createdAt?.seconds ? new Date(f.createdAt.seconds*1000) : new Date();
+    const monto  = f.monto||0;
+    const pagado = f.pagado||0;
+    const saldo  = Math.max(0, monto - pagado);
+    const pagos  = pagosMap[f.id]||[];
+
+    // Items del fiado
+    const itemsHtml = (f.items||[]).length
+      ? (f.items||[]).map(i=>`
+          <tr>
+            <td style="padding:4px 6px">${i.qty}× ${i.prodNombre||i.nombre||'—'}</td>
+            <td style="padding:4px 6px;text-align:right">Bs.${((i.subtotal!=null?i.subtotal:(i.precio||0)*(i.qty||0))).toFixed(2)}</td>
+          </tr>`).join('')
+      : f.detalle
+        ? `<tr><td colspan="2" style="padding:4px 6px;color:#555">${f.detalle}</td></tr>`
+        : `<tr><td colspan="2" style="padding:4px 6px;color:#999">Sin detalle</td></tr>`;
+
+    // Pagos parciales
+    const aCuentaInicial = pagos.find(p=>p.nota?.includes('momento del fiado'));
+    const pagosAdicionales = pagos.filter(p=>!p.nota?.includes('momento del fiado'));
+    let pagosHtml = '';
+    if(aCuentaInicial) {
+      pagosHtml += `<tr><td style="padding:3px 6px;color:#1b5e20">→ A cuenta al fiarse</td><td style="padding:3px 6px;text-align:right;color:#1b5e20">Bs.${(aCuentaInicial.monto||0).toFixed(2)}</td></tr>`;
+    }
+    pagosAdicionales.forEach(p=>{
+      const pt = p.createdAt?.seconds ? new Date(p.createdAt.seconds*1000) : new Date();
+      pagosHtml += `<tr><td style="padding:3px 6px;color:#1b5e20">→ ${pt.toLocaleDateString('es',{day:'numeric',month:'short'})}${p.nota?' · '+p.nota:''}</td><td style="padding:3px 6px;text-align:right;color:#1b5e20">Bs.${(p.monto||0).toFixed(2)}</td></tr>`;
+    });
+
+    return `
+    <div class="fiado-block">
+      <div class="fiado-header">
+        <span class="fiado-nombre">${f.nombre}</span>
+        <span class="fiado-fecha">${t.toLocaleDateString('es',{day:'numeric',month:'long',year:'numeric'})}</span>
+      </div>
+      <table class="fiado-table">
+        <thead><tr><th>Artículo</th><th style="text-align:right">Monto</th></tr></thead>
+        <tbody>${itemsHtml}</tbody>
+        <tfoot>
+          <tr class="subtotal-row"><td>Deuda total</td><td style="text-align:right">Bs.${monto.toFixed(2)}</td></tr>
+          ${pagosHtml ? `<tr><td colspan="2" style="padding:4px 6px;font-weight:700;color:#1b5e20;font-size:.85em">Pagos recibidos:</td></tr>${pagosHtml}` : ''}
+          <tr class="total-row ${saldo>0?'saldo-pendiente':'saldo-ok'}">
+            <td>${saldo>0?'Saldo pendiente':'✅ Saldado'}</td>
+            <td style="text-align:right">Bs.${saldo.toFixed(2)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+  <title>Fiados — ${storeName}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;font-size:13px;color:#111;padding:16px;max-width:680px;margin:auto}
+    h1{font-size:1.15rem;font-weight:900;margin-bottom:2px}
+    .sub{font-size:.8rem;color:#555;margin-bottom:14px}
+    .fiado-block{border:1px solid #ccc;border-radius:8px;margin-bottom:14px;overflow:hidden;page-break-inside:avoid}
+    .fiado-header{background:#1b5e20;color:#fff;padding:8px 12px;display:flex;justify-content:space-between;align-items:center}
+    .fiado-nombre{font-weight:900;font-size:1rem}
+    .fiado-fecha{font-size:.78rem;opacity:.85}
+    .fiado-table{width:100%;border-collapse:collapse}
+    .fiado-table th{background:#e8f5e9;padding:5px 6px;font-size:.8rem;text-align:left;border-bottom:1px solid #c8e6c9}
+    .fiado-table td{padding:4px 6px;border-bottom:1px solid #f0f0f0}
+    .subtotal-row td{font-weight:700;background:#f9f9f9;border-top:1.5px solid #ccc}
+    .total-row td{font-weight:900;font-size:1rem;padding:7px 6px}
+    .saldo-pendiente td{color:#c62828;background:#ffebee}
+    .saldo-ok td{color:#1b5e20;background:#e8f5e9}
+    .totales{border:2px solid #1b5e20;border-radius:8px;padding:12px;margin-top:16px;background:#f9fbe7}
+    .totales h2{font-size:.95rem;margin-bottom:8px;color:#1b5e20}
+    .totales table{width:100%;border-collapse:collapse}
+    .totales td{padding:4px 6px;font-size:.88rem}
+    .totales .gran-total td{font-weight:900;font-size:1.05rem;color:#c62828;border-top:2px solid #ccc;padding-top:8px}
+    .print-footer{margin-top:20px;font-size:.72rem;color:#888;text-align:center;border-top:1px solid #eee;padding-top:8px}
+    @media print{body{padding:8px}.print-footer{position:fixed;bottom:0;width:100%}}
+  </style></head><body>
+  <h1>📋 Reporte de Fiados — ${storeName}</h1>
+  <div class="sub">Generado el ${fecha} · ${seleccionados.length} fiado${seleccionados.length!==1?'s':''} seleccionado${seleccionados.length!==1?'s':''}</div>
+  ${fiadosHtml}
+  <div class="totales">
+    <h2>📊 Resumen general</h2>
+    <table>
+      <tr><td>Total fiados seleccionados</td><td style="text-align:right;font-weight:700">${seleccionados.length}</td></tr>
+      <tr><td>Deuda total acumulada</td><td style="text-align:right;font-weight:700">Bs.${totalDeuda.toFixed(2)}</td></tr>
+      <tr><td>Total ya pagado</td><td style="text-align:right;font-weight:700;color:#1b5e20">Bs.${totalPagado.toFixed(2)}</td></tr>
+      <tr class="gran-total"><td>Total por cobrar</td><td style="text-align:right">Bs.${totalSaldo.toFixed(2)}</td></tr>
+    </table>
+  </div>
+  <div class="print-footer">La Bodega Online Pacata · ${fecha}</div>
+  <script>window.onload=()=>{window.print();}<\/script>
+  </body></html>`;
+
+  const win = window.open('','_blank');
+  if(!win) { showToast("Habilitá ventanas emergentes para imprimir", true); return; }
+  win.document.write(html);
+  win.document.close();
 }
 
 async function repararFiadosAntiguos() {
@@ -3284,6 +3467,10 @@ window.openAddFiado = openAddFiado;
 window.saveFiado = saveFiado;
 window.cobrarFiado = cobrarFiado;
 window.repararFiadosAntiguos = repararFiadosAntiguos;
+window.toggleModoSeleccion = toggleModoSeleccion;
+window.toggleTodosFiados = toggleTodosFiados;
+window.toggleFiadoSeleccion = toggleFiadoSeleccion;
+window.imprimirFiadosSeleccionados = imprimirFiadosSeleccionados;
 
 // ════════════════════════════════════════════════════════
 // CONSUMO PROPIO — venta a precio de costo, reporte aparte
