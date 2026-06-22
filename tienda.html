@@ -525,6 +525,9 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
       <button class="btn btn-or" onclick="openAddFiado()" style="padding:7px 13px;font-size:.78rem">+ Nuevo</button>
     </div>
     <div id="fiadoTotal" style="background:var(--vbg);border-radius:10px;padding:9px 13px;margin-bottom:10px;font-size:.8rem;font-weight:700;color:var(--v)">Total pendiente: Bs. 0.00</div>
+    <button id="btnRepararFiados" onclick="repararFiadosAntiguos()" style="display:none;width:100%;background:#fff3cd;color:#856404;border:1.5px solid #ffeeba;border-radius:10px;padding:9px;font-size:.78rem;font-weight:800;cursor:pointer;margin-bottom:10px">
+      🔧 Reparar fiados con deuda incorrecta
+    </button>
     <!-- Tabla de fiados -->
     <div style="overflow-x:auto;margin-bottom:10px">
       <table style="width:100%;border-collapse:collapse;font-size:.78rem">
@@ -2617,6 +2620,17 @@ function renderFiados() {
   const el=document.getElementById("fiadoTableBody");
   const totalPendiente=fiados.reduce((s,f)=>s+Math.max(0,(f.monto||0)-(f.pagado||0)),0);
   document.getElementById("fiadoTotal").textContent="Total pendiente: Bs. "+totalPendiente.toFixed(2);
+  // Detectar fiados con monto incorrecto (creados con bug de doble descuento)
+  const fiadosMalos = fiados.filter(f => {
+    if(!f.items || !f.items.length) return false;
+    const realTotal = f.items.reduce((s,i)=>(s+(i.subtotal!=null?i.subtotal:(i.precio||0)*(i.qty||0))),0);
+    return realTotal > 0 && Math.abs(realTotal - (f.monto||0)) > 0.01;
+  });
+  const btnRep = document.getElementById("btnRepararFiados");
+  if(btnRep) {
+    btnRep.style.display = fiadosMalos.length > 0 ? "block" : "none";
+    btnRep.textContent = `🔧 Reparar ${fiadosMalos.length} fiado${fiadosMalos.length!==1?'s':''} con deuda incorrecta`;
+  }
   if(!fiados.length){
     el.innerHTML=`<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--gr);font-size:.82rem">Sin fiados pendientes 🎉</td></tr>`;
     return;
@@ -2626,16 +2640,19 @@ function renderFiados() {
     const monto = f.monto||0;
     const pagado = f.pagado||0;
     const saldo = Math.max(0, monto-pagado);
+    // Indicar si este fiado tiene monto incorrecto
+    const realTotal = (f.items||[]).reduce((s,i)=>(s+(i.subtotal!=null?i.subtotal:(i.precio||0)*(i.qty||0))),0);
+    const montoMal = realTotal > 0 && Math.abs(realTotal - monto) > 0.01;
     const ultPago = f.lastPagoAt?.seconds
       ? new Date(f.lastPagoAt.seconds*1000).toLocaleDateString("es",{day:"numeric",month:"short"})
       : "—";
-    return `<tr onclick="verDetalleFiado('${f.id}')" style="cursor:pointer;border-bottom:1px solid var(--vbg)">
+    return `<tr onclick="verDetalleFiado('${f.id}')" style="cursor:pointer;border-bottom:1px solid var(--vbg)${montoMal?';background:#fff8e1':''}">
       <td style="padding:8px;text-align:left">
-        <div style="font-weight:800">${f.nombre}</div>
+        <div style="font-weight:800">${f.nombre}${montoMal?` <span style="font-size:.65rem;color:#e65100;font-weight:900">⚠️</span>`:""}</div>
         ${f.detalle?`<div style="font-size:.7rem;color:var(--gr);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.detalle}</div>`:""}
         <div style="font-size:.66rem;color:var(--gr)">${t.toLocaleDateString("es",{day:"numeric",month:"short"})}</div>
       </td>
-      <td style="padding:8px 4px;text-align:right">Bs.${monto.toFixed(2)}</td>
+      <td style="padding:8px 4px;text-align:right${montoMal?';color:#e65100':''}">Bs.${monto.toFixed(2)}</td>
       <td style="padding:8px 4px;text-align:right;color:var(--v)">Bs.${pagado.toFixed(2)}</td>
       <td style="padding:8px 4px;text-align:right;font-weight:800;color:${saldo>0?'var(--ro)':'var(--v)'}">Bs.${saldo.toFixed(2)}</td>
       <td style="padding:8px 4px;text-align:center;font-size:.7rem;color:var(--gr)">${ultPago}</td>
@@ -2644,6 +2661,29 @@ function renderFiados() {
       </td>
     </tr>`;
   }).join("");
+}
+
+async function repararFiadosAntiguos() {
+  const fiadosMalos = fiados.filter(f => {
+    if(!f.items || !f.items.length) return false;
+    const realTotal = f.items.reduce((s,i)=>(s+(i.subtotal!=null?i.subtotal:(i.precio||0)*(i.qty||0))),0);
+    return realTotal > 0 && Math.abs(realTotal - (f.monto||0)) > 0.01;
+  });
+  if(!fiadosMalos.length) { showToast("No hay fiados para reparar", false); return; }
+  const nombres = fiadosMalos.map(f=>`• ${f.nombre}: Bs.${(f.monto||0).toFixed(2)} → Bs.${f.items.reduce((s,i)=>(s+(i.subtotal!=null?i.subtotal:(i.precio||0)*(i.qty||0))),0).toFixed(2)}`).join("\n");
+  if(!confirm(`Se corregirá el monto de ${fiadosMalos.length} fiado(s):\n\n${nombres}\n\n¿Continuar?`)) return;
+  const btn = document.getElementById("btnRepararFiados");
+  if(btn) { btn.disabled=true; btn.textContent="⏳ Reparando..."; }
+  let ok=0, err=0;
+  for(const f of fiadosMalos) {
+    try {
+      const realTotal = f.items.reduce((s,i)=>(s+(i.subtotal!=null?i.subtotal:(i.precio||0)*(i.qty||0))),0);
+      await fs.updateDoc(fs.doc(db,"fiados",f.id), { monto: realTotal });
+      ok++;
+    } catch(e) { err++; }
+  }
+  if(btn) btn.disabled=false;
+  showToast(err===0 ? `✅ ${ok} fiado(s) reparado(s)` : `⚠️ ${ok} reparados, ${err} con error`, err>0);
 }
 function openAddFiado(){openModal("fiadoModal");["fiadoNombre","fiadoMonto","fiadoDetalle"].forEach(id=>document.getElementById(id).value="");}
 async function saveFiado(){
@@ -3243,6 +3283,7 @@ window.saveTempProd = saveTempProd;
 window.openAddFiado = openAddFiado;
 window.saveFiado = saveFiado;
 window.cobrarFiado = cobrarFiado;
+window.repararFiadosAntiguos = repararFiadosAntiguos;
 
 // ════════════════════════════════════════════════════════
 // CONSUMO PROPIO — venta a precio de costo, reporte aparte
