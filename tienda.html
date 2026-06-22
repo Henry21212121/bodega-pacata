@@ -2739,7 +2739,7 @@ async function imprimirFiadosSeleccionados() {
   }
 
   const fecha = new Date().toLocaleDateString('es',{day:'numeric',month:'long',year:'numeric'});
-  const storeName = document.getElementById('storeNameHeader')?.textContent || 'La Bodega';
+  const storeName = document.getElementById('storeNameHeader')?.textContent || 'Tienda de Barrio COQUETTE';
 
   // Totales globales
   const totalDeuda  = seleccionados.reduce((s,f)=>s+(f.monto||0),0);
@@ -2781,7 +2781,7 @@ async function imprimirFiadosSeleccionados() {
     <div class="fiado-block">
       <div class="fiado-header">
         <span class="fiado-nombre">${f.nombre}</span>
-        <span class="fiado-fecha">${t.toLocaleDateString('es',{day:'numeric',month:'long',year:'numeric'})}</span>
+        <span class="fiado-fecha">${t.toLocaleDateString('es',{day:'numeric',month:'long',year:'numeric'})} · ${t.toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'})}</span>
       </div>
       <table class="fiado-table">
         <thead><tr><th>Artículo</th><th style="text-align:right">Monto</th></tr></thead>
@@ -2836,7 +2836,7 @@ async function imprimirFiadosSeleccionados() {
       <tr class="gran-total"><td>Total por cobrar</td><td style="text-align:right">Bs.${totalSaldo.toFixed(2)}</td></tr>
     </table>
   </div>
-  <div class="print-footer">La Bodega Online Pacata · ${fecha}</div>
+  <div class="print-footer">Tienda de Barrio COQUETTE · ${fecha}</div>
   <script>window.onload=()=>{window.print();}<\/script>
   </body></html>`;
 
