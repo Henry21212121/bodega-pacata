@@ -494,13 +494,15 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
       <div class="stat-card"><div class="stat-val" id="dGanancia" style="color:var(--v)">Bs.0</div><div class="stat-lbl">Ganancia</div></div>
       <div class="stat-card"><div class="stat-val" id="dGastos">Bs.0</div><div class="stat-lbl">Gastos</div></div>
       <div class="stat-card"><div class="stat-val" id="dNeto">Bs.0</div><div class="stat-lbl" style="color:var(--v)">Neto</div></div>
+      <div class="stat-card" style="cursor:pointer" onclick="showTab('fiados',document.querySelector('.tab-btn:nth-child(4)'))"><div class="stat-val" id="dFiados" style="color:var(--ro)">Bs.0</div><div class="stat-lbl" style="color:var(--ro)">Por cobrar 📋</div></div>
     </div>
 
     <!-- Selector de modo de vista del detalle -->
     <div style="display:flex;gap:4px;margin:14px 0 10px;overflow-x:auto;padding-bottom:2px">
-      <button class="day-view-tab active" onclick="setDayView('porventa',this)" style="flex:1;min-width:110px;padding:8px 6px;font-size:.78rem;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:var(--v);color:#fff">🧾 Por venta</button>
-      <button class="day-view-tab" onclick="setDayView('porarticulo',this)" style="flex:1;min-width:110px;padding:8px 6px;font-size:.78rem;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#eee;color:#555">📦 Más vendidos</button>
-      <button class="day-view-tab" onclick="setDayView('porpago',this)" style="flex:1;min-width:110px;padding:8px 6px;font-size:.78rem;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#eee;color:#555">💳 Por pago</button>
+      <button class="day-view-tab active" onclick="setDayView('porventa',this)" style="flex:1;min-width:90px;padding:8px 6px;font-size:.78rem;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:var(--v);color:#fff">🧾 Por venta</button>
+      <button class="day-view-tab" onclick="setDayView('porarticulo',this)" style="flex:1;min-width:90px;padding:8px 6px;font-size:.78rem;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#eee;color:#555">📦 Más vendidos</button>
+      <button class="day-view-tab" onclick="setDayView('porpago',this)" style="flex:1;min-width:90px;padding:8px 6px;font-size:.78rem;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#eee;color:#555">💳 Por pago</button>
+      <button class="day-view-tab" id="btnObservados" onclick="setDayView('observados',this)" style="flex:1;min-width:90px;padding:8px 6px;font-size:.78rem;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#eee;color:#555">🔍 Observados</button>
     </div>
 
     <div class="section-title" id="dayDetailTitle">🧾 Ventas del período</div>
@@ -1317,7 +1319,7 @@ async function confirmarFiar() {
     const celularExist = fiarDeudorSeleccionado.celular||'';
     const docRef = await fs.addDoc(fs.collection(db,'fiados'), {
       nombre, celular: celularExist,
-      monto: saldo, pagado: aCuenta,
+      monto: total, pagado: aCuenta,
       detalle, items: itemsArr,
       cobrado: saldo<=0,
       createdAt: fs.serverTimestamp()
@@ -1348,7 +1350,7 @@ async function confirmarFiar() {
 
     const docRef = await fs.addDoc(fs.collection(db,'fiados'), {
       nombre, celular: celular||'',
-      monto: saldo,
+      monto: total,
       pagado: aCuenta,
       detalle,
       items: itemsArr,
@@ -2232,20 +2234,38 @@ function renderDayStats() {
   const totalG = gastos.reduce((s,x)=>s+(x.monto||0),0);
   const totalGanancia = sales.reduce((s,x)=>s+(x.items||[]).reduce((s2,i)=>s2+resolveItemCost(i).ganancia,0),0);
   const totalCosto = sales.reduce((s,x)=>s+(x.items||[]).reduce((s2,i)=>s2+resolveItemCost(i).costoTotal,0),0);
-  document.getElementById("dVentas").textContent="Bs."+totalV.toFixed(0);
+  document.getElementById("dVentas").textContent="Bs."+totalV.toFixed(2);
   document.getElementById("dQty").textContent=sales.length;
-  document.getElementById("dGastos").textContent="Bs."+totalG.toFixed(0);
-  document.getElementById("dNeto").textContent="Bs."+(totalV-totalG).toFixed(0);
+  document.getElementById("dGastos").textContent="Bs."+totalG.toFixed(2);
+  document.getElementById("dNeto").textContent="Bs."+(totalV-totalG).toFixed(2);
   const ganEl = document.getElementById("dGanancia");
-  if(ganEl) ganEl.textContent="Bs."+totalGanancia.toFixed(0);
+  if(ganEl) ganEl.textContent="Bs."+totalGanancia.toFixed(2);
   const capEl = document.getElementById("dCapital");
-  if(capEl) capEl.textContent="Bs."+totalCosto.toFixed(0);
+  if(capEl) capEl.textContent="Bs."+totalCosto.toFixed(2);
+  // Fiados pendientes (total global, no filtrado por período)
+  const fiadosEl = document.getElementById("dFiados");
+  if(fiadosEl) {
+    const totalFiados = (fiados||[]).reduce((s,f)=>s+Math.max(0,(f.monto||0)-(f.pagado||0)),0);
+    fiadosEl.textContent="Bs."+totalFiados.toFixed(2);
+  }
 }
 
 function renderDayDetail() {
   if(dayViewMode === "porventa") renderDayPorVenta();
   else if(dayViewMode === "porarticulo") renderDayPorArticulo();
   else if(dayViewMode === "porpago") renderDayPorPago();
+  else if(dayViewMode === "observados") renderDayObservados();
+  // Actualizar badge del botón Observados
+  const period = document.getElementById("dayPeriod")?.value||"today";
+  const sales = filterByPeriod(allSales, period);
+  const nObs = sales.filter(s=>(s.items||[]).some(i=>!i.esLibre && (i.costoUnit==null||i.costoUnit===0) && (i.precio||0)>0)).length;
+  const btn = document.getElementById("btnObservados");
+  if(btn) {
+    btn.textContent = nObs > 0 ? `🔍 Observados (${nObs})` : "🔍 Observados";
+    if(nObs > 0 && dayViewMode !== "observados") btn.style.background = "#fff3cd";
+    else if(dayViewMode === "observados") { btn.style.background = "#e65100"; btn.style.color = "#fff"; }
+    else btn.style.background = "#eee";
+  }
 }
 
 function renderDayPorVenta() {
@@ -2316,6 +2336,84 @@ function renderDayPorVenta() {
       </div>
     </div>`;
   }).join("");
+}
+
+function renderDayObservados() {
+  document.getElementById("dayDetailTitle").textContent = "🔍 Ventas con observaciones";
+  const period = document.getElementById("dayPeriod")?.value||"today";
+  const sales = filterByPeriod(allSales, period)
+    .filter(s=>(s.items||[]).some(i=>!i.esLibre && (i.costoUnit==null||i.costoUnit===0) && (i.precio||0)>0))
+    .sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+  const el = document.getElementById("dayTickets");
+  if(!sales.length) {
+    el.innerHTML=`<div style="text-align:center;padding:24px;color:var(--v);font-size:.85rem;font-weight:700">✅ Sin observaciones en este período</div>`;
+    return;
+  }
+  el.innerHTML = sales.map((s,idx)=>{
+    const t = s.createdAt?.seconds ? new Date(s.createdAt.seconds*1000) : new Date();
+    const items = s.items||[];
+    const rowsHtml = items.map((i,iIdx)=>{
+      const tieneError = !i.esLibre && (i.costoUnit==null||i.costoUnit===0) && (i.precio||0)>0;
+      const costoUnitMostrar = i.costoUnitRef != null ? i.costoUnitRef : (i.costoUnit||0);
+      const pventaMostrar = i.pventaRef != null ? i.pventaRef : (i.precio||0);
+      return `<tr style="${tieneError?'background:#fff8e1':''}">
+        <td style="padding:5px 6px;font-size:.76rem">
+          ${tieneError?'<span style="color:#e65100;font-weight:900;font-size:.7rem">⚠️ </span>':''}${i.qty}× ${i.prodNombre}
+        </td>
+        <td style="padding:5px 6px;font-size:.76rem;text-align:right">
+          ${tieneError
+            ? `<input type="number" placeholder="0.00" step="0.01" min="0" value=""
+                 onchange="repararItemIndividual('${s.id}',${iIdx},this.value)"
+                 style="width:68px;text-align:right;padding:3px 5px;border:1.5px solid #e65100;border-radius:6px;font-size:.74rem;color:#e65100;background:#fff8e1"
+                 title="Ingresá el PU de adquisición para reparar">`
+            : `Bs.${costoUnitMostrar.toFixed(2)}`}
+        </td>
+        <td style="padding:5px 6px;font-size:.76rem;text-align:right">Bs.${pventaMostrar.toFixed(2)}</td>
+        <td style="padding:5px 6px;font-size:.76rem;text-align:right;color:var(--v)">Bs.${((i.precio||0)*(i.qty||0)).toFixed(2)}</td>
+      </tr>`;
+    }).join("");
+    return `<div class="ticket" style="border-left:3px solid #e65100;padding:10px 12px;margin-bottom:10px">
+      <div class="ticket-header" style="margin-bottom:6px">
+        <span style="font-weight:900;color:#e65100">Venta #${idx+1} — ${fmtFechaCorta(t)}</span>
+        <span style="font-size:.7rem;color:var(--gr)">${items.length} artículo${items.length!==1?'s':''}</span>
+      </div>
+      <div style="font-size:.7rem;color:#e65100;margin-bottom:6px;font-weight:700">⚠️ Ingresá el PU Adq. faltante y presioná Enter para reparar</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;min-width:300px">
+          <thead><tr style="border-bottom:1.5px solid var(--vbg)">
+            <th style="text-align:left;padding:4px 6px;font-size:.68rem;color:var(--gr)">Producto</th>
+            <th style="text-align:right;padding:4px 6px;font-size:.68rem;color:var(--gr)">PU Adq.</th>
+            <th style="text-align:right;padding:4px 6px;font-size:.68rem;color:var(--gr)">PU Venta</th>
+            <th style="text-align:right;padding:4px 6px;font-size:.68rem;color:var(--gr)">Parcial</th>
+          </tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+      <div style="text-align:right;margin-top:6px;font-weight:900;font-size:.88rem">Total: Bs.${(s.total||0).toFixed(2)}</div>
+    </div>`;
+  }).join("");
+}
+
+async function repararItemIndividual(saleId, itemIdx, valor) {
+  const costoUnitNuevo = parseFloat(valor)||0;
+  if(!costoUnitNuevo) return;
+  const sale = allSales.find(s=>s.id===saleId);
+  if(!sale) return;
+  const items = [...(sale.items||[])];
+  const item = items[itemIdx];
+  if(!item) return;
+  const qty = item.qty||1;
+  const precio = item.precio||0;
+  // Para items coquette qty=1 y precio=total cobrado, el costoUnit ingresado es PU de referencia
+  // pero costoTotal debe calcularse proporcionalmente: costoTotal = costoUnitNuevo * qty
+  const costoTotal = costoUnitNuevo * qty;
+  const ganancia = precio * qty - costoTotal;
+  items[itemIdx] = {...item, costoUnit: costoUnitNuevo, costoTotal, ganancia, costoUnitEditado: costoUnitNuevo};
+  try {
+    await fs.updateDoc(fs.doc(db,"sales_physical",saleId), {items});
+    showToast(`✅ Venta reparada — Ganancia: Bs.${ganancia.toFixed(2)}`);
+    renderDayDetail();
+  } catch(e) { showToast("Error: "+e.message, true); }
 }
 
 async function editarCostoLibre(saleId, itemIdx, valor) {
@@ -3139,6 +3237,8 @@ window.confirmSale = confirmSale;
 window.revertirVenta = revertirVenta;
 window.repararVentasAntiguas = repararVentasAntiguas;
 window.editarCostoLibre = editarCostoLibre;
+window.renderDayObservados = renderDayObservados;
+window.repararItemIndividual = repararItemIndividual;
 window.saveTempProd = saveTempProd;
 window.openAddFiado = openAddFiado;
 window.saveFiado = saveFiado;
