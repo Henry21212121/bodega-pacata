@@ -492,9 +492,16 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
       <div class="stat-card"><div class="stat-val" id="dQty">0</div><div class="stat-lbl">Transacciones</div></div>
       <div class="stat-card"><div class="stat-val" id="dCapital" style="color:#1565c0">Bs.0</div><div class="stat-lbl">Capital (costo)</div></div>
       <div class="stat-card"><div class="stat-val" id="dGanancia" style="color:var(--v)">Bs.0</div><div class="stat-lbl">Ganancia</div></div>
+      <div class="stat-card"><div class="stat-val" id="dAbonos" style="color:#6a1b9a">Bs.0</div><div class="stat-lbl">Cobros fiados 💰</div></div>
       <div class="stat-card"><div class="stat-val" id="dGastos">Bs.0</div><div class="stat-lbl">Gastos</div></div>
       <div class="stat-card"><div class="stat-val" id="dNeto">Bs.0</div><div class="stat-lbl" style="color:var(--v)">Neto</div></div>
       <div class="stat-card" style="cursor:pointer" onclick="showTab('fiados',document.querySelector('.tab-btn:nth-child(4)'))"><div class="stat-val" id="dFiados" style="color:var(--ro)">Bs.0</div><div class="stat-lbl" style="color:var(--ro)">Por cobrar 📋</div></div>
+    </div>
+
+    <!-- Fiados del período (informativo) -->
+    <div id="fiadosDiaPanel" style="display:none;background:#1a1a2e;border:1.5px solid #6a1b9a;border-radius:10px;padding:10px 12px;margin-bottom:10px">
+      <div style="font-size:.78rem;font-weight:900;color:#ce93d8;margin-bottom:6px">📋 Fiados del período <span id="fiadosDiaBadge" style="background:#6a1b9a;color:#fff;border-radius:10px;padding:1px 7px;font-size:.7rem;margin-left:4px">0</span></div>
+      <div id="fiadosDiaLista" style="font-size:.76rem"></div>
     </div>
 
     <!-- Selector de modo de vista del detalle -->
@@ -1204,6 +1211,15 @@ async function savePagoParc() {
   if(!f) return;
   try {
     const nota = document.getElementById('pagoParcNota').value.trim();
+    // Calcular capital+ganancia proporcional al pago
+    const montoTotal = f.monto || monto;
+    const costoTotalFiado = (f.items||[]).reduce((s,i)=>{
+      const c = i.costoTotal != null ? i.costoTotal : (i.costoUnit||0)*(i.qty||1);
+      return s + c;
+    }, 0);
+    const proporcion = montoTotal > 0 ? monto / montoTotal : 0;
+    const costoParc = costoTotalFiado * proporcion;
+    const gananciaParc = monto - costoParc;
     // Save pago
     await fs.addDoc(fs.collection(db,'pagos_fiado'), {
       fiadoId: id, monto,
@@ -1218,16 +1234,17 @@ async function savePagoParc() {
       cobrado: saldo <= 0,
       lastPagoAt: fs.serverTimestamp()
     });
-    // El monto del pago parcial SÍ entra a la caja ahora — se registra como venta real
+    // Registrar en caja con capital+ganancia proporcionales
     await fs.addDoc(fs.collection(db,'sales_physical'), {
-      items: [{prodNombre:'Abono fiado: '+(f.nombre||''), qty:1, precio:monto, subtotal:monto, costoUnit:0, costoTotal:0, ganancia:monto}],
+      items: [{prodNombre:'Abono fiado: '+(f.nombre||''), qty:1, precio:monto, subtotal:monto, costoUnit:costoParc, costoTotal:costoParc, ganancia:gananciaParc, esAbono:true}],
       total: monto, payMethod: 'efectivo',
       nota: 'Pago parcial de fiado'+(nota?': '+nota:''),
+      esAbono: true,
       createdAt: fs.serverTimestamp()
     });
     closeModal('pagoParcModal');
     closeModal('fiadoDetalleModal');
-    showToast(`✅ Pago de Bs.${monto.toFixed(2)} registrado en caja`);
+    showToast(`✅ Pago de Bs.${monto.toFixed(2)} registrado — Ganancia: Bs.${gananciaParc.toFixed(2)}`);
   } catch(e) { showToast('Error: '+e.message, true); }
 }
 
@@ -2086,6 +2103,18 @@ function setDayView(mode, btn) {
   renderDayDetail();
 }
 
+function isInPeriod(t, period) {
+  if(period === "custom") {
+    const fromStr = document.getElementById("dayFromCustom")?.value;
+    const toStr   = document.getElementById("dayToCustom")?.value;
+    if(!fromStr || !toStr) return true;
+    return t >= new Date(fromStr+"T00:00:00") && t <= new Date(toStr+"T23:59:59");
+  }
+  if(period === "today") { const tod=new Date(); tod.setHours(0,0,0,0); return t>=tod; }
+  if(period === "week")  { const w=new Date(); w.setDate(w.getDate()-7); w.setHours(0,0,0,0); return t>=w; }
+  const m=new Date(); m.setDate(1); m.setHours(0,0,0,0); return t>=m;
+}
+
 function filterByPeriod(arr, period) {
   if(period === "custom") {
     const fromStr = document.getElementById("dayFromCustom")?.value;
@@ -2246,23 +2275,61 @@ function renderDayStats() {
   const period = document.getElementById("dayPeriod")?.value||"today";
   const sales = filterByPeriod(allSales, period);
   const gastos = filterByPeriod(allGastos, period);
-  const totalV = sales.reduce((s,x)=>s+(x.total||0),0);
+  // Separar ventas reales de cobros de fiados
+  const ventasReales = sales.filter(s => !s.esAbono);
+  const cobrosAbono  = sales.filter(s =>  s.esAbono);
+  const totalV = ventasReales.reduce((s,x)=>s+(x.total||0),0);
   const totalG = gastos.reduce((s,x)=>s+(x.monto||0),0);
-  const totalGanancia = sales.reduce((s,x)=>s+(x.items||[]).reduce((s2,i)=>s2+resolveItemCost(i).ganancia,0),0);
-  const totalCosto = sales.reduce((s,x)=>s+(x.items||[]).reduce((s2,i)=>s2+resolveItemCost(i).costoTotal,0),0);
+  const totalAbonos = cobrosAbono.reduce((s,x)=>s+(x.total||0),0);
+  const totalGanancia = ventasReales.reduce((s,x)=>s+(x.items||[]).reduce((s2,i)=>s2+resolveItemCost(i).ganancia,0),0);
+  const totalCosto = ventasReales.reduce((s,x)=>s+(x.items||[]).reduce((s2,i)=>s2+resolveItemCost(i).costoTotal,0),0);
   document.getElementById("dVentas").textContent="Bs."+totalV.toFixed(2);
-  document.getElementById("dQty").textContent=sales.length;
+  document.getElementById("dQty").textContent=ventasReales.length;
   document.getElementById("dGastos").textContent="Bs."+totalG.toFixed(2);
   document.getElementById("dNeto").textContent="Bs."+(totalV-totalG).toFixed(2);
   const ganEl = document.getElementById("dGanancia");
   if(ganEl) ganEl.textContent="Bs."+totalGanancia.toFixed(2);
   const capEl = document.getElementById("dCapital");
   if(capEl) capEl.textContent="Bs."+totalCosto.toFixed(2);
-  // Fiados pendientes (total global, no filtrado por período)
+  // Cobros de fiados del día
+  const abonosEl = document.getElementById("dAbonos");
+  if(abonosEl) abonosEl.textContent="Bs."+totalAbonos.toFixed(2);
+  // Fiados pendientes (total global)
   const fiadosEl = document.getElementById("dFiados");
   if(fiadosEl) {
     const totalFiados = (fiados||[]).reduce((s,f)=>s+Math.max(0,(f.monto||0)-(f.pagado||0)),0);
     fiadosEl.textContent="Bs."+totalFiados.toFixed(2);
+  }
+  // Panel fiados del período (informativo — no suma a ventas)
+  const fiadosDiaPanel = document.getElementById("fiadosDiaPanel");
+  const fiadosDiaLista = document.getElementById("fiadosDiaLista");
+  const fiadosDiaBadge = document.getElementById("fiadosDiaBadge");
+  if(fiadosDiaPanel && fiadosDiaLista) {
+    const fiadosDelPeriodo = (fiados||[]).filter(f => {
+      if(!f.createdAt?.seconds) return false;
+      const t = new Date(f.createdAt.seconds*1000);
+      return isInPeriod(t, period);
+    });
+    if(fiadosDelPeriodo.length) {
+      fiadosDiaPanel.style.display = "block";
+      if(fiadosDiaBadge) fiadosDiaBadge.textContent = fiadosDelPeriodo.length;
+      const totalFiadoHoy = fiadosDelPeriodo.reduce((s,f)=>s+(f.monto||0),0);
+      const totalACuenta = fiadosDelPeriodo.reduce((s,f)=>s+(f.pagado||0),0);
+      fiadosDiaLista.innerHTML = fiadosDelPeriodo.map(f=>{
+        const aCuenta = f.pagado||0;
+        const saldo = Math.max(0,(f.monto||0)-aCuenta);
+        return `<div style="padding:3px 0;border-bottom:1px solid rgba(255,255,255,.07);display:flex;justify-content:space-between;align-items:center">
+          <span style="color:#e1bee7;font-weight:700">${f.nombre}</span>
+          <span style="color:#ce93d8">Bs.${(f.monto||0).toFixed(2)}${aCuenta>0?` <span style="color:#a5d6a7;font-size:.68rem">(a cuenta: Bs.${aCuenta.toFixed(2)})</span>`:''} — saldo: <span style="color:${saldo>0?'#ef9a9a':'#a5d6a7'}">Bs.${saldo.toFixed(2)}</span></span>
+        </div>`;
+      }).join("") +
+      `<div style="margin-top:6px;font-size:.74rem;color:#ce93d8;font-weight:700;text-align:right">
+        Total fiado: Bs.${totalFiadoHoy.toFixed(2)}${totalACuenta>0?` · A cuenta: Bs.${totalACuenta.toFixed(2)}`:''}
+        <span style="color:#888;font-size:.68rem;font-weight:400;display:block">No incluido en ventas del día</span>
+      </div>`;
+    } else {
+      fiadosDiaPanel.style.display = "none";
+    }
   }
 }
 
@@ -2274,7 +2341,7 @@ function renderDayDetail() {
   // Actualizar badge del botón Observados
   const period = document.getElementById("dayPeriod")?.value||"today";
   const sales = filterByPeriod(allSales, period);
-  const nObs = sales.filter(s=>(s.items||[]).some(i=>!i.esLibre && (i.costoUnit==null||i.costoUnit===0) && (i.precio||0)>0)).length;
+  const nObs = sales.filter(s=>!s.esAbono && !/fiado:/i.test(s.nota||s.items?.[0]?.prodNombre||"") && (s.items||[]).some(i=>!i.esLibre && !i.esAbono && !/fiado:/i.test(i.prodNombre||"") && (i.costoUnit==null||i.costoUnit===0) && (i.precio||0)>0)).length;
   const btn = document.getElementById("btnObservados");
   if(btn) {
     btn.textContent = nObs > 0 ? `🔍 Observados (${nObs})` : "🔍 Observados";
@@ -2320,6 +2387,19 @@ function renderDayPorVenta() {
 
     const totalGanancia = items.reduce((s2,i)=>s2+resolveItemCost(i).ganancia,0);
     const totalCosto = items.reduce((s2,i)=>s2+resolveItemCost(i).costoTotal,0);
+    const esAbono = !!s.esAbono;
+
+    if(esAbono) return `<div class="ticket" style="border-left:3px solid #6a1b9a;padding:10px 12px;opacity:.85">
+      <div class="ticket-header" style="margin-bottom:4px">
+        <span style="font-weight:900;color:#6a1b9a">💰 Cobro de fiado</span>
+        <span class="ticket-time">${fmtFechaCorta(t)}</span>
+      </div>
+      <div style="font-size:.8rem;color:#555">${items[0]?.prodNombre||'Abono'}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+        <button onclick="revertirVenta('${s.id}')" style="background:none;border:1.5px solid var(--ro);color:var(--ro);border-radius:8px;padding:4px 9px;font-size:.68rem;font-weight:800;cursor:pointer">↩️ Revertir</button>
+        <div style="font-weight:900;font-size:.92rem;color:#6a1b9a">Bs.${(s.total||0).toFixed(2)}</div>
+      </div>
+    </div>`;
 
     return `<div class="ticket" style="border-left:3px solid var(--v);padding:10px 12px">
       <div class="ticket-header" style="margin-bottom:6px">
@@ -2358,7 +2438,7 @@ function renderDayObservados() {
   document.getElementById("dayDetailTitle").textContent = "🔍 Ventas con observaciones";
   const period = document.getElementById("dayPeriod")?.value||"today";
   const sales = filterByPeriod(allSales, period)
-    .filter(s=>(s.items||[]).some(i=>!i.esLibre && (i.costoUnit==null||i.costoUnit===0) && (i.precio||0)>0))
+    .filter(s=>!s.esAbono && !/fiado:/i.test(s.nota||s.items?.[0]?.prodNombre||"") && (s.items||[]).some(i=>!i.esLibre && !i.esAbono && !/fiado:/i.test(i.prodNombre||"") && (i.costoUnit==null||i.costoUnit===0) && (i.precio||0)>0))
     .sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
   const el = document.getElementById("dayTickets");
   if(!sales.length) {
@@ -2668,10 +2748,8 @@ function renderFiados() {
   const el=document.getElementById("fiadoTableBody");
   const totalPendiente=fiados.reduce((s,f)=>s+Math.max(0,(f.monto||0)-(f.pagado||0)),0);
   document.getElementById("fiadoTotal").textContent="Total pendiente: Bs. "+totalPendiente.toFixed(2);
-  // Mostrar botón seleccionar si hay fiados
   const btnToggle = document.getElementById("btnToggleSeleccion");
   if(btnToggle) btnToggle.style.display = fiados.length ? "inline-flex" : "none";
-  // Detectar fiados con monto incorrecto
   const fiadosMalos = fiados.filter(f => {
     if(!f.items || !f.items.length) return false;
     const realTotal = f.items.reduce((s,i)=>(s+(i.subtotal!=null?i.subtotal:(i.precio||0)*(i.qty||0))),0);
@@ -2686,39 +2764,84 @@ function renderFiados() {
     el.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--gr);font-size:.82rem">Sin fiados pendientes 🎉</td></tr>`;
     return;
   }
-  el.innerHTML=fiados.map(f=>{
-    const t=f.createdAt?.seconds?new Date(f.createdAt.seconds*1000):new Date();
-    const monto = f.monto||0;
-    const pagado = f.pagado||0;
-    const saldo = Math.max(0, monto-pagado);
-    const realTotal = (f.items||[]).reduce((s,i)=>(s+(i.subtotal!=null?i.subtotal:(i.precio||0)*(i.qty||0))),0);
-    const montoMal = realTotal > 0 && Math.abs(realTotal - monto) > 0.01;
-    const ultPago = f.lastPagoAt?.seconds
-      ? new Date(f.lastPagoAt.seconds*1000).toLocaleDateString("es",{day:"numeric",month:"short"})
-      : "—";
-    const seleccionado = fiadosSeleccionados.has(f.id);
-    return `<tr style="cursor:pointer;border-bottom:1px solid var(--vbg)${montoMal?';background:#fff8e1':seleccionado?';background:#e8f5e9':''}">
-      ${modoSeleccionFiados
-        ? `<td style="padding:6px 6px" onclick="event.stopPropagation()">
-            <input type="checkbox" ${seleccionado?'checked':''} onchange="toggleFiadoSeleccion('${f.id}',this.checked)"
-              style="width:18px;height:18px;accent-color:var(--v);cursor:pointer">
-           </td>`
-        : ''}
-      <td onclick="verDetalleFiado('${f.id}')" style="padding:8px;text-align:left">
-        <div style="font-weight:800">${f.nombre}${montoMal?` <span style="font-size:.65rem;color:#e65100;font-weight:900">⚠️</span>`:""}</div>
-        ${f.detalle?`<div style="font-size:.7rem;color:var(--gr);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.detalle}</div>`:""}
-        <div style="font-size:.66rem;color:var(--gr)">${t.toLocaleDateString("es",{day:"numeric",month:"short"})}</div>
-      </td>
-      <td onclick="verDetalleFiado('${f.id}')" style="padding:8px 4px;text-align:right${montoMal?';color:#e65100':''}">Bs.${monto.toFixed(2)}</td>
-      <td onclick="verDetalleFiado('${f.id}')" style="padding:8px 4px;text-align:right;color:var(--v)">Bs.${pagado.toFixed(2)}</td>
-      <td onclick="verDetalleFiado('${f.id}')" style="padding:8px 4px;text-align:right;font-weight:800;color:${saldo>0?'var(--ro)':'var(--v)'}">Bs.${saldo.toFixed(2)}</td>
-      <td onclick="verDetalleFiado('${f.id}')" style="padding:8px 4px;text-align:center;font-size:.7rem;color:var(--gr)">${ultPago}</td>
-      <td style="padding:8px 4px">
-        <button onclick="event.stopPropagation();verDetalleFiado('${f.id}')" style="background:var(--v);color:#fff;border:none;border-radius:8px;padding:5px 10px;font-size:.7rem;font-weight:800;cursor:pointer;white-space:nowrap">Ver / Cobrar</button>
+  // Agrupar por nombre
+  const grupos = {};
+  fiados.forEach(f => {
+    const key = (f.nombre||'—').trim().toLowerCase();
+    if(!grupos[key]) grupos[key] = { nombre: (f.nombre||'—').trim(), items: [] };
+    grupos[key].items.push(f);
+  });
+  const gruposOrdenados = Object.values(grupos).sort((a,b)=>a.nombre.localeCompare(b.nombre));
+
+  el.innerHTML = gruposOrdenados.map(g => {
+    const totalGrupo = g.items.reduce((s,f)=>s+(f.monto||0),0);
+    const pagadoGrupo = g.items.reduce((s,f)=>s+(f.pagado||0),0);
+    const saldoGrupo = Math.max(0, totalGrupo - pagadoGrupo);
+    const tieneError = g.items.some(f => {
+      const realTotal = (f.items||[]).reduce((s,i)=>(s+(i.subtotal!=null?i.subtotal:(i.precio||0)*(i.qty||0))),0);
+      return realTotal > 0 && Math.abs(realTotal - (f.monto||0)) > 0.01;
+    });
+
+    // Fila de cabecera del grupo
+    const cabecera = `<tr style="background:var(--vbg);cursor:pointer" onclick="toggleGrupoFiado('${g.nombre.replace(/'/g,"\\'")}')">
+      ${modoSeleccionFiados ? `<td style="padding:6px"></td>` : ''}
+      <td colspan="${modoSeleccionFiados?6:7}" style="padding:8px 10px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:900;font-size:.88rem">
+            <span id="chevron-${g.nombre.replace(/\s+/g,'_')}">▼</span> ${g.nombre}
+            ${tieneError?'<span style="color:#e65100;font-size:.7rem"> ⚠️</span>':''}
+            ${g.items.length>1?`<span style="font-size:.68rem;color:var(--gr);font-weight:400"> (${g.items.length} fiados)</span>`:''}
+          </span>
+          <span style="font-size:.78rem;font-weight:700;color:${saldoGrupo>0?'var(--ro)':'var(--v)'}">
+            Saldo: Bs.${saldoGrupo.toFixed(2)}
+            <span style="font-size:.68rem;color:var(--gr);font-weight:400"> / Total: Bs.${totalGrupo.toFixed(2)}</span>
+          </span>
+        </div>
       </td>
     </tr>`;
+
+    // Filas de detalle del grupo
+    const detalles = g.items.map(f => {
+      const t=f.createdAt?.seconds?new Date(f.createdAt.seconds*1000):new Date();
+      const monto=f.monto||0, pagado=f.pagado||0, saldo=Math.max(0,monto-pagado);
+      const realTotal=(f.items||[]).reduce((s,i)=>(s+(i.subtotal!=null?i.subtotal:(i.precio||0)*(i.qty||0))),0);
+      const montoMal=realTotal>0&&Math.abs(realTotal-monto)>0.01;
+      const ultPago=f.lastPagoAt?.seconds?new Date(f.lastPagoAt.seconds*1000).toLocaleDateString("es",{day:"numeric",month:"short"}):"—";
+      const seleccionado=fiadosSeleccionados.has(f.id);
+      return `<tr class="fiado-grupo-${g.nombre.replace(/\s+/g,'_')}" style="cursor:pointer;border-bottom:1px solid var(--vbg)${montoMal?';background:#fff8e1':seleccionado?';background:#e8f5e9':''}">
+        ${modoSeleccionFiados?`<td style="padding:6px 6px" onclick="event.stopPropagation()">
+          <input type="checkbox" ${seleccionado?'checked':''} onchange="toggleFiadoSeleccion('${f.id}',this.checked)" style="width:18px;height:18px;accent-color:var(--v);cursor:pointer">
+         </td>`:''}
+        <td onclick="verDetalleFiado('${f.id}')" style="padding:7px 8px 7px 20px;text-align:left">
+          <div style="font-size:.72rem;color:var(--gr)">${t.toLocaleDateString("es",{day:"numeric",month:"short"})}</div>
+          ${f.detalle?`<div style="font-size:.7rem;color:var(--gr);max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.detalle}</div>`:""}
+          ${montoMal?'<span style="font-size:.65rem;color:#e65100">⚠️ monto incorrecto</span>':""}
+        </td>
+        <td onclick="verDetalleFiado('${f.id}')" style="padding:7px 4px;text-align:right;font-size:.82rem${montoMal?';color:#e65100':''}">Bs.${monto.toFixed(2)}</td>
+        <td onclick="verDetalleFiado('${f.id}')" style="padding:7px 4px;text-align:right;font-size:.82rem;color:var(--v)">Bs.${pagado.toFixed(2)}</td>
+        <td onclick="verDetalleFiado('${f.id}')" style="padding:7px 4px;text-align:right;font-weight:800;font-size:.82rem;color:${saldo>0?'var(--ro)':'var(--v)'}">Bs.${saldo.toFixed(2)}</td>
+        <td onclick="verDetalleFiado('${f.id}')" style="padding:7px 4px;text-align:center;font-size:.7rem;color:var(--gr)">${ultPago}</td>
+        <td style="padding:7px 4px">
+          <button onclick="event.stopPropagation();verDetalleFiado('${f.id}')" style="background:var(--v);color:#fff;border:none;border-radius:8px;padding:5px 10px;font-size:.7rem;font-weight:800;cursor:pointer;white-space:nowrap">Ver / Cobrar</button>
+        </td>
+      </tr>`;
+    }).join("");
+
+    return cabecera + detalles;
   }).join("");
 }
+
+function toggleGrupoFiado(nombre) {
+  const key = nombre.replace(/\s+/g,'_');
+  const rows = document.querySelectorAll(`.fiado-grupo-${key}`);
+  const chevron = document.getElementById(`chevron-${key}`);
+  if(!rows.length) return;
+  const visible = rows[0].style.display !== 'none';
+  rows.forEach(r => r.style.display = visible ? 'none' : '');
+  if(chevron) chevron.textContent = visible ? '▶' : '▼';
+}
+
+
 
 async function imprimirFiadosSeleccionados() {
   if(!fiadosSeleccionados.size) { showToast("Seleccioná al menos un fiado", true); return; }
@@ -2914,16 +3037,26 @@ async function cobrarFiado(id,saldoPendiente){
   const f = fiados.find(x=>x.id===id);
   try {
     await fs.updateDoc(fs.doc(db,"fiados",id),{cobrado:true,pagado:(f?.monto)||saldoPendiente,cobradoAt:fs.serverTimestamp()});
-    // El saldo cobrado ahora SÍ entra a la caja — se registra como venta real
     if(saldoPendiente > 0) {
+      const montoTotal = f?.monto || saldoPendiente;
+      const costoTotalFiado = (f?.items||[]).reduce((s,i)=>{
+        const c = i.costoTotal != null ? i.costoTotal : (i.costoUnit||0)*(i.qty||1);
+        return s + c;
+      }, 0);
+      const proporcion = montoTotal > 0 ? saldoPendiente / montoTotal : 0;
+      const costoParc = costoTotalFiado * proporcion;
+      const gananciaParc = saldoPendiente - costoParc;
       await fs.addDoc(fs.collection(db,'sales_physical'), {
-        items: [{prodNombre:'Saldo cobrado fiado: '+(f?.nombre||''), qty:1, precio:saldoPendiente, subtotal:saldoPendiente, costoUnit:0, costoTotal:0, ganancia:saldoPendiente}],
+        items: [{prodNombre:'Saldo cobrado fiado: '+(f?.nombre||''), qty:1, precio:saldoPendiente, subtotal:saldoPendiente, costoUnit:costoParc, costoTotal:costoParc, ganancia:gananciaParc, esAbono:true}],
         total: saldoPendiente, payMethod: 'efectivo',
         nota: 'Cobro de fiado: '+(f?.nombre||''),
+        esAbono: true,
         createdAt: fs.serverTimestamp()
       });
+      showToast(`✅ Fiado cobrado — Ganancia: Bs.${gananciaParc.toFixed(2)}`);
+    } else {
+      showToast("✅ Fiado marcado como cobrado");
     }
-    showToast("✅ Fiado cobrado y registrado en caja");
   } catch(e) { showToast('Error: '+e.message, true); }
 }
 
@@ -3504,6 +3637,7 @@ window.toggleModoSeleccion = toggleModoSeleccion;
 window.toggleTodosFiados = toggleTodosFiados;
 window.toggleFiadoSeleccion = toggleFiadoSeleccion;
 window.imprimirFiadosSeleccionados = imprimirFiadosSeleccionados;
+window.toggleGrupoFiado = toggleGrupoFiado;
 
 // ════════════════════════════════════════════════════════
 // CONSUMO PROPIO — venta a precio de costo, reporte aparte
