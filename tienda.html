@@ -816,6 +816,59 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 
 <!-- MODAL: COMPRA -->
 
+<!-- MODAL: EDITAR VENTA -->
+<div class="modal-ov" id="editarVentaModal">
+  <button onclick="closeModal('editarVentaModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10">✕</button>
+  <div class="modal-box" style="max-width:520px">
+    <div class="modal-title">✏️ Editar venta</div>
+    <div id="editarVentaInfo" style="font-size:.75rem;color:var(--gr);margin-bottom:10px"></div>
+
+    <!-- Items actuales -->
+    <div style="font-size:.78rem;font-weight:800;margin-bottom:6px;color:var(--v)">Artículos</div>
+    <div id="editarItemsLista" style="margin-bottom:12px"></div>
+
+    <!-- Agregar ítem -->
+    <details style="margin-bottom:12px">
+      <summary style="font-size:.78rem;font-weight:800;cursor:pointer;color:#1565c0;padding:6px 0">+ Agregar artículo olvidado</summary>
+      <div style="margin-top:8px;background:var(--vbg);border-radius:8px;padding:10px">
+        <input id="editAgregarBuscar" type="text" placeholder="Buscar producto..." oninput="buscarProdEditarVenta(this.value)"
+          style="width:100%;padding:8px;border:1.5px solid var(--vbg);border-radius:8px;font-size:.82rem;background:#1a1a2e;color:var(--tx);margin-bottom:6px">
+        <div id="editAgregarResultados" style="max-height:120px;overflow-y:auto"></div>
+        <div id="editAgregarSeleccionado" style="display:none;margin-top:6px;padding:8px;border:1.5px solid var(--v);border-radius:8px;font-size:.78rem">
+          <div id="editAgregarNombre" style="font-weight:800;margin-bottom:4px"></div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <label style="font-size:.74rem">Cant:</label>
+            <input id="editAgregarQty" type="number" min="1" value="1" style="width:60px;padding:4px;border:1.5px solid var(--vbg);border-radius:6px;background:#1a1a2e;color:var(--tx);font-size:.8rem">
+            <button onclick="confirmarAgregarItemEdit()" style="background:var(--v);color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:.75rem;font-weight:800;cursor:pointer">Agregar</button>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <!-- Cambiar método de pago -->
+    <div style="margin-bottom:12px">
+      <div style="font-size:.78rem;font-weight:800;margin-bottom:6px">Método de pago</div>
+      <div style="display:flex;gap:8px">
+        <button id="editPayEfectivo" onclick="setEditPayMethod('efectivo')"
+          style="flex:1;padding:8px;border:2px solid var(--v);border-radius:8px;font-size:.78rem;font-weight:800;cursor:pointer;background:var(--v);color:#fff">💵 Efectivo</button>
+        <button id="editPayQR" onclick="setEditPayMethod('qr')"
+          style="flex:1;padding:8px;border:2px solid var(--vbg);border-radius:8px;font-size:.78rem;font-weight:800;cursor:pointer;background:var(--vbg);color:var(--gr)">📱 QR</button>
+      </div>
+    </div>
+
+    <!-- Motivo -->
+    <div style="margin-bottom:12px">
+      <div style="font-size:.78rem;font-weight:800;margin-bottom:4px">Motivo de la corrección <span style="color:var(--ro)">*</span></div>
+      <input id="editarVentaMotivo" type="text" placeholder="Ej: se ingresó mal la cantidad" maxlength="120"
+        style="width:100%;padding:9px;border:1.5px solid var(--vbg);border-radius:8px;font-size:.82rem;background:#1a1a2e;color:var(--tx)">
+    </div>
+
+    <button onclick="guardarEdicionVenta()" style="width:100%;background:var(--v);color:#fff;border:none;border-radius:10px;padding:12px;font-size:.88rem;font-weight:900;cursor:pointer">
+      💾 Guardar corrección
+    </button>
+  </div>
+</div>
+
 <!-- MODAL: FIAR DESDE CARRITO -->
 <div class="modal-ov" id="fiarModal"><button onclick="closeModal('fiarModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
   <div class="modal-box">
@@ -2009,6 +2062,175 @@ async function confirmSale() {
 }
 
 // ── Revertir / cancelar una venta ya registrada ──────────────
+// ── EDITAR VENTA ──────────────────────────────────────────
+let _editVentaId = null;
+let _editVentaItems = [];
+let _editVentaPayMethod = 'efectivo';
+let _editAgregarProd = null;
+
+function abrirEditarVenta(saleId) {
+  const sale = allSales.find(s => s.id === saleId);
+  if(!sale) return;
+  _editVentaId = saleId;
+  _editVentaItems = JSON.parse(JSON.stringify(sale.items || []));
+  _editVentaPayMethod = sale.payMethod || 'efectivo';
+
+  const t = sale.createdAt?.seconds ? new Date(sale.createdAt.seconds*1000) : new Date();
+  const edits = (sale.editLog||[]).length;
+  document.getElementById('editarVentaInfo').innerHTML =
+    `${fmtFechaCorta(t)} · <span style="color:#1565c0">${edits}/3 ediciones realizadas</span>`;
+  document.getElementById('editarVentaMotivo').value = '';
+  document.getElementById('editAgregarBuscar').value = '';
+  document.getElementById('editAgregarResultados').innerHTML = '';
+  document.getElementById('editAgregarSeleccionado').style.display = 'none';
+  _editAgregarProd = null;
+  setEditPayMethod(_editVentaPayMethod);
+  renderEditarItems();
+  openModal('editarVentaModal');
+}
+
+function renderEditarItems() {
+  const el = document.getElementById('editarItemsLista');
+  if(!_editVentaItems.length) { el.innerHTML = `<div style="color:var(--ro);font-size:.78rem;padding:6px">⚠️ Sin artículos — la venta quedará vacía</div>`; return; }
+  el.innerHTML = _editVentaItems.map((i,idx) => {
+    const subtotal = (i.precio||0)*(i.qty||1);
+    return `<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--vbg)">
+      <div style="flex:1;font-size:.78rem">${i.prodNombre}</div>
+      <div style="display:flex;align-items:center;gap:4px">
+        <button onclick="cambiarCantEdit(${idx},-1)" style="width:24px;height:24px;border:none;border-radius:6px;background:var(--vbg);color:var(--tx);cursor:pointer;font-size:.9rem;font-weight:900">−</button>
+        <span style="font-size:.82rem;font-weight:800;min-width:20px;text-align:center">${i.qty}</span>
+        <button onclick="cambiarCantEdit(${idx},1)" style="width:24px;height:24px;border:none;border-radius:6px;background:var(--vbg);color:var(--tx);cursor:pointer;font-size:.9rem;font-weight:900">+</button>
+      </div>
+      <div style="font-size:.78rem;color:var(--v);min-width:60px;text-align:right">Bs.${subtotal.toFixed(2)}</div>
+      <button onclick="eliminarItemEdit(${idx})" style="background:none;border:none;color:var(--ro);cursor:pointer;font-size:.9rem;padding:2px 4px" title="Quitar artículo">🗑</button>
+    </div>`;
+  }).join('');
+  const total = _editVentaItems.reduce((s,i)=>s+(i.precio||0)*(i.qty||1),0);
+  el.innerHTML += `<div style="text-align:right;font-weight:900;font-size:.88rem;padding:8px 0;color:var(--v)">Total: Bs.${total.toFixed(2)}</div>`;
+}
+
+function cambiarCantEdit(idx, delta) {
+  if(!_editVentaItems[idx]) return;
+  const newQty = (_editVentaItems[idx].qty||1) + delta;
+  if(newQty < 1) { if(confirm(`¿Eliminar "${_editVentaItems[idx].prodNombre}" de la venta?`)) eliminarItemEdit(idx); return; }
+  _editVentaItems[idx] = {..._editVentaItems[idx], qty: newQty, subtotal: newQty*(_editVentaItems[idx].precio||0)};
+  renderEditarItems();
+}
+
+function eliminarItemEdit(idx) {
+  _editVentaItems.splice(idx, 1);
+  renderEditarItems();
+}
+
+function setEditPayMethod(method) {
+  _editVentaPayMethod = method;
+  const eEl = document.getElementById('editPayEfectivo');
+  const qEl = document.getElementById('editPayQR');
+  if(eEl) { eEl.style.background = method==='efectivo'?'var(--v)':'var(--vbg)'; eEl.style.color = method==='efectivo'?'#fff':'var(--gr)'; eEl.style.borderColor = method==='efectivo'?'var(--v)':'var(--vbg)'; }
+  if(qEl) { qEl.style.background = method==='qr'?'#0d47a1':'var(--vbg)'; qEl.style.color = method==='qr'?'#fff':'var(--gr)'; qEl.style.borderColor = method==='qr'?'#0d47a1':'var(--vbg)'; }
+}
+
+function buscarProdEditarVenta(q) {
+  const el = document.getElementById('editAgregarResultados');
+  document.getElementById('editAgregarSeleccionado').style.display = 'none';
+  _editAgregarProd = null;
+  if(!q.trim()) { el.innerHTML=''; return; }
+  const matches = (allProducts||[]).filter(p => p.nombre?.toLowerCase().includes(q.toLowerCase())).slice(0,6);
+  if(!matches.length) { el.innerHTML=`<div style="font-size:.74rem;color:var(--gr);padding:4px">Sin resultados</div>`; return; }
+  el.innerHTML = matches.map(p=>`
+    <div onclick="seleccionarProdEdit('${p.id}')" style="padding:6px 8px;cursor:pointer;border-radius:6px;font-size:.78rem;margin-bottom:2px;background:var(--vbg)">
+      ${p.nombre} <span style="color:var(--v);font-weight:700">Bs.${(p.precio||0).toFixed(2)}</span>
+    </div>`).join('');
+}
+
+function seleccionarProdEdit(prodId) {
+  const p = (allProducts||[]).find(x=>x.id===prodId);
+  if(!p) return;
+  _editAgregarProd = p;
+  document.getElementById('editAgregarNombre').textContent = `${p.nombre} — Bs.${(p.precio||0).toFixed(2)}`;
+  document.getElementById('editAgregarSeleccionado').style.display = 'block';
+  document.getElementById('editAgregarResultados').innerHTML = '';
+  document.getElementById('editAgregarBuscar').value = p.nombre;
+  document.getElementById('editAgregarQty').value = 1;
+}
+
+function confirmarAgregarItemEdit() {
+  if(!_editAgregarProd) return;
+  const qty = parseInt(document.getElementById('editAgregarQty').value)||1;
+  const precio = _editAgregarProd.precio||0;
+  // Verificar si ya existe en la venta
+  const existeIdx = _editVentaItems.findIndex(i=>i.prodId===_editAgregarProd.id||i.prodNombre===_editAgregarProd.nombre);
+  if(existeIdx>=0) {
+    _editVentaItems[existeIdx].qty += qty;
+    _editVentaItems[existeIdx].subtotal = _editVentaItems[existeIdx].qty * precio;
+  } else {
+    const costoUnit = _editAgregarProd.precioUnit||0;
+    _editVentaItems.push({ prodId:_editAgregarProd.id, prodNombre:_editAgregarProd.nombre, qty, precio, subtotal:qty*precio, costoUnit, costoTotal:costoUnit*qty, ganancia:(precio-costoUnit)*qty });
+  }
+  document.getElementById('editAgregarBuscar').value='';
+  document.getElementById('editAgregarSeleccionado').style.display='none';
+  document.getElementById('editAgregarResultados').innerHTML='';
+  _editAgregarProd = null;
+  renderEditarItems();
+}
+
+async function guardarEdicionVenta() {
+  if(!_editVentaId) return;
+  const motivo = document.getElementById('editarVentaMotivo').value.trim();
+  if(!motivo) { showToast('Ingresá el motivo de la corrección', true); return; }
+  if(!_editVentaItems.length) { showToast('La venta no puede quedar sin artículos', true); return; }
+
+  const sale = allSales.find(s=>s.id===_editVentaId);
+  if(!sale) return;
+
+  const nuevoTotal = _editVentaItems.reduce((s,i)=>s+(i.precio||0)*(i.qty||1),0);
+  const editEntry = { fecha: new Date().toISOString(), motivo, itemsAntes: sale.items, totalAntes: sale.total, payMethodAntes: sale.payMethod };
+
+  // Restaurar stock de items eliminados o reducidos
+  const itemsAntes = sale.items||[];
+  for(const iAntes of itemsAntes) {
+    const iDespues = _editVentaItems.find(x=>x.prodId===iAntes.prodId||(x.prodNombre===iAntes.prodNombre));
+    const diffQty = (iAntes.qty||1) - (iDespues ? (iDespues.qty||1) : 0);
+    if(diffQty > 0 && iAntes.prodId) {
+      // Devolver stock al inventario
+      try {
+        const prodRef = fs.doc(db,'products',iAntes.prodId);
+        const snap = await fs.getDoc(prodRef);
+        if(snap.exists()) {
+          const stockActual = snap.data().stock||0;
+          await fs.updateDoc(prodRef, { stock: stockActual + diffQty });
+        }
+      } catch(e) { /* sin stock tracked */ }
+    }
+  }
+  // Descontar stock de items nuevos agregados
+  for(const iDespues of _editVentaItems) {
+    const iAntes = itemsAntes.find(x=>x.prodId===iDespues.prodId||(x.prodNombre===iDespues.prodNombre));
+    const diffQty = (iDespues.qty||1) - (iAntes ? (iAntes.qty||1) : 0);
+    if(diffQty > 0 && iDespues.prodId) {
+      try {
+        const prodRef = fs.doc(db,'products',iDespues.prodId);
+        const snap = await fs.getDoc(prodRef);
+        if(snap.exists()) {
+          const stockActual = snap.data().stock||0;
+          await fs.updateDoc(prodRef, { stock: Math.max(0, stockActual - diffQty) });
+        }
+      } catch(e) {}
+    }
+  }
+
+  try {
+    await fs.updateDoc(fs.doc(db,'sales_physical',_editVentaId), {
+      items: _editVentaItems,
+      total: nuevoTotal,
+      payMethod: _editVentaPayMethod,
+      editLog: [...(sale.editLog||[]), editEntry]
+    });
+    showToast('✅ Venta corregida');
+    closeModal('editarVentaModal');
+  } catch(e) { showToast('Error: '+e.message, true); }
+}
+
 async function revertirVenta(saleId) {
   const sale = allSales.find(s => s.id === saleId);
   if(!sale) { showToast("Venta no encontrada", true); return; }
@@ -2389,6 +2611,12 @@ function renderDayPorVenta() {
     const totalCosto = items.reduce((s2,i)=>s2+resolveItemCost(i).costoTotal,0);
     const esAbono = !!s.esAbono;
 
+    // Calcular si la venta es editable (máx 3 edits, máx 3 días)
+    const diasDesde = (Date.now() - t.getTime()) / (1000*60*60*24);
+    const editsHechos = (s.editLog||[]).length;
+    const puedeEditar = !esAbono && diasDesde <= 3 && editsHechos < 3;
+    const razonNoEditar = esAbono ? '' : diasDesde > 3 ? 'Venta de más de 3 días' : editsHechos >= 3 ? 'Máx. 3 ediciones alcanzado' : '';
+
     if(esAbono) return `<div class="ticket" style="border-left:3px solid #6a1b9a;padding:10px 12px;opacity:.85">
       <div class="ticket-header" style="margin-bottom:4px">
         <span style="font-weight:900;color:#6a1b9a">💰 Cobro de fiado</span>
@@ -2421,10 +2649,18 @@ function renderDayPorVenta() {
         </table>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--vbg)">
-        <button onclick="revertirVenta('${s.id}')" title="Cancelar / revertir esta venta"
-          style="background:none;border:1.5px solid var(--ro);color:var(--ro);border-radius:8px;padding:4px 9px;font-size:.68rem;font-weight:800;cursor:pointer;white-space:nowrap">
-          ↩️ Revertir
-        </button>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <button onclick="revertirVenta('${s.id}')" title="Cancelar / revertir esta venta"
+            style="background:none;border:1.5px solid var(--ro);color:var(--ro);border-radius:8px;padding:4px 9px;font-size:.68rem;font-weight:800;cursor:pointer;white-space:nowrap">
+            ↩️ Revertir
+          </button>
+          ${puedeEditar
+            ? `<button onclick="abrirEditarVenta('${s.id}')"
+                style="background:none;border:1.5px solid #1565c0;color:#1565c0;border-radius:8px;padding:4px 9px;font-size:.68rem;font-weight:800;cursor:pointer;white-space:nowrap">
+                ✏️ Editar${editsHechos>0?` (${editsHechos}/3)`:''}</button>`
+            : razonNoEditar ? `<span style="font-size:.65rem;color:var(--gr);padding:4px 6px">🔒 ${razonNoEditar}</span>` : ''
+          }
+        </div>
         <div style="text-align:right">
           <div style="font-size:.68rem;color:var(--gr)">${s.payMethod==="qr"?"📱 QR":"💵 Efectivo"} · Costo: Bs.${totalCosto.toFixed(2)} · Ganancia: <span style="color:var(--v);font-weight:800">Bs.${totalGanancia.toFixed(2)}</span></div>
           <div style="font-weight:900;font-size:.92rem;color:var(--v)">Total: Bs.${(s.total||0).toFixed(2)}</div>
@@ -3624,6 +3860,14 @@ window.selectPayMethod = selectPayMethod;
 window.calcCheckoutVuelto = calcCheckoutVuelto;
 window.confirmSale = confirmSale;
 window.revertirVenta = revertirVenta;
+window.abrirEditarVenta = abrirEditarVenta;
+window.cambiarCantEdit = cambiarCantEdit;
+window.eliminarItemEdit = eliminarItemEdit;
+window.setEditPayMethod = setEditPayMethod;
+window.buscarProdEditarVenta = buscarProdEditarVenta;
+window.seleccionarProdEdit = seleccionarProdEdit;
+window.confirmarAgregarItemEdit = confirmarAgregarItemEdit;
+window.guardarEdicionVenta = guardarEdicionVenta;
 window.repararVentasAntiguas = repararVentasAntiguas;
 window.editarCostoLibre = editarCostoLibre;
 window.renderDayObservados = renderDayObservados;
