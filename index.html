@@ -1952,6 +1952,13 @@ async function confirmOrder() {
   const items = Object.values(cart);
   if(!items.length) return;
 
+  // Bloquear pedidos antes de la inauguración
+  const INAUGURATION = new Date("2026-07-01T08:00:00");
+  if(new Date() < INAUGURATION) {
+    showToast("🚀 ¡Próximamente! Aún no estamos abiertos. ¡Volvé el 1 de julio!", true);
+    return;
+  }
+
   if(!DB.config.wa) { showToast("⚠️ Tienda no configurada aún", true); return; }
 
   // Check store hours
