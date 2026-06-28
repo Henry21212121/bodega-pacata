@@ -545,12 +545,68 @@ input[type=file]{display:none;}
           <div id="storeMapDiv" style="height:180px;border-radius:8px;overflow:hidden;border:2px solid #d0e8d8;margin-bottom:8px"></div>
           <div style="font-size:.72rem;color:var(--gr)" id="storeLocDisplay">Clic en el mapa para marcar la tienda</div>
         </div>
-        <div class="form-row">
-          <div class="fld"><label>Hora apertura</label><input type="time" id="cfgOpen" value="08:00"></div>
-          <div class="fld"><label>Hora cierre</label><input type="time" id="cfgClose" value="20:00"></div>
-        </div>
-        <div class="fld"><label>Días de atención</label>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px" id="cfgDays"></div>
+        <div class="fld">
+          <label>Horarios de atención</label>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">
+
+            <!-- Lunes a Viernes -->
+            <div style="background:var(--vbg);border-radius:10px;padding:10px 12px">
+              <div style="font-size:.78rem;font-weight:900;margin-bottom:6px">📅 Lunes a Viernes</div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <label style="display:flex;align-items:center;gap:4px;font-size:.75rem">
+                  <input type="checkbox" id="schLVActivo" checked style="accent-color:var(--v)"> Activo
+                </label>
+                <input type="time" id="schLVOpen" value="08:00" style="padding:5px 8px;border:1.5px solid #d0e8d8;border-radius:7px;font-size:.8rem">
+                <span style="font-size:.75rem;color:var(--gr)">a</span>
+                <input type="time" id="schLVClose" value="20:00" style="padding:5px 8px;border:1.5px solid #d0e8d8;border-radius:7px;font-size:.8rem">
+              </div>
+            </div>
+
+            <!-- Sábado -->
+            <div style="background:var(--vbg);border-radius:10px;padding:10px 12px">
+              <div style="font-size:.78rem;font-weight:900;margin-bottom:6px">📅 Sábado</div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <label style="display:flex;align-items:center;gap:4px;font-size:.75rem">
+                  <input type="checkbox" id="schSabActivo" checked style="accent-color:var(--v)"> Activo
+                </label>
+                <input type="time" id="schSabOpen" value="08:00" style="padding:5px 8px;border:1.5px solid #d0e8d8;border-radius:7px;font-size:.8rem">
+                <span style="font-size:.75rem;color:var(--gr)">a</span>
+                <input type="time" id="schSabClose" value="14:00" style="padding:5px 8px;border:1.5px solid #d0e8d8;border-radius:7px;font-size:.8rem">
+              </div>
+            </div>
+
+            <!-- Domingo -->
+            <div style="background:var(--vbg);border-radius:10px;padding:10px 12px">
+              <div style="font-size:.78rem;font-weight:900;margin-bottom:6px">📅 Domingo</div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <label style="display:flex;align-items:center;gap:4px;font-size:.75rem">
+                  <input type="checkbox" id="schDomActivo" style="accent-color:var(--v)"> Activo
+                </label>
+                <input type="time" id="schDomOpen" value="09:00" style="padding:5px 8px;border:1.5px solid #d0e8d8;border-radius:7px;font-size:.8rem">
+                <span style="font-size:.75rem;color:var(--gr)">a</span>
+                <input type="time" id="schDomClose" value="13:00" style="padding:5px 8px;border:1.5px solid #d0e8d8;border-radius:7px;font-size:.8rem">
+              </div>
+            </div>
+
+            <!-- Feriados -->
+            <div style="background:var(--vbg);border-radius:10px;padding:10px 12px">
+              <div style="font-size:.78rem;font-weight:900;margin-bottom:6px">🎉 Feriados</div>
+              <label style="display:flex;align-items:center;gap:6px;font-size:.75rem;margin-bottom:8px;cursor:pointer">
+                <input type="checkbox" id="schFeriadoCerrado" checked onchange="toggleFeriadoHorario()" style="accent-color:var(--v)"> Cerrado en feriados
+              </label>
+              <div id="schFeriadoHorario" style="display:none;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px">
+                <input type="time" id="schFerOpen" value="09:00" style="padding:5px 8px;border:1.5px solid #d0e8d8;border-radius:7px;font-size:.8rem">
+                <span style="font-size:.75rem;color:var(--gr)">a</span>
+                <input type="time" id="schFerClose" value="13:00" style="padding:5px 8px;border:1.5px solid #d0e8d8;border-radius:7px;font-size:.8rem">
+              </div>
+              <div id="schFeriadoLista" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
+              <div style="display:flex;gap:6px;align-items:center">
+                <input type="date" id="schFeriadoNuevo" style="padding:5px 8px;border:1.5px solid #d0e8d8;border-radius:7px;font-size:.8rem;flex:1">
+                <button onclick="agregarFeriado()" style="background:var(--v);color:#fff;border:none;border-radius:7px;padding:5px 12px;font-size:.78rem;font-weight:800;cursor:pointer">+ Agregar</button>
+              </div>
+            </div>
+
+          </div>
         </div>
         <button class="btn btn-v btn-full" style="margin-top:12px" onclick="saveConfig()">💾 Guardar configuración</button>
       </div>
@@ -2400,6 +2456,26 @@ function loadConfig() {
   set("cfgFreeDelivery", c.freeDeliveryFrom||0);
   set("cfgOpen", c.openTime||"08:00");
   set("cfgClose", c.closeTime||"20:00");
+  // Cargar horarios variables
+  const sch = c.schedule || {};
+  const lv = sch.lv || {}; const sab = sch.sab || {}; const dom = sch.dom || {}; const fer = sch.feriados || {};
+  const setChk = (id,v) => { const el=document.getElementById(id); if(el) el.checked=!!v; };
+  const setVal = (id,v) => { const el=document.getElementById(id); if(el && v) el.value=v; };
+  setChk("schLVActivo",  lv.activo  !== false);
+  setVal("schLVOpen",    lv.open  || "08:00");
+  setVal("schLVClose",   lv.close || "20:00");
+  setChk("schSabActivo", sab.activo !== false);
+  setVal("schSabOpen",   sab.open  || "08:00");
+  setVal("schSabClose",  sab.close || "14:00");
+  setChk("schDomActivo", !!dom.activo);
+  setVal("schDomOpen",   dom.open  || "09:00");
+  setVal("schDomClose",  dom.close || "13:00");
+  setChk("schFeriadoCerrado", fer.cerrado !== false);
+  setVal("schFerOpen",   fer.open  || "09:00");
+  setVal("schFerClose",  fer.close || "13:00");
+  window._feriados = fer.fechas ? [...fer.fechas] : [];
+  toggleFeriadoHorario();
+  renderFeriadoLista();
   set("cfgDeliveryTime", c.deliveryTime||"10 a 15");
   set("cfgDeliveryBaseDist", c.deliveryBaseDist||1);
   set("cfgDeliveryBasePrice", c.deliveryBasePrice||2);
@@ -2425,22 +2501,39 @@ function loadConfig() {
   renderCatList();
 }
 
-function buildDaysCheckboxes() {
-  const days = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
-  document.getElementById("cfgDays").innerHTML = days.map((d,i) =>
-    `<label style="display:flex;align-items:center;gap:4px;font-size:.78rem;font-weight:700;cursor:pointer;background:var(--vbg);border-radius:6px;padding:4px 8px">
-      <input type="checkbox" value="${i}" id="day${i}"> ${d}
-    </label>`).join("");
+function toggleFeriadoHorario() {
+  const cerrado = document.getElementById("schFeriadoCerrado")?.checked;
+  const horDiv = document.getElementById("schFeriadoHorario");
+  if(horDiv) horDiv.style.display = cerrado ? "none" : "flex";
 }
-function updateDaysCheckboxes(days) {
-  for(let i=0;i<7;i++) {
-    const cb = document.getElementById("day"+i);
-    if(cb) cb.checked = days.includes(i);
+function agregarFeriado() {
+  const inp = document.getElementById("schFeriadoNuevo");
+  const val = inp?.value;
+  if(!val) return;
+  if(!(window._feriados||[]).includes(val)) {
+    window._feriados = [...(window._feriados||[]), val].sort();
   }
+  if(inp) inp.value = "";
+  renderFeriadoLista();
 }
-function getSelectedDays() {
-  return [0,1,2,3,4,5,6].filter(i => document.getElementById("day"+i)?.checked);
+function eliminarFeriado(fecha) {
+  window._feriados = (window._feriados||[]).filter(f=>f!==fecha);
+  renderFeriadoLista();
 }
+function renderFeriadoLista() {
+  const el = document.getElementById("schFeriadoLista");
+  if(!el) return;
+  el.innerHTML = (window._feriados||[]).map(f=>`
+    <span style="display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#e65100;border-radius:8px;padding:3px 8px;font-size:.74rem;font-weight:700">
+      ${new Date(f+"T12:00:00").toLocaleDateString("es",{day:"numeric",month:"short"})}
+      <button onclick="eliminarFeriado('${f}')" style="background:none;border:none;color:#e65100;cursor:pointer;font-size:.75rem;padding:0 2px;line-height:1">✕</button>
+    </span>`).join("") || `<span style="font-size:.72rem;color:var(--gr)">Sin feriados cargados</span>`;
+}
+
+function buildDaysCheckboxes() { /* reemplazado por nuevo sistema de horarios */ }
+function updateDaysCheckboxes(days) { /* reemplazado por nuevo sistema de horarios */ }
+function getSelectedDays() { return [0,1,2,3,4,5,6].filter(i => document.getElementById("day"+i)?.checked); }
+
 
 async function handleLogoUpload(ev) {
   const file = ev.target.files[0]; if(!file) return;
@@ -2467,9 +2560,19 @@ async function saveConfig() {
     minOrder: parseFloat(document.getElementById("cfgMinOrder").value)||0,
     deliveryFee: parseFloat(document.getElementById("cfgDelivery")?.value)||0,
     freeDeliveryFrom: parseFloat(document.getElementById("cfgFreeDelivery").value)||0,
-    openTime: document.getElementById("cfgOpen").value,
-    closeTime: document.getElementById("cfgClose").value,
-    openDays: getSelectedDays(),
+    openTime: document.getElementById("schLVOpen")?.value || "08:00",
+    closeTime: document.getElementById("schLVClose")?.value || "20:00",
+    openDays: [1,2,3,4,5,6].filter(d => {
+      if(d>=1&&d<=5) return document.getElementById("schLVActivo")?.checked;
+      if(d===6) return document.getElementById("schSabActivo")?.checked;
+      return false;
+    }).concat(document.getElementById("schDomActivo")?.checked ? [0] : []),
+    schedule: {
+      lv:  { activo: !!document.getElementById("schLVActivo")?.checked,  open: document.getElementById("schLVOpen")?.value||"08:00",  close: document.getElementById("schLVClose")?.value||"20:00" },
+      sab: { activo: !!document.getElementById("schSabActivo")?.checked, open: document.getElementById("schSabOpen")?.value||"08:00",  close: document.getElementById("schSabClose")?.value||"14:00" },
+      dom: { activo: !!document.getElementById("schDomActivo")?.checked, open: document.getElementById("schDomOpen")?.value||"09:00",  close: document.getElementById("schDomClose")?.value||"13:00" },
+      feriados: { cerrado: !!document.getElementById("schFeriadoCerrado")?.checked, open: document.getElementById("schFerOpen")?.value||"09:00", close: document.getElementById("schFerClose")?.value||"13:00", fechas: window._feriados||[] }
+    },
     logo: DB.config.logo||"",
     deliveryTime: document.getElementById("cfgDeliveryTime")?.value||"10 a 15",
     deliveryBaseDist: parseFloat(document.getElementById("cfgDeliveryBaseDist")?.value)||1,
@@ -4058,6 +4161,9 @@ async function ejecutarResetStock() {
 }
 
 window.confirmarResetStock = confirmarResetStock;
+window.agregarFeriado = agregarFeriado;
+window.eliminarFeriado = eliminarFeriado;
+window.toggleFeriadoHorario = toggleFeriadoHorario;
 window.handleIntroFilesMulti = handleIntroFilesMulti;
 window.renderIntroSlides = renderIntroSlides;
 window.moverSlide = moverSlide;
