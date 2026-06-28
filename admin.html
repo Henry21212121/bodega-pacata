@@ -3493,25 +3493,46 @@ async function loadIntroConfig() {
 async function handleIntroFilesMulti(ev) {
   const files = Array.from(ev.target.files);
   if(!files.length) return;
-  showToast("⏳ Subiendo imágenes...");
+  showToast("⏳ Subiendo archivos...");
   let ok = 0;
   for(const file of files) {
     const isVideo = file.type.startsWith("video");
+    // Leer duración real si es video
+    let duracion = 3;
+    if(isVideo) {
+      duracion = await new Promise(res => {
+        const blobUrl = URL.createObjectURL(file);
+        const vid = document.createElement("video");
+        vid.preload = "metadata";
+        vid.onloadedmetadata = () => { URL.revokeObjectURL(blobUrl); res(Math.ceil(vid.duration)||3); };
+        vid.onerror = () => { URL.revokeObjectURL(blobUrl); res(3); };
+        vid.src = blobUrl;
+      });
+    }
     try {
       const url = await uploadToCloudinary(file);
-      introSlides.push({url, type: isVideo?"video":"image", duration: 3});
+      introSlides.push({url, type: isVideo?"video":"image", duration: duracion});
       ok++;
+      renderIntroSlides();
+      showToast(`⏳ ${ok}/${files.length} subido...`);
     } catch(e) {
+      if(isVideo) {
+        showToast(`❌ Video demasiado grande para subir. Usá Cloudinary o reducí el tamaño.`, true);
+        continue;
+      }
+      // Fallback base64 solo para imágenes
       await new Promise(res => {
         const r = new FileReader();
-        r.onload = e2 => { introSlides.push({url: e2.target.result, type: isVideo?"video":"image", duration: 3}); ok++; res(); };
+        r.onload = e2 => { introSlides.push({url: e2.target.result, type:"image", duration: duracion}); ok++; res(); };
+        r.onerror = () => res();
         r.readAsDataURL(file);
       });
+      renderIntroSlides();
     }
   }
   ev.target.value = "";
   renderIntroSlides();
-  showToast(`✅ ${ok} archivo${ok!==1?"s":""} agregado${ok!==1?"s":""}`);
+  showToast(ok > 0 ? `✅ ${ok} archivo${ok!==1?"s":""} agregado${ok!==1?"s":""}` : "❌ No se pudo subir ningún archivo", ok===0);
 }
 
 function actualizarDuracionSlide(idx, val) {
@@ -3561,16 +3582,48 @@ function eliminarSlide(idx) {
 }
 
 async function saveIntro() {
-  await fs.setDoc(fs.doc(db,"config","intro"), {
-    active: document.getElementById("introActive").checked,
-    slides: introSlides,
-    // Retrocompatibilidad
-    media: introSlides[0]?.url || "",
-    mediaType: introSlides[0]?.type || "image",
-    duration: introSlides[0]?.duration || 3,
-    updatedAt: fs.serverTimestamp()
-  });
-  showToast("✅ Configuración de intro guardada");
+  const btn = document.querySelector('[onclick="saveIntro()"]');
+  if(btn) { btn.disabled = true; btn.textContent = "⏳ Guardando..."; }
+  try {
+    // Verificar que no haya slides con base64 de video (demasiado grandes para Firestore)
+    const tieneVideoBase64 = introSlides.some(s => s.type === "video" && s.url.startsWith("data:"));
+    if(tieneVideoBase64) {
+      showToast("❌ El video no se subió correctamente a Cloudinary. Intentá subirlo de nuevo.", true);
+      if(btn) { btn.disabled = false; btn.textContent = "💾 Guardar configuración de intro"; }
+      return;
+    }
+    // Guardar en Firestore
+    await fs.setDoc(fs.doc(db,"config","intro"), {
+      active: document.getElementById("introActive").checked,
+      slides: introSlides,
+      media: introSlides[0]?.url || "",
+      mediaType: introSlides[0]?.type || "image",
+      duration: introSlides[0]?.duration || 3,
+      updatedAt: fs.serverTimestamp()
+    });
+    showToast("✅ Intro guardada correctamente");
+    // Actualizar banner de estado
+    const estadoEl = document.getElementById("introEstadoActual");
+    if(estadoEl) {
+      const active = document.getElementById("introActive").checked;
+      const totalSeg = introSlides.reduce((s,x)=>s+(x.duration||3),0);
+      if(!introSlides.length) {
+        estadoEl.textContent = "📭 Sin intro configurada";
+        estadoEl.style.background="#fff3e0"; estadoEl.style.color="#e65100";
+      } else if(!active) {
+        estadoEl.innerHTML = `⏸️ Intro desactivada · ${introSlides.length} imagen${introSlides.length!==1?"es":""} · ${totalSeg}s total`;
+        estadoEl.style.background="#fff3e0"; estadoEl.style.color="#b45309";
+      } else {
+        estadoEl.innerHTML = `✅ Intro activa · ${introSlides.length} imagen${introSlides.length!==1?"es":""} · ${totalSeg}s total`;
+        estadoEl.style.background="#e8f5e9"; estadoEl.style.color="#1b5e20";
+      }
+    }
+  } catch(e) {
+    showToast("❌ Error al guardar: " + (e.message||e), true);
+    console.error("saveIntro error:", e);
+  } finally {
+    if(btn) { btn.disabled = false; btn.textContent = "💾 Guardar configuración de intro"; }
+  }
 }
 
 // ── OFFER HISTORY ──────────────────────────────────────
