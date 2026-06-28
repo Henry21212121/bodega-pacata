@@ -567,7 +567,7 @@ input[type=file]{display:none;}
     <div id="tab-intro" class="tab-content" style="display:none">
       <div class="panel">
         <h2>🎬 Pantalla de bienvenida</h2>
-        <p style="font-size:.82rem;color:var(--gr);margin-bottom:14px">Se muestra al cliente al abrir la app, antes de la oferta. Duración configurable.</p>
+        <p style="font-size:.82rem;color:var(--gr);margin-bottom:14px">Se muestra al cliente al abrir la app. Podés agregar varias imágenes — aparecen en secuencia automáticamente.</p>
         <div class="fld">
           <label>Activar intro</label>
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:4px">
@@ -575,21 +575,21 @@ input[type=file]{display:none;}
           </label>
         </div>
         <div class="fld">
-          <label>Duración (segundos)</label>
+          <label>Duración por imagen (segundos)</label>
           <input type="number" id="introDuration" value="3" min="1" max="15" style="width:80px;padding:7px 10px;border:1.5px solid #d0e8d8;border-radius:8px;outline:none">
         </div>
         <div class="fld">
-          <label>Imagen o video de bienvenida</label>
-          <div style="display:flex;gap:10px;align-items:center;margin-top:6px">
-            <div id="introPreview" style="width:120px;height:80px;border-radius:8px;border:2px dashed #d0e8d8;background:#f5f5f5;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer" onclick="document.getElementById('introFile').click()">
-              <span style="font-size:1.5rem">🎬</span>
-            </div>
-            <div>
-              <div style="font-size:.78rem;color:var(--gr);margin-bottom:6px">Formatos: JPG, PNG, MP4, WebM<br>Recomendado: 1080×1920 (vertical)</div>
-              <button class="btn btn-sec btn-sm" onclick="document.getElementById('introFile').click()">📁 Seleccionar archivo</button>
-            </div>
-          </div>
-          <input type="file" id="introFile" accept="image/*,video/*" style="display:none" onchange="handleIntroFile(event)">
+          <label>Imágenes de bienvenida</label>
+          <div style="font-size:.76rem;color:var(--gr);margin-bottom:8px">Formatos: JPG, PNG · Recomendado: 1080×1920 (vertical) · Podés reordenar arrastrando</div>
+
+          <!-- Lista de slides -->
+          <div id="introSlidesList" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px"></div>
+
+          <!-- Botón agregar -->
+          <label style="display:inline-flex;align-items:center;gap:6px;background:#e8f5e9;color:#1b5e20;border:1.5px dashed #4caf50;border-radius:10px;padding:10px 16px;cursor:pointer;font-size:.82rem;font-weight:700">
+            ➕ Agregar imagen
+            <input type="file" id="introFileMulti" accept="image/*" multiple style="display:none" onchange="handleIntroFilesMulti(event)">
+          </label>
         </div>
         <button class="btn btn-v btn-full" style="margin-top:12px" onclick="saveIntro()">💾 Guardar configuración de intro</button>
       </div>
@@ -3339,7 +3339,7 @@ async function deleteClient(id) {
 // ── LOAD/SAVE NEW CONFIG FIELDS ─────────────────────────
 
 // ── INTRO CONFIG ───────────────────────────────────────
-let introMediaTemp = "", introMediaType = "image";
+let introSlides = []; // [{url, type}]
 
 async function loadIntroConfig() {
   try {
@@ -3348,46 +3348,81 @@ async function loadIntroConfig() {
       const d = snap.data();
       document.getElementById("introActive").checked = d.active||false;
       document.getElementById("introDuration").value = d.duration||3;
-      if(d.media) {
-        introMediaTemp = d.media;
-        introMediaType = d.mediaType||"image";
-        const prev = document.getElementById("introPreview");
-        if(d.mediaType==="video") {
-          prev.innerHTML = `<video src="${d.media}" style="width:100%;height:100%;object-fit:cover" muted></video>`;
-        } else {
-          prev.innerHTML = `<img src="${d.media}" style="width:100%;height:100%;object-fit:cover">`;
-        }
+      // Compatibilidad: si tiene slides array (nuevo) o media único (viejo)
+      if(d.slides && d.slides.length) {
+        introSlides = d.slides;
+      } else if(d.media) {
+        introSlides = [{url: d.media, type: d.mediaType||"image"}];
+      } else {
+        introSlides = [];
       }
+      renderIntroSlides();
     }
   } catch(e) {}
 }
 
-async function handleIntroFile(ev) {
-  const file = ev.target.files[0]; if(!file) return;
-  introMediaType = file.type.startsWith("video") ? "video" : "image";
-  try {
-    const url = await uploadToCloudinary(file);
-    introMediaTemp = url;
-  } catch(e) {
-    const r = new FileReader();
-    r.onload = e2 => { introMediaTemp = e2.target.result; };
-    r.readAsDataURL(file);
+async function handleIntroFilesMulti(ev) {
+  const files = Array.from(ev.target.files);
+  if(!files.length) return;
+  showToast("⏳ Subiendo imágenes...");
+  let ok = 0;
+  for(const file of files) {
+    try {
+      const url = await uploadToCloudinary(file);
+      introSlides.push({url, type: "image"});
+      ok++;
+    } catch(e) {
+      // Fallback base64
+      await new Promise(res => {
+        const r = new FileReader();
+        r.onload = e2 => { introSlides.push({url: e2.target.result, type:"image"}); ok++; res(); };
+        r.readAsDataURL(file);
+      });
+    }
   }
-  const prev = document.getElementById("introPreview");
-  if(introMediaType==="video") {
-    prev.innerHTML = `<video src="${introMediaTemp}" style="width:100%;height:100%;object-fit:cover" muted autoplay loop></video>`;
-  } else {
-    prev.innerHTML = `<img src="${introMediaTemp}" style="width:100%;height:100%;object-fit:cover">`;
+  ev.target.value = "";
+  renderIntroSlides();
+  showToast(`✅ ${ok} imagen${ok!==1?"es":""} agregada${ok!==1?"s":""}`);
+}
+
+function renderIntroSlides() {
+  const el = document.getElementById("introSlidesList");
+  if(!introSlides.length) {
+    el.innerHTML = `<div style="color:var(--gr);font-size:.78rem;padding:8px 0">Sin imágenes agregadas</div>`;
+    return;
   }
-  showToast("✅ Archivo cargado");
+  el.innerHTML = introSlides.map((s,i) => `
+    <div style="position:relative;width:90px;flex-shrink:0">
+      <img src="${s.url}" style="width:90px;height:130px;object-fit:cover;border-radius:8px;border:2px solid #d0e8d8;display:block">
+      <div style="position:absolute;top:4px;left:4px;background:rgba(0,0,0,.6);color:#fff;border-radius:10px;padding:1px 7px;font-size:.68rem;font-weight:800">${i+1}</div>
+      <div style="display:flex;justify-content:center;gap:4px;margin-top:4px">
+        ${i>0?`<button onclick="moverSlide(${i},-1)" title="Mover izq." style="background:var(--vbg);border:none;border-radius:6px;padding:3px 7px;cursor:pointer;font-size:.75rem">◀</button>`:'<span style="width:28px"></span>'}
+        <button onclick="eliminarSlide(${i})" title="Eliminar" style="background:#ffebee;color:#c62828;border:none;border-radius:6px;padding:3px 7px;cursor:pointer;font-size:.75rem">🗑</button>
+        ${i<introSlides.length-1?`<button onclick="moverSlide(${i},1)" title="Mover der." style="background:var(--vbg);border:none;border-radius:6px;padding:3px 7px;cursor:pointer;font-size:.75rem">▶</button>`:'<span style="width:28px"></span>'}
+      </div>
+    </div>`).join("");
+}
+
+function moverSlide(idx, dir) {
+  const newIdx = idx + dir;
+  if(newIdx < 0 || newIdx >= introSlides.length) return;
+  [introSlides[idx], introSlides[newIdx]] = [introSlides[newIdx], introSlides[idx]];
+  renderIntroSlides();
+}
+
+function eliminarSlide(idx) {
+  introSlides.splice(idx, 1);
+  renderIntroSlides();
 }
 
 async function saveIntro() {
   await fs.setDoc(fs.doc(db,"config","intro"), {
     active: document.getElementById("introActive").checked,
     duration: parseInt(document.getElementById("introDuration").value)||3,
-    media: introMediaTemp,
-    mediaType: introMediaType,
+    slides: introSlides,
+    // Compatibilidad con index.html viejo
+    media: introSlides[0]?.url || "",
+    mediaType: introSlides[0]?.type || "image",
     updatedAt: fs.serverTimestamp()
   });
   showToast("✅ Configuración de intro guardada");
@@ -4012,6 +4047,11 @@ async function ejecutarResetStock() {
 }
 
 window.confirmarResetStock = confirmarResetStock;
+window.handleIntroFilesMulti = handleIntroFilesMulti;
+window.renderIntroSlides = renderIntroSlides;
+window.moverSlide = moverSlide;
+window.eliminarSlide = eliminarSlide;
+window.saveIntro = saveIntro;
 window.setPedImg = setPedImg;
 window.clearPedImg = clearPedImg;
 
