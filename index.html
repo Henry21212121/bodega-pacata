@@ -915,34 +915,59 @@ async function startApp() {
       const snap = await fs.getDoc(fs.doc(db,"config","intro"));
       if(snap.exists()) {
         const intro = snap.data();
-        if(intro.active && intro.media) {
-          introDuration = intro.duration || 3;
+        // Soporte multi-slide (nuevo) y media único (retrocompatibilidad)
+        const slides = (intro.slides && intro.slides.length) ? intro.slides : (intro.media ? [{url:intro.media, type:intro.mediaType||"image"}] : []);
+        if(intro.active && slides.length) {
+          const durPorSlide = (intro.duration||3) * 1000;
+          introDuration = (durPorSlide * slides.length) / 1000;
           const def = document.getElementById("loadingDefault");
           const wrap = document.getElementById("loadingIntroWrap");
           const barWrap = document.getElementById("loadingBarWrap");
-
-          // Hide default logo, show fullscreen intro
           if(def) def.style.display = "none";
-
-          if(intro.mediaType === "video") {
-            // Video fullscreen — NO loading bar
-            if(wrap) {
-              wrap.style.display = "block";
-              wrap.innerHTML = `<video autoplay muted playsinline loop style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" src="${intro.media}"></video>
-                <button onclick="skipLoading()" style="position:absolute;bottom:24px;right:24px;background:rgba(0,0,0,.4);color:#fff;border:1px solid rgba(255,255,255,.5);border-radius:50px;padding:8px 20px;font-size:.85rem;font-weight:700;cursor:pointer;z-index:10">Saltar →</button>`;
+          if(wrap) {
+            wrap.style.display = "block";
+            // Construir slideshow
+            let currentSlide = 0;
+            const showSlide = (idx) => {
+              const s = slides[idx];
+              if(!s) return;
+              wrap.style.transition = "opacity .4s";
+              wrap.style.opacity = "0";
+              setTimeout(() => {
+                wrap.style.backgroundImage = `url('${s.url}')`;
+                wrap.style.backgroundSize = "cover";
+                wrap.style.backgroundPosition = "center";
+                wrap.style.backgroundRepeat = "no-repeat";
+                // Dots indicadores
+                const dotsEl = wrap.querySelector('.intro-dots');
+                if(dotsEl) dotsEl.querySelectorAll('span').forEach((d,i)=>{ d.style.opacity = i===idx?'1':'.4'; d.style.width = i===idx?'18px':'8px'; });
+                wrap.style.opacity = "1";
+              }, 400);
+            };
+            // Dots solo si hay más de 1
+            if(slides.length > 1) {
+              const dots = document.createElement('div');
+              dots.className = 'intro-dots';
+              dots.style.cssText = 'position:absolute;bottom:60px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:10';
+              dots.innerHTML = slides.map((_,i)=>`<span style="height:8px;width:${i===0?'18':'8'}px;border-radius:4px;background:#fff;opacity:${i===0?'1':'.4'};transition:all .3s;display:block"></span>`).join('');
+              wrap.appendChild(dots);
             }
-          } else {
-            // Image fullscreen via background-image for true cover (no white margins)
-            if(wrap) {
-              wrap.style.display = "block";
-              wrap.style.backgroundImage = `url('${intro.media}')`;
-              wrap.style.backgroundSize = "cover";
-              wrap.style.backgroundPosition = "center";
-              wrap.style.backgroundRepeat = "no-repeat";
+            // Botón saltar
+            const skipBtn = document.createElement('button');
+            skipBtn.textContent = 'Saltar →';
+            skipBtn.onclick = skipLoading;
+            skipBtn.style.cssText = 'position:absolute;bottom:24px;right:24px;background:rgba(0,0,0,.4);color:#fff;border:1px solid rgba(255,255,255,.5);border-radius:50px;padding:8px 20px;font-size:.85rem;font-weight:700;cursor:pointer;z-index:10';
+            wrap.appendChild(skipBtn);
+            showSlide(0);
+            if(slides.length > 1) {
+              const iv = setInterval(()=>{
+                currentSlide = (currentSlide+1) % slides.length;
+                showSlide(currentSlide);
+                if(currentSlide === 0) clearInterval(iv);
+              }, durPorSlide);
             }
-            // Show loading bar at bottom over the image
-            if(barWrap) barWrap.style.display = "block";
           }
+          if(barWrap) barWrap.style.display = "block";
         }
       }
     }
