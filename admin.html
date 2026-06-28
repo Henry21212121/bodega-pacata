@@ -3510,7 +3510,19 @@ async function handleIntroFilesMulti(ev) {
       });
     }
     try {
-      const url = await uploadToCloudinary(file);
+      // Cloudinary usa endpoint diferente para video e imagen
+      let url;
+      if(isVideo) {
+        const fd = new FormData();
+        fd.append("file", file);
+        fd.append("upload_preset", CLOUD_PRESET);
+        const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/video/upload`, {method:"POST", body:fd});
+        if(!res.ok) { const err = await res.text(); throw new Error(err); }
+        const d = await res.json();
+        url = d.secure_url;
+      } else {
+        url = await uploadToCloudinary(file);
+      }
       introSlides.push({url, type: isVideo?"video":"image", duration: duracion});
       ok++;
       renderIntroSlides();
