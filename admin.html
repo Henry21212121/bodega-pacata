@@ -300,6 +300,7 @@ input[type=file]{display:none;}
           <button class="btn btn-sec btn-sm fpill" data-filter="active" onclick="filterOrdersGroup('active',this)">🔄 En curso <span id="activeCount" style="background:#fff;color:var(--v);border-radius:50px;padding:0 6px;font-size:.68rem;margin-left:4px">0</span></button>
           <button class="btn btn-sec btn-sm fpill" data-filter="done" onclick="filterOrdersGroup('done',this)">✅ Concluidos</button>
           <button class="btn btn-sec btn-sm fpill" data-filter="cancelled" onclick="filterOrdersGroup('cancelled',this)">❌ Cancelados</button>
+          <button class="btn btn-ro btn-sm" onclick="confirmarResetPedidos()" style="margin-left:auto" title="Eliminar todos los pedidos de prueba">🗑️ Limpiar datos de prueba</button>
         </div>
         <div class="tbl-wrap">
           <table class="tbl">
@@ -363,7 +364,6 @@ input[type=file]{display:none;}
           <button class="btn btn-sec btn-sm" onclick="openNewCat()" title="Agregar categoría">🗂️ + Categoría</button>
           <button class="btn btn-or btn-sm" onclick="bulkGenDescriptions()" id="bulkDescBtn" title="Genera descripciones con IA para todos los productos que no tienen una">✨ Descripciones masivas</button>
           <button class="btn btn-ro btn-sm" onclick="confirmarResetStock()">🗑️ Resetear stock</button>
-          <button class="btn btn-ro btn-sm" onclick="confirmarResetPedidos()" title="Eliminar todos los pedidos de prueba">🗑️ Limpiar pedidos</button>
         </div>
         <div id="bulkDescProgress" style="display:none;background:#fff8ec;border:1px solid #fde19a;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:.82rem"></div>
         <div class="filter-pills" id="catFilterPills"></div>
@@ -4017,6 +4017,9 @@ function renderOrders() {
         : `<button class="btn btn-sec btn-sm" onclick="openCalModal('${o.id}')">⭐ Calificar</button>`;
     }
 
+    const cancelable = !['delivered','cancelled','rejected'].includes(effectiveStatus);
+    const editable   = !['delivered','cancelled','rejected'].includes(effectiveStatus);
+
     return `<tr>
       <td><b>${o.code||"—"}</b>${schedBadge}</td>
       <td>${o.clientName||"—"}<br><small style="color:var(--gr)">${o.clientPhone||""}</small></td>
@@ -4027,6 +4030,8 @@ function renderOrders() {
       <td style="display:flex;gap:3px;flex-wrap:wrap;align-items:center">
         ${quickBtn}
         <button class="btn btn-sec btn-sm" onclick="openOrder('${o.id}')">👁️</button>
+        ${editable   ? `<button class="btn btn-sec btn-sm" onclick="abrirEditarPedido('${o.id}')" title="Editar pedido">✏️</button>` : ''}
+        ${cancelable ? `<button class="btn btn-ro btn-sm"  onclick="cancelarPedido('${o.id}')"    title="Cancelar pedido">✕</button>` : ''}
       </td>
     </tr>`;
   }).join("");
@@ -4195,8 +4200,109 @@ async function ejecutarResetStock() {
   showToast(errores===0 ? `✅ Stock de ${procesados} productos reseteado a 0` : `⚠️ ${procesados} OK · ${errores} errores`, errores>0);
 }
 
+// ── CANCELAR PEDIDO ───────────────────────────────────────
+async function cancelarPedido(orderId) {
+  const o = DB.orders.find(x=>x.id===orderId);
+  if(!o) return;
+  const motivo = prompt(`¿Cancelar pedido ${o.code||orderId}?\n\nMotivo de cancelación (requerido):`);
+  if(!motivo?.trim()) { showToast("Cancelado — se requiere motivo", true); return; }
+  try {
+    await fs.updateDoc(fs.doc(db,"orders",orderId), {
+      status: "cancelled",
+      cancelledAt: fs.serverTimestamp(),
+      cancelNote: motivo.trim()
+    });
+    // Notificar al cliente por WhatsApp si tiene teléfono
+    if(o.clientPhone) {
+      const msg = `Hola ${o.clientName||''}👋, lamentamos informarte que tu pedido *${o.code||''}* fue cancelado.\n\nMotivo: ${motivo.trim()}\n\nDisculpá las molestias. ¡Podés hacer un nuevo pedido cuando quieras!`;
+      window.open(`https://wa.me/${o.clientPhone.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`, '_blank');
+    }
+    showToast(`✅ Pedido ${o.code||''} cancelado`);
+  } catch(e) { showToast("Error: "+e.message, true); }
+}
+
+// ── EDITAR PEDIDO ─────────────────────────────────────────
+let _editPedidoId = null;
+let _editPedidoItems = [];
+
+function abrirEditarPedido(orderId) {
+  const o = DB.orders.find(x=>x.id===orderId);
+  if(!o) return;
+  _editPedidoId = orderId;
+  _editPedidoItems = JSON.parse(JSON.stringify(o.items||[]));
+
+  document.getElementById("editPedidoInfo").textContent =
+    `${o.code||'—'} · ${o.clientName||'—'} · Bs.${(o.total||0).toFixed(2)}`;
+  document.getElementById("editPedidoDireccion").value = o.address||o.clientAddress||'';
+  document.getElementById("editPedidoNota").value = o.adminNote||'';
+  document.getElementById("editPedidoMotivo").value = '';
+  renderEditPedidoItems();
+  document.getElementById("editarPedidoModal").style.display = "flex";
+}
+
+function renderEditPedidoItems() {
+  const el = document.getElementById("editPedidoItems");
+  if(!_editPedidoItems.length) { el.innerHTML=`<div style="color:var(--ro);font-size:.78rem">Sin artículos</div>`; return; }
+  const total = _editPedidoItems.reduce((s,i)=>s+(i.precio||i.unitPrice||0)*(i.qty||i.quantity||1),0);
+  el.innerHTML = _editPedidoItems.map((i,idx)=>{
+    const precio = i.precio||i.unitPrice||0;
+    const qty = i.qty||i.quantity||1;
+    const nombre = i.prodNombre||i.nombre||i.name||'?';
+    return `<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--vbg);font-size:.78rem">
+      <div style="flex:1">${nombre}</div>
+      <div style="display:flex;align-items:center;gap:3px">
+        <button onclick="cambiarCantPedido(${idx},-1)" style="width:22px;height:22px;border:none;border-radius:5px;background:var(--vbg);cursor:pointer;font-weight:900">−</button>
+        <span style="min-width:18px;text-align:center;font-weight:800">${qty}</span>
+        <button onclick="cambiarCantPedido(${idx},1)"  style="width:22px;height:22px;border:none;border-radius:5px;background:var(--vbg);cursor:pointer;font-weight:900">+</button>
+      </div>
+      <span style="min-width:60px;text-align:right;color:var(--v);font-weight:700">Bs.${(precio*qty).toFixed(2)}</span>
+      <button onclick="eliminarItemPedido(${idx})" style="background:none;border:none;color:var(--ro);cursor:pointer">🗑</button>
+    </div>`;
+  }).join('') + `<div style="text-align:right;font-weight:900;padding:6px 0;font-size:.85rem">Total: Bs.${total.toFixed(2)}</div>`;
+}
+
+function cambiarCantPedido(idx, delta) {
+  const item = _editPedidoItems[idx];
+  if(!item) return;
+  const qField = item.qty != null ? 'qty' : 'quantity';
+  const newQty = (item[qField]||1) + delta;
+  if(newQty < 1) { eliminarItemPedido(idx); return; }
+  _editPedidoItems[idx][qField] = newQty;
+  renderEditPedidoItems();
+}
+
+function eliminarItemPedido(idx) {
+  _editPedidoItems.splice(idx,1);
+  renderEditPedidoItems();
+}
+
+async function guardarEdicionPedido() {
+  if(!_editPedidoId) return;
+  const motivo = document.getElementById("editPedidoMotivo").value.trim();
+  if(!motivo) { showToast("Ingresá el motivo", true); return; }
+  if(!_editPedidoItems.length) { showToast("El pedido no puede quedar sin artículos", true); return; }
+  const nuevoTotal = _editPedidoItems.reduce((s,i)=>s+(i.precio||i.unitPrice||0)*(i.qty||i.quantity||1),0);
+  const o = DB.orders.find(x=>x.id===_editPedidoId);
+  try {
+    await fs.updateDoc(fs.doc(db,"orders",_editPedidoId), {
+      items: _editPedidoItems,
+      total: nuevoTotal,
+      address: document.getElementById("editPedidoDireccion").value.trim() || (o?.address||''),
+      adminNote: document.getElementById("editPedidoNota").value.trim(),
+      editLog: [...(o?.editLog||[]), { fecha: new Date().toISOString(), motivo, totalAntes: o?.total }]
+    });
+    showToast("✅ Pedido actualizado");
+    close2("editarPedidoModal");
+  } catch(e) { showToast("Error: "+e.message, true); }
+}
+
 window.confirmarResetStock = confirmarResetStock;
 window.confirmarResetPedidos = confirmarResetPedidos;
+window.cancelarPedido = cancelarPedido;
+window.abrirEditarPedido = abrirEditarPedido;
+window.guardarEdicionPedido = guardarEdicionPedido;
+window.cambiarCantPedido = cambiarCantPedido;
+window.eliminarItemPedido = eliminarItemPedido;
 window.agregarFeriado = agregarFeriado;
 window.eliminarFeriado = eliminarFeriado;
 window.toggleFeriadoHorario = toggleFeriadoHorario;
@@ -4393,6 +4499,37 @@ window.renderCoquetteAdminList = renderCoquetteAdminList;
       <button class="cbtn cbtn-s" onclick="close2('calModal')">Cancelar</button>
       <button class="cbtn cbtn-v" onclick="sendCalLink()">💬 Enviar por WhatsApp</button>
     </div>
+  </div>
+</div>
+
+<!-- MODAL: EDITAR PEDIDO -->
+<div class="confirm-ov" id="editarPedidoModal" style="display:none">
+  <button onclick="close2('editarPedidoModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;z-index:10">✕</button>
+  <div class="confirm-box" style="max-width:460px">
+    <h3>✏️ Editar pedido</h3>
+    <div id="editPedidoInfo" style="font-size:.75rem;color:var(--gr);margin-bottom:12px"></div>
+
+    <div style="font-size:.78rem;font-weight:800;margin-bottom:6px">Artículos</div>
+    <div id="editPedidoItems" style="margin-bottom:12px;max-height:200px;overflow-y:auto"></div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+      <div>
+        <div style="font-size:.75rem;font-weight:800;margin-bottom:4px">Dirección de entrega</div>
+        <textarea id="editPedidoDireccion" rows="2" style="width:100%;padding:7px;border:1.5px solid #d0e8d8;border-radius:8px;font-size:.8rem;resize:none"></textarea>
+      </div>
+      <div>
+        <div style="font-size:.75rem;font-weight:800;margin-bottom:4px">Nota interna</div>
+        <textarea id="editPedidoNota" rows="2" style="width:100%;padding:7px;border:1.5px solid #d0e8d8;border-radius:8px;font-size:.8rem;resize:none"></textarea>
+      </div>
+    </div>
+
+    <div style="font-size:.75rem;font-weight:800;margin-bottom:4px">Motivo de la edición <span style="color:var(--ro)">*</span></div>
+    <input id="editPedidoMotivo" type="text" placeholder="Ej: cliente cambió de dirección" maxlength="120"
+      style="width:100%;padding:8px;border:1.5px solid #d0e8d8;border-radius:8px;font-size:.8rem;margin-bottom:12px">
+
+    <button onclick="guardarEdicionPedido()" style="width:100%;background:var(--v);color:#fff;border:none;border-radius:10px;padding:12px;font-size:.88rem;font-weight:900;cursor:pointer">
+      💾 Guardar cambios
+    </button>
   </div>
 </div>
 </body>
