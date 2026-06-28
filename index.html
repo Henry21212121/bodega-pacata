@@ -923,6 +923,8 @@ async function startApp() {
         if(intro.active && slides.length) {
           // Duración total = suma de duración de cada slide
           introDuration = slides.reduce((s,x)=>s+(x.duration||3), 0);
+          // Extender el safety fallback para que no corte la intro
+          if(window._extendSafety) window._extendSafety(introDuration * 1000 + 5000);
 
           const def = document.getElementById("loadingDefault");
           const wrap = document.getElementById("loadingIntroWrap");
@@ -1045,14 +1047,20 @@ document.addEventListener('DOMContentLoaded', function() {
     } catch(e) {}
     // Connect Firebase — startApp handles loading + intro + products
     waitForDB();
-    // Safety fallback: if Firebase takes more than 8s, show products anyway
-    setTimeout(() => {
-      const ls = document.getElementById("loadingScreen");
-      if(ls && ls.style.display !== "none" && !ls.classList.contains("hidden")) {
-        renderProducts();
-        hideLoading();
-      }
-    }, 8000);
+    // Safety fallback: si Firebase no responde, mostrar productos.
+    // startApp puede extender este timeout llamando window._extendSafety(ms).
+    let _safetyTimer = null;
+    const _armSafety = (ms) => {
+      if(_safetyTimer) clearTimeout(_safetyTimer);
+      _safetyTimer = setTimeout(() => {
+        const ls = document.getElementById("loadingScreen");
+        if(ls && ls.style.display !== "none" && !ls.classList.contains("hidden")) {
+          renderProducts(); hideLoading();
+        }
+      }, ms);
+    };
+    window._extendSafety = (ms) => _armSafety(ms);
+    _armSafety(10000); // default 10s mientras llega la config
   } catch(e) {
     console.error("Init error:", e);
     renderProducts();
