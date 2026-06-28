@@ -575,11 +575,7 @@ input[type=file]{display:none;}
           </label>
         </div>
         <div class="fld">
-          <label>Duración por imagen (segundos)</label>
-          <input type="number" id="introDuration" value="3" min="1" max="15" style="width:80px;padding:7px 10px;border:1.5px solid #d0e8d8;border-radius:8px;outline:none">
-        </div>
-        <div class="fld">
-          <label>Imágenes de bienvenida</label>
+          <label>Imágenes / videos de bienvenida</label>
           <div style="font-size:.76rem;color:var(--gr);margin-bottom:8px">Formatos: JPG, PNG · Recomendado: 1080×1920 (vertical) · Podés reordenar arrastrando</div>
 
           <!-- Lista de slides -->
@@ -3339,7 +3335,7 @@ async function deleteClient(id) {
 // ── LOAD/SAVE NEW CONFIG FIELDS ─────────────────────────
 
 // ── INTRO CONFIG ───────────────────────────────────────
-let introSlides = []; // [{url, type}]
+let introSlides = []; // [{url, type, duration}]
 
 async function loadIntroConfig() {
   try {
@@ -3347,12 +3343,11 @@ async function loadIntroConfig() {
     if(snap.exists()) {
       const d = snap.data();
       document.getElementById("introActive").checked = d.active||false;
-      document.getElementById("introDuration").value = d.duration||3;
-      // Compatibilidad: si tiene slides array (nuevo) o media único (viejo)
+      // Compatibilidad: slides array (nuevo) o media único (viejo)
       if(d.slides && d.slides.length) {
-        introSlides = d.slides;
+        introSlides = d.slides.map(s=>({...s, duration: s.duration||d.duration||3}));
       } else if(d.media) {
-        introSlides = [{url: d.media, type: d.mediaType||"image"}];
+        introSlides = [{url: d.media, type: d.mediaType||"image", duration: d.duration||3}];
       } else {
         introSlides = [];
       }
@@ -3367,22 +3362,26 @@ async function handleIntroFilesMulti(ev) {
   showToast("⏳ Subiendo imágenes...");
   let ok = 0;
   for(const file of files) {
+    const isVideo = file.type.startsWith("video");
     try {
       const url = await uploadToCloudinary(file);
-      introSlides.push({url, type: "image"});
+      introSlides.push({url, type: isVideo?"video":"image", duration: 3});
       ok++;
     } catch(e) {
-      // Fallback base64
       await new Promise(res => {
         const r = new FileReader();
-        r.onload = e2 => { introSlides.push({url: e2.target.result, type:"image"}); ok++; res(); };
+        r.onload = e2 => { introSlides.push({url: e2.target.result, type: isVideo?"video":"image", duration: 3}); ok++; res(); };
         r.readAsDataURL(file);
       });
     }
   }
   ev.target.value = "";
   renderIntroSlides();
-  showToast(`✅ ${ok} imagen${ok!==1?"es":""} agregada${ok!==1?"s":""}`);
+  showToast(`✅ ${ok} archivo${ok!==1?"s":""} agregado${ok!==1?"s":""}`);
+}
+
+function actualizarDuracionSlide(idx, val) {
+  if(introSlides[idx]) introSlides[idx].duration = Math.max(1, parseInt(val)||3);
 }
 
 function renderIntroSlides() {
@@ -3392,15 +3391,27 @@ function renderIntroSlides() {
     return;
   }
   el.innerHTML = introSlides.map((s,i) => `
-    <div style="position:relative;width:90px;flex-shrink:0">
-      <img src="${s.url}" style="width:90px;height:130px;object-fit:cover;border-radius:8px;border:2px solid #d0e8d8;display:block">
-      <div style="position:absolute;top:4px;left:4px;background:rgba(0,0,0,.6);color:#fff;border-radius:10px;padding:1px 7px;font-size:.68rem;font-weight:800">${i+1}</div>
-      <div style="display:flex;justify-content:center;gap:4px;margin-top:4px">
-        ${i>0?`<button onclick="moverSlide(${i},-1)" title="Mover izq." style="background:var(--vbg);border:none;border-radius:6px;padding:3px 7px;cursor:pointer;font-size:.75rem">◀</button>`:'<span style="width:28px"></span>'}
-        <button onclick="eliminarSlide(${i})" title="Eliminar" style="background:#ffebee;color:#c62828;border:none;border-radius:6px;padding:3px 7px;cursor:pointer;font-size:.75rem">🗑</button>
-        ${i<introSlides.length-1?`<button onclick="moverSlide(${i},1)" title="Mover der." style="background:var(--vbg);border:none;border-radius:6px;padding:3px 7px;cursor:pointer;font-size:.75rem">▶</button>`:'<span style="width:28px"></span>'}
+    <div style="flex-shrink:0;width:100px;background:var(--vbg);border-radius:10px;padding:6px;border:1.5px solid #d0e8d8">
+      ${s.type==="video"
+        ? `<video src="${s.url}" style="width:100%;height:130px;object-fit:cover;border-radius:6px;display:block" muted></video>`
+        : `<img src="${s.url}" style="width:100%;height:130px;object-fit:cover;border-radius:6px;display:block">`}
+      <div style="text-align:center;font-size:.65rem;font-weight:800;color:var(--gr);margin:4px 0 2px">#${i+1}</div>
+      <div style="display:flex;align-items:center;gap:3px;margin-bottom:4px">
+        <input type="number" value="${s.duration||3}" min="1" max="30"
+          onchange="actualizarDuracionSlide(${i},this.value)"
+          style="width:100%;padding:3px 5px;border:1.5px solid #d0e8d8;border-radius:6px;font-size:.72rem;text-align:center">
+        <span style="font-size:.65rem;color:var(--gr);white-space:nowrap">seg</span>
+      </div>
+      <div style="display:flex;justify-content:center;gap:3px">
+        ${i>0?`<button onclick="moverSlide(${i},-1)" style="flex:1;background:#e8f5e9;border:none;border-radius:5px;padding:3px;cursor:pointer;font-size:.7rem">◀</button>`:'<span style="flex:1"></span>'}
+        <button onclick="eliminarSlide(${i})" style="flex:1;background:#ffebee;color:#c62828;border:none;border-radius:5px;padding:3px;cursor:pointer;font-size:.7rem">🗑</button>
+        ${i<introSlides.length-1?`<button onclick="moverSlide(${i},1)" style="flex:1;background:#e8f5e9;border:none;border-radius:5px;padding:3px;cursor:pointer;font-size:.7rem">▶</button>`:'<span style="flex:1"></span>'}
       </div>
     </div>`).join("");
+  // Mostrar duración total
+  const totalSeg = introSlides.reduce((s,x)=>s+(x.duration||3),0);
+  el.insertAdjacentHTML('beforeend',
+    `<div style="width:100%;margin-top:6px;font-size:.74rem;color:var(--gr)">⏱ Duración total: <strong>${totalSeg}s</strong></div>`);
 }
 
 function moverSlide(idx, dir) {
@@ -3418,11 +3429,11 @@ function eliminarSlide(idx) {
 async function saveIntro() {
   await fs.setDoc(fs.doc(db,"config","intro"), {
     active: document.getElementById("introActive").checked,
-    duration: parseInt(document.getElementById("introDuration").value)||3,
     slides: introSlides,
-    // Compatibilidad con index.html viejo
+    // Retrocompatibilidad
     media: introSlides[0]?.url || "",
     mediaType: introSlides[0]?.type || "image",
+    duration: introSlides[0]?.duration || 3,
     updatedAt: fs.serverTimestamp()
   });
   showToast("✅ Configuración de intro guardada");
@@ -4052,6 +4063,7 @@ window.renderIntroSlides = renderIntroSlides;
 window.moverSlide = moverSlide;
 window.eliminarSlide = eliminarSlide;
 window.saveIntro = saveIntro;
+window.actualizarDuracionSlide = actualizarDuracionSlide;
 window.setPedImg = setPedImg;
 window.clearPedImg = clearPedImg;
 
