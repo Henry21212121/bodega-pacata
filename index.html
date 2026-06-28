@@ -959,8 +959,9 @@ async function startApp() {
                   // Limpiar background, poner video
                   wrap.style.backgroundImage = 'none';
                   let vid = wrap.querySelector('video.intro-vid');
-                  if(!vid) { vid = document.createElement('video'); vid.className='intro-vid'; vid.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0'; vid.muted=true; vid.playsInline=true; wrap.prepend(vid); }
-                  vid.src = s.url; vid.play();
+                  if(!vid) { vid = document.createElement('video'); vid.className='intro-vid'; vid.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0'; vid.playsInline=true; wrap.prepend(vid); }
+                  vid.src = s.url;
+                  vid.play().catch(()=>{ vid.muted=true; vid.play(); }); // fallback muted si el navegador bloquea audio
                 } else {
                   const vid = wrap.querySelector('video.intro-vid');
                   if(vid) vid.style.display='none';
