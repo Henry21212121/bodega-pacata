@@ -1239,13 +1239,12 @@ function applyBranding() {
 
 // ── STATUS BAR ─────────────────────
 function checkStatus() {
-  const INAUGURATION = new Date("2026-07-01T08:00:00"); // Miércoles 1 julio 2026 8:00
+  const INAUGURATION = new Date("2026-07-01T08:00:00");
   const now = new Date();
   const preInaugural = now < INAUGURATION;
 
   const c = DB.config;
-  const now = new Date();
-  const day = now.getDay(); // 0=dom,1=lun,...,6=sab
+  const day = now.getDay();
   const hm = now.getHours()*60 + now.getMinutes();
   const sch = c.schedule;
   let isOpen = false;
