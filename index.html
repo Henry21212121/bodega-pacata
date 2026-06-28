@@ -1239,27 +1239,82 @@ function applyBranding() {
 
 // ── STATUS BAR ─────────────────────
 function checkStatus() {
-  const c = DB.config;
-  if(!c.openTime) { c.openTime="08:00"; c.closeTime="20:00"; c.openDays=[1,2,3,4,5,6]; }
+  const INAUGURATION = new Date("2026-07-01T08:00:00"); // Miércoles 1 julio 2026 8:00
   const now = new Date();
-  const day = now.getDay(); // 0=sun
+  const preInaugural = now < INAUGURATION;
+
+  const c = DB.config;
+  const now = new Date();
+  const day = now.getDay(); // 0=dom,1=lun,...,6=sab
   const hm = now.getHours()*60 + now.getMinutes();
-  const [oh,om] = (c.openTime||"08:00").split(":").map(Number);
-  const [ch,cm] = (c.closeTime||"20:00").split(":").map(Number);
-  const open = hm >= oh*60+om && hm < ch*60+cm;
-  const dayOk = (c.openDays||[1,2,3,4,5,6]).includes(day);
-  const isOpen = open && dayOk;
+  const sch = c.schedule;
+  let isOpen = false;
+  let openLabel = "";
+
+  if(sch) {
+    // Determinar si hoy es feriado
+    const todayStr = now.toISOString().split("T")[0];
+    const esFeriado = (sch.feriados?.fechas||[]).includes(todayStr);
+    let horario = null;
+    if(esFeriado) {
+      horario = sch.feriados?.cerrado ? null : sch.feriados;
+    } else if(day === 0) {
+      horario = sch.dom?.activo ? sch.dom : null;
+    } else if(day === 6) {
+      horario = sch.sab?.activo ? sch.sab : null;
+    } else {
+      horario = sch.lv?.activo ? sch.lv : null;
+    }
+    if(horario) {
+      const [oh,om] = (horario.open||"08:00").split(":").map(Number);
+      const [ch,cm] = (horario.close||"20:00").split(":").map(Number);
+      isOpen = hm >= oh*60+om && hm < ch*60+cm;
+      openLabel = horario.open + " – " + horario.close;
+    }
+  } else {
+    // Retrocompatibilidad con formato viejo
+    if(!c.openTime) { c.openTime="08:00"; c.closeTime="20:00"; c.openDays=[1,2,3,4,5,6]; }
+    const [oh,om] = (c.openTime||"08:00").split(":").map(Number);
+    const [ch,cm] = (c.closeTime||"20:00").split(":").map(Number);
+    const open = hm >= oh*60+om && hm < ch*60+cm;
+    const dayOk = (c.openDays||[1,2,3,4,5,6]).includes(day);
+    isOpen = open && dayOk;
+    openLabel = c.openTime + " – " + c.closeTime;
+  }
+
   const bar = document.getElementById("statusBar");
   const dot = document.getElementById("statusDot");
   const txt = document.getElementById("statusTxt");
-  bar.className = "status-bar show" + (isOpen ? "" : " closed");
-  dot.className = "status-dot" + (isOpen ? "" : " off");
-  txt.textContent = isOpen ? `Abierto · Cerramos a las ${c.closeTime}` : `Cerrado · Abrimos a las ${c.openTime}`;
+  const efectivamenteAbierto = !preInaugural && isOpen;
+
+  bar.className = "status-bar show" + (efectivamenteAbierto ? "" : " closed");
+  dot.className = "status-dot" + (efectivamenteAbierto ? "" : " off");
+
+  if(preInaugural) {
+    // Calcular tiempo restante
+    const diff = INAUGURATION - now;
+    const dias  = Math.floor(diff / 86400000);
+    const horas = Math.floor((diff % 86400000) / 3600000);
+    const mins  = Math.floor((diff % 3600000) / 60000);
+    const segs  = Math.floor((diff % 60000) / 1000);
+    const partes = [];
+    if(dias)  partes.push(`${dias}d`);
+    if(horas) partes.push(`${horas}h`);
+    partes.push(`${String(mins).padStart(2,"0")}m`);
+    partes.push(`${String(segs).padStart(2,"0")}s`);
+    txt.textContent = `🚀 Inauguramos en ${partes.join(" ")}`;
+    // Actualizar cada segundo
+    if(!window._countdownIv) window._countdownIv = setInterval(checkStatus, 1000);
+  } else {
+    // Ya inauguramos — limpiar el intervalo del countdown
+    if(window._countdownIv) { clearInterval(window._countdownIv); window._countdownIv = null; }
+    txt.textContent = efectivamenteAbierto ? `Abierto · ${openLabel}` : `Cerrado`;
+  }
 
   // Show/hide scheduled order prompt — solo si está habilitado en config
   let schedPrompt = document.getElementById("schedPrompt");
   const scheduledEnabled = DB.config?.scheduledEnabled === true;
-  if(!isOpen && scheduledEnabled) {
+  if(!efectivamenteAbierto && !preInaugural && scheduledEnabled) {
     if(!schedPrompt) {
       schedPrompt = document.createElement("div");
       schedPrompt.id = "schedPrompt";
