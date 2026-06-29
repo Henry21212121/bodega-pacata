@@ -1332,7 +1332,7 @@ function buscarDeudor() {
   const sug = document.getElementById('fiarSugerencias');
   if(!q) { sug.style.display='none'; return; }
   // Search in all fiados (including cobrados for reference)
-  const matches = fiados.filter(f=>f.nombre.toLowerCase().includes(q));
+  const matches = fiados.filter(f=>matchBusqueda(f.nombre||"", q));
   if(!matches.length) { sug.style.display='none'; return; }
   sug.innerHTML = matches.map(f=>{
     const saldo = (f.monto||0)-(f.pagado||0);
@@ -1511,6 +1511,27 @@ let currentProdTab = "catalogo";
 let payMethod = "efectivo";
 let editTempId = null;
 let allSales = [], allGastos = [], fiados = [];
+
+// ── BÚSQUEDA FLEXIBLE: sin acentos + equivalencias fonéticas ──
+function normalizar(txt) {
+  return (txt||"")
+    .toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[zc]/g, "s")
+    .replace(/[qk]/g, "k")
+    .replace(/v/g,    "b")
+    .replace(/x/g,    "s")
+    .replace(/ll/g,   "y")
+    .replace(/ñ/g, "n")
+    .trim();
+}
+
+function matchBusqueda(nombre, q) {
+  if(!q) return true;
+  const nN = normalizar(nombre);
+  const nQ = normalizar(q);
+  return nQ.split(/\s+/).every(p => nN.includes(p));
+}
 
 // ════════════════════════════════════
 // PAPELERA — guardar antes de borrar
@@ -1706,7 +1727,7 @@ function onVendSearch() {
   const allProds = [
     ...Object.values(DB.products).filter(p=>p.estado!=="oculto").map(p=>({...p,_tipo:"catalogo"})),
     ...cqProds.filter(p=>!p.oculto).map(p=>({...p,_tipo:"coquette"}))
-  ].filter(p=>p.nombre?.toLowerCase().includes(q));
+  ].filter(p=>matchBusqueda(p.nombre||"", q));
 
   // Hide regular product grid, show search results in grid format
   const wrap = document.getElementById("vendProdsWrap");
@@ -2158,7 +2179,7 @@ function buscarProdEditarVenta(q) {
   document.getElementById('editAgregarSeleccionado').style.display = 'none';
   _editAgregarProd = null;
   if(!q.trim()) { el.innerHTML=''; return; }
-  const matches = (allProducts||[]).filter(p => p.nombre?.toLowerCase().includes(q.toLowerCase())).slice(0,6);
+  const matches = (allProducts||[]).filter(p => matchBusqueda(p.nombre||"", q)).slice(0,6);
   if(!matches.length) { el.innerHTML=`<div style="font-size:.74rem;color:var(--gr);padding:4px">Sin resultados</div>`; return; }
   el.innerHTML = matches.map(p=>`
     <div onclick="seleccionarProdEdit('${p.id}')" style="padding:6px 8px;cursor:pointer;border-radius:6px;font-size:.78rem;margin-bottom:2px;background:var(--vbg)">
@@ -3924,7 +3945,7 @@ function onConsumoSearch() {
     ...Object.values(DB.products||{}).filter(p=>p.estado!=="oculto").map(p=>({...p,_tipo:"catalogo"})),
     ...(DB.tempProds||[]).map(p=>({...p,_tipo:"temporal"})),
     ...(cqProds||[]).filter(p=>!p.oculto).map(p=>({...p,_tipo:"coquette"})),
-  ].filter(p => p.nombre?.toLowerCase().includes(q)).slice(0, 12);
+  ].filter(p => matchBusqueda(p.nombre||"", q)).slice(0, 12);
 
   if(!candidatos.length) { el.innerHTML = `<div style="font-size:.78rem;color:var(--gr);padding:8px">Sin resultados</div>`; return; }
 
