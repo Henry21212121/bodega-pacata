@@ -1003,6 +1003,27 @@ let currentOrderDetail = null;
 let currentClientDetail = null;
 let offerProds = [];
 
+// ── BÚSQUEDA FLEXIBLE: sin acentos + equivalencias fonéticas ──
+function normalizar(txt) {
+  return (txt||"")
+    .toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[zc]/g, "s")
+    .replace(/[qk]/g, "k")
+    .replace(/v/g,    "b")
+    .replace(/x/g,    "s")
+    .replace(/ll/g,   "y")
+    .replace(/ñ/g, "n")
+    .trim();
+}
+
+function matchBusqueda(nombre, q) {
+  if(!q) return true;
+  const nN = normalizar(nombre);
+  const nQ = normalizar(q);
+  return nQ.split(/\s+/).every(p => nN.includes(p));
+}
+
 // ─── PAPELERA — FUNCIÓN CENTRAL ────────────────────────────
 // Guarda un documento en deleted_items antes de borrarlo
 async function saveToTrash(coleccion, docId, datos, origen, descripcion) {
@@ -1880,7 +1901,7 @@ function renderAdmProds() {
 
   let prods = Object.values(DB.products);
   if(currentProdCat !== "all") prods = prods.filter(p => p.cat === currentProdCat);
-  if(q) prods = prods.filter(p => p.nombre.toLowerCase().includes(q) || (p.cat||"").toLowerCase().includes(q));
+  if(q) prods = prods.filter(p => matchBusqueda(p.nombre, q) || matchBusqueda(p.cat||"", q));
 
   if(sortBy==="sin_foto")          prods = [...prods.filter(p=>!p.img),...prods.filter(p=>!!p.img)];
   else if(sortBy==="con_vencimiento") prods = prods.filter(p=>p.expiry&&p.expiry!=="");
@@ -1938,7 +1959,7 @@ function renderAdmProds() {
 // ── Lista editable de productos propios COQUETTE (espejo de tienda.html) ──
 function renderCoquetteAdminList(q) {
   let prods = Object.values(DB.coquetteProducts || {});
-  if(q) prods = prods.filter(p => (p.nombre||"").toLowerCase().includes(q));
+  if(q) prods = prods.filter(p => matchBusqueda(p.nombre||"", q));
   prods.sort((a,b) => (a.nombre||"").localeCompare(b.nombre||""));
 
   const list = document.getElementById("prodList");
@@ -2376,7 +2397,7 @@ async function uploadToCloudinary(file) {
 function renderAdmClients() {
   const q = (document.getElementById("cliSearch")?.value||"").toLowerCase();
   let cls = DB.clients;
-  if(q) cls = cls.filter(c => c.name?.toLowerCase().includes(q) || c.phone?.includes(q));
+  if(q) cls = cls.filter(c => matchBusqueda(c.name||"", q) || (c.phone||"").includes(q));
   const tbody = document.getElementById("clientsBody");
   if(!cls.length) { tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--gr);padding:20px">Sin clientes aún</td></tr>'; return; }
   tbody.innerHTML = cls.map(c => {
