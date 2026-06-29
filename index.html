@@ -108,11 +108,13 @@ header{background:var(--v);color:#fff;padding:0 14px;position:sticky;top:0;z-ind
 .hero p{font-size:.88rem;opacity:.85;}
 
 /* ── SEARCH FLOATING ── */
-.srch-fab{position:fixed;bottom:82px;right:16px;z-index:150;width:48px;height:48px;border-radius:50%;background:var(--v);color:#fff;border:none;font-size:1.25rem;box-shadow:0 4px 16px rgba(0,0,0,.22);display:flex;align-items:center;justify-content:center;transition:all .2s;cursor:pointer;}
-.srch-fab:hover{background:var(--vl);}
-.mic-fab{position:fixed;bottom:140px;right:16px;z-index:150;width:48px;height:48px;border-radius:50%;background:var(--v);color:#fff;border:none;font-size:1.2rem;box-shadow:0 4px 16px rgba(0,0,0,.22);display:flex;align-items:center;justify-content:center;transition:all .2s;cursor:pointer;}
-.mic-fab:hover{background:var(--vl);}
-.mic-fab.active{background:var(--ro);box-shadow:0 4px 20px rgba(229,57,53,.5);}
+@keyframes fabPulse{0%,100%{box-shadow:0 4px 16px rgba(0,0,0,.22),0 0 0 0 rgba(255,152,0,.6)}60%{box-shadow:0 4px 16px rgba(0,0,0,.22),0 0 0 10px rgba(255,152,0,0)}}
+@keyframes fabPulseMic{0%,100%{box-shadow:0 4px 16px rgba(0,0,0,.22),0 0 0 0 rgba(63,81,181,.6)}60%{box-shadow:0 4px 16px rgba(0,0,0,.22),0 0 0 10px rgba(63,81,181,0)}}
+.srch-fab{position:fixed;bottom:82px;right:16px;z-index:150;width:48px;height:48px;border-radius:50%;background:#FF9800;color:#fff;border:none;font-size:1.25rem;display:flex;align-items:center;justify-content:center;cursor:pointer;animation:fabPulse 1.8s ease-in-out infinite;}
+.srch-fab:hover{background:#F57C00;animation:none;}
+.mic-fab{position:fixed;bottom:140px;right:16px;z-index:150;width:48px;height:48px;border-radius:50%;background:#3F51B5;color:#fff;border:none;font-size:1.2rem;display:flex;align-items:center;justify-content:center;cursor:pointer;animation:fabPulseMic 1.8s ease-in-out infinite;}
+.mic-fab:hover{background:#303F9F;animation:none;}
+.mic-fab.active{background:var(--ro);box-shadow:0 4px 20px rgba(229,57,53,.5);animation:none;}
 .srch-popup{position:fixed;bottom:138px;right:14px;z-index:149;background:#fff;border-radius:50px;box-shadow:0 4px 24px rgba(0,0,0,.18);border:2px solid var(--vbg);display:flex;align-items:center;overflow:hidden;width:0;opacity:0;pointer-events:none;transition:width .28s cubic-bezier(.4,0,.2,1),opacity .22s;}
 .srch-popup.open{width:min(280px,78vw);opacity:1;pointer-events:all;}
 .srch-popup input{flex:1;padding:11px 16px;border:none;outline:none;font-size:.95rem;background:transparent;}
@@ -3421,10 +3423,11 @@ function showPostOfferTips() {
   _tipsShown = true;
 
   // Create tip bubbles only — NO auto greeting
-  createTipBubble("mic", "🎤 Pedido por voz —\ntocá para pedir hablando", "voiceBtn");
+  // Lupa primero (naranja), micrófono después (azul índigo)
+  createTipBubble("search", "🔍 Busca tu producto\nescribiendo aquí", "srchFab", "#FF9800");
   setTimeout(() => {
-    createTipBubble("search", "🔍 Busca tu producto\nescribiendo aquí", "srchFab");
-  }, 200);
+    createTipBubble("mic", "🎤 Pedido por voz —\ntocá para pedir hablando", "voiceBtn", "#3F51B5");
+  }, 500);
 
   // Dismiss on any tap
   const dismiss = () => { removeTips(); };
@@ -3438,7 +3441,8 @@ function showPostOfferTips() {
   // NO speakGreeting here — voice activates only when mic is tapped
 }
 
-function createTipBubble(id, text, targetId) {
+function createTipBubble(id, text, targetId, color) {
+  color = color || "var(--v)";
   const target = document.getElementById(targetId);
   if(!target) return;
   const rect = target.getBoundingClientRect();
@@ -3446,7 +3450,7 @@ function createTipBubble(id, text, targetId) {
   tip.id = "tip-" + id;
   tip.style.cssText = `
     position:fixed;z-index:9000;
-    background:var(--v);color:#fff;
+    background:${color};color:#fff;
     border-radius:12px;padding:9px 13px;
     font-size:.78rem;font-weight:800;line-height:1.4;
     box-shadow:0 4px 20px rgba(0,0,0,.3);
@@ -3462,7 +3466,7 @@ function createTipBubble(id, text, targetId) {
     width:0;height:0;
     border-left:8px solid transparent;
     border-right:8px solid transparent;
-    border-top:8px solid var(--v);
+    border-top:8px solid ${color};
   `;
   tip.appendChild(arrow);
   document.body.appendChild(tip);
