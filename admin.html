@@ -626,34 +626,74 @@ input[type=file]{display:none;}
     <div id="tab-intro" class="tab-content" style="display:none">
       <div class="panel">
         <h2>🎬 Pantalla de bienvenida</h2>
-        <p style="font-size:.82rem;color:var(--gr);margin-bottom:14px">Se muestra al cliente al abrir la app. Podés agregar varias imágenes — aparecen en secuencia automáticamente.</p>
 
         <!-- Estado actual -->
         <div id="introEstadoActual" style="border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:.8rem;font-weight:700;background:#f5f5f5;color:#888">
           ⏳ Cargando configuración actual...
         </div>
 
+        <!-- Activar -->
         <div class="fld">
           <label>Activar intro</label>
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:4px">
             <input type="checkbox" id="introActive" style="width:18px;height:18px"> Mostrar pantalla de bienvenida
           </label>
         </div>
+
+        <!-- Selector de modo -->
         <div class="fld">
-          <label>Imágenes / videos de bienvenida</label>
-          <div style="font-size:.76rem;color:var(--gr);margin-bottom:8px">Formatos: JPG, PNG, MP4 · Recomendado: 1080×1920 (vertical) · Podés reordenar con ◀ ▶</div>
-
-          <!-- Lista de slides -->
-          <div id="introSlidesList" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px">
-            <div style="color:var(--gr);font-size:.78rem;padding:8px 0">⏳ Cargando...</div>
+          <label>Modo de reproducción</label>
+          <div style="display:flex;gap:10px;margin-top:6px">
+            <label id="modoSeqBtn" onclick="setIntroMode('secuencial')" style="flex:1;border:2px solid var(--v);border-radius:12px;padding:12px 10px;cursor:pointer;text-align:center;background:var(--vbg);transition:all .2s">
+              <div style="font-size:1.3rem">🎞️</div>
+              <div style="font-weight:900;font-size:.85rem;color:var(--v)">Secuencial</div>
+              <div style="font-size:.72rem;color:var(--gr);margin-top:3px">Todos en orden,<br>cada uno con su tiempo</div>
+            </label>
+            <label id="modoRndBtn" onclick="setIntroMode('aleatorio')" style="flex:1;border:2px solid #ccc;border-radius:12px;padding:12px 10px;cursor:pointer;text-align:center;background:#fafafa;transition:all .2s">
+              <div style="font-size:1.3rem">🎲</div>
+              <div style="font-weight:900;font-size:.85rem;color:#666">Aleatorio</div>
+              <div style="font-size:.72rem;color:var(--gr);margin-top:3px">1 al azar por<br>cada visita</div>
+            </label>
           </div>
-
-          <!-- Botón agregar -->
-          <label style="display:inline-flex;align-items:center;gap:6px;background:#e8f5e9;color:#1b5e20;border:1.5px dashed #4caf50;border-radius:10px;padding:10px 16px;cursor:pointer;font-size:.82rem;font-weight:700">
-            ➕ Agregar imagen / video
-            <input type="file" id="introFileMulti" accept="image/*,video/*" multiple style="display:none" onchange="handleIntroFilesMulti(event)">
-          </label>
         </div>
+
+        <!-- ── MODO SECUENCIAL ── -->
+        <div id="introSecPanel">
+          <div class="fld">
+            <label>Imágenes / videos <span style="background:#e8f5e9;color:#1b5e20;border-radius:50px;padding:1px 8px;font-size:.72rem">Secuencial</span></label>
+            <div style="font-size:.76rem;color:var(--gr);margin-bottom:8px">Se muestran todos en el orden que definas · Podés reordenar con ◀ ▶ · Cada uno tiene su propio tiempo</div>
+            <div id="introSlidesList" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px">
+              <div style="color:var(--gr);font-size:.78rem;padding:8px 0">⏳ Cargando...</div>
+            </div>
+            <label style="display:inline-flex;align-items:center;gap:6px;background:#e8f5e9;color:#1b5e20;border:1.5px dashed #4caf50;border-radius:10px;padding:10px 16px;cursor:pointer;font-size:.82rem;font-weight:700">
+              ➕ Agregar imagen / video
+              <input type="file" id="introFileMulti" accept="image/*,video/*" multiple style="display:none" onchange="handleIntroFilesMulti(event,'seq')">
+            </label>
+          </div>
+        </div>
+
+        <!-- ── MODO ALEATORIO ── -->
+        <div id="introRndPanel" style="display:none">
+          <div class="fld">
+            <label>Imágenes / videos <span style="background:#e8f5e9;color:#1b5e20;border-radius:50px;padding:1px 8px;font-size:.72rem">Aleatorio</span></label>
+            <div style="font-size:.76rem;color:var(--gr);margin-bottom:8px">En cada visita se elige 1 al azar · Los videos se reproducen completos · Las imágenes usan el tiempo global</div>
+            <div id="introRndList" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px">
+              <div style="color:var(--gr);font-size:.78rem;padding:8px 0">Sin archivos en el grupo aleatorio</div>
+            </div>
+            <label style="display:inline-flex;align-items:center;gap:6px;background:#e8f5e9;color:#1b5e20;border:1.5px dashed #4caf50;border-radius:10px;padding:10px 16px;cursor:pointer;font-size:.82rem;font-weight:700">
+              ➕ Agregar imagen / video
+              <input type="file" id="introRndFileMulti" accept="image/*,video/*" multiple style="display:none" onchange="handleIntroFilesMulti(event,'rnd')">
+            </label>
+          </div>
+          <div class="fld">
+            <label>Duración de imágenes (segundos)</label>
+            <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+              <input type="number" id="introRndDuration" value="5" min="1" max="30" style="width:80px;padding:8px;border:1.5px solid #d0e8d8;border-radius:8px;font-size:.9rem;text-align:center">
+              <span style="font-size:.8rem;color:var(--gr)">segundos (solo aplica a imágenes; los videos duran lo que duran)</span>
+            </div>
+          </div>
+        </div>
+
         <button class="btn btn-v btn-full" style="margin-top:12px" onclick="saveIntro()">💾 Guardar configuración de intro</button>
       </div>
     </div>
@@ -3606,6 +3646,31 @@ async function deleteClient(id) {
 // ── INTRO CONFIG ───────────────────────────────────────
 let introSlides = []; // [{url, type, duration}]
 
+// ── INTRO MODE ─────────────────────────────────────────────
+let introSlides   = [];   // modo secuencial
+let introRndPool  = [];   // modo aleatorio
+let introMode     = 'secuencial';
+
+function setIntroMode(mode) {
+  introMode = mode;
+  document.getElementById('introSecPanel').style.display = mode === 'secuencial' ? '' : 'none';
+  document.getElementById('introRndPanel').style.display = mode === 'aleatorio'  ? '' : 'none';
+  // Estilos de los botones de modo
+  const seqBtn = document.getElementById('modoSeqBtn');
+  const rndBtn = document.getElementById('modoRndBtn');
+  if(mode === 'secuencial') {
+    seqBtn.style.border = '2px solid var(--v)'; seqBtn.style.background = 'var(--vbg)';
+    seqBtn.querySelector('div:nth-child(2)').style.color = 'var(--v)';
+    rndBtn.style.border = '2px solid #ccc';     rndBtn.style.background = '#fafafa';
+    rndBtn.querySelector('div:nth-child(2)').style.color = '#666';
+  } else {
+    rndBtn.style.border = '2px solid var(--v)'; rndBtn.style.background = 'var(--vbg)';
+    rndBtn.querySelector('div:nth-child(2)').style.color = 'var(--v)';
+    seqBtn.style.border = '2px solid #ccc';     seqBtn.style.background = '#fafafa';
+    seqBtn.querySelector('div:nth-child(2)').style.color = '#666';
+  }
+}
+
 async function loadIntroConfig() {
   const estadoEl = document.getElementById("introEstadoActual");
   if(estadoEl) { estadoEl.textContent = "⏳ Cargando configuración..."; estadoEl.style.background="#f5f5f5"; estadoEl.style.color="#888"; }
@@ -3614,6 +3679,10 @@ async function loadIntroConfig() {
     if(snap.exists()) {
       const d = snap.data();
       document.getElementById("introActive").checked = d.active||false;
+      // Modo
+      const mode = d.mode || 'secuencial';
+      setIntroMode(mode);
+      // Slides secuencial
       if(d.slides && d.slides.length) {
         introSlides = d.slides.map(s=>({...s, duration: s.duration||d.duration||3}));
       } else if(d.media) {
@@ -3621,39 +3690,49 @@ async function loadIntroConfig() {
       } else {
         introSlides = [];
       }
-      // Mostrar estado actual en banner
+      // Pool aleatorio
+      introRndPool = (d.randomPool || []).map(s=>({...s}));
+      if(d.randomDuration) document.getElementById('introRndDuration').value = d.randomDuration;
+      // Banner estado
       if(estadoEl) {
-        if(!introSlides.length) {
-          estadoEl.innerHTML = "📭 Sin intro configurada — agregá imágenes y guardá";
-          estadoEl.style.background = "#fff3e0"; estadoEl.style.color = "#e65100";
-        } else if(!d.active) {
+        const active = d.active||false;
+        const list   = mode === 'secuencial' ? introSlides : introRndPool;
+        if(!list.length) {
+          estadoEl.innerHTML = "📭 Sin intro configurada — agregá archivos y guardá";
+          estadoEl.style.background="#fff3e0"; estadoEl.style.color="#e65100";
+        } else if(!active) {
+          estadoEl.innerHTML = `⏸️ Intro desactivada · Modo <b>${mode}</b> · ${list.length} archivo${list.length!==1?'s':''}`;
+          estadoEl.style.background="#fff3e0"; estadoEl.style.color="#b45309";
+        } else if(mode==='secuencial') {
           const totalSeg = introSlides.reduce((s,x)=>s+(x.duration||3),0);
-          estadoEl.innerHTML = `⏸️ Intro desactivada · ${introSlides.length} imagen${introSlides.length!==1?"es":""} · ${totalSeg}s total — <em>activala para que se muestre</em>`;
-          estadoEl.style.background = "#fff3e0"; estadoEl.style.color = "#b45309";
+          estadoEl.innerHTML = `✅ Intro activa · Modo <b>Secuencial</b> · ${introSlides.length} archivo${introSlides.length!==1?'s':''} · ${totalSeg}s total`;
+          estadoEl.style.background="#e8f5e9"; estadoEl.style.color="#1b5e20";
         } else {
-          const totalSeg = introSlides.reduce((s,x)=>s+(x.duration||3),0);
-          estadoEl.innerHTML = `✅ Intro activa · ${introSlides.length} imagen${introSlides.length!==1?"es":""} · ${totalSeg}s total`;
-          estadoEl.style.background = "#e8f5e9"; estadoEl.style.color = "#1b5e20";
+          estadoEl.innerHTML = `✅ Intro activa · Modo <b>Aleatorio</b> · ${introRndPool.length} archivo${introRndPool.length!==1?'s':''} en el grupo`;
+          estadoEl.style.background="#e8f5e9"; estadoEl.style.color="#1b5e20";
         }
       }
     } else {
-      introSlides = [];
+      introSlides = []; introRndPool = [];
+      setIntroMode('secuencial');
       if(estadoEl) { estadoEl.textContent = "📭 Sin intro configurada aún"; estadoEl.style.background="#fff3e0"; estadoEl.style.color="#e65100"; }
     }
     renderIntroSlides();
+    renderIntroRndList();
   } catch(e) {
     if(estadoEl) { estadoEl.textContent = "❌ Error al cargar: "+e.message; estadoEl.style.background="#ffebee"; estadoEl.style.color="#c62828"; }
   }
 }
 
-async function handleIntroFilesMulti(ev) {
+async function handleIntroFilesMulti(ev, target) {
+  // target: 'seq' = secuencial, 'rnd' = aleatorio
   const files = Array.from(ev.target.files);
   if(!files.length) return;
+  const isRnd = target === 'rnd';
   showToast("⏳ Subiendo archivos...");
   let ok = 0;
   for(const file of files) {
     const isVideo = file.type.startsWith("video");
-    // Leer duración real si es video
     let duracion = 3;
     if(isVideo) {
       duracion = await new Promise(res => {
@@ -3666,7 +3745,6 @@ async function handleIntroFilesMulti(ev) {
       });
     }
     try {
-      // Cloudinary usa endpoint diferente para video e imagen
       let url;
       if(isVideo) {
         const fd = new FormData();
@@ -3679,27 +3757,28 @@ async function handleIntroFilesMulti(ev) {
       } else {
         url = await uploadToCloudinary(file);
       }
-      introSlides.push({url, type: isVideo?"video":"image", duration: duracion});
+      const item = {url, type: isVideo?"video":"image", duration: duracion};
+      if(isRnd) introRndPool.push(item); else introSlides.push(item);
       ok++;
-      renderIntroSlides();
+      if(isRnd) renderIntroRndList(); else renderIntroSlides();
       showToast(`⏳ ${ok}/${files.length} subido...`);
     } catch(e) {
-      if(isVideo) {
-        showToast(`❌ Video demasiado grande para subir. Usá Cloudinary o reducí el tamaño.`, true);
-        continue;
-      }
-      // Fallback base64 solo para imágenes
+      if(isVideo) { showToast("❌ Video demasiado grande. Reducí el tamaño o usá Cloudinary.", true); continue; }
       await new Promise(res => {
         const r = new FileReader();
-        r.onload = e2 => { introSlides.push({url: e2.target.result, type:"image", duration: duracion}); ok++; res(); };
+        r.onload = e2 => {
+          const item = {url: e2.target.result, type:"image", duration: duracion};
+          if(isRnd) introRndPool.push(item); else introSlides.push(item);
+          ok++; res();
+        };
         r.onerror = () => res();
         r.readAsDataURL(file);
       });
-      renderIntroSlides();
+      if(isRnd) renderIntroRndList(); else renderIntroSlides();
     }
   }
   ev.target.value = "";
-  renderIntroSlides();
+  if(isRnd) renderIntroRndList(); else renderIntroSlides();
   showToast(ok > 0 ? `✅ ${ok} archivo${ok!==1?"s":""} agregado${ok!==1?"s":""}` : "❌ No se pudo subir ningún archivo", ok===0);
 }
 
@@ -3709,8 +3788,9 @@ function actualizarDuracionSlide(idx, val) {
 
 function renderIntroSlides() {
   const el = document.getElementById("introSlidesList");
+  if(!el) return;
   if(!introSlides.length) {
-    el.innerHTML = `<div style="color:var(--gr);font-size:.78rem;padding:8px 0">Sin imágenes agregadas</div>`;
+    el.innerHTML = `<div style="color:var(--gr);font-size:.78rem;padding:8px 0">Sin imágenes/videos en modo secuencial</div>`;
     return;
   }
   el.innerHTML = introSlides.map((s,i) => `
@@ -3727,14 +3807,36 @@ function renderIntroSlides() {
       </div>
       <div style="display:flex;justify-content:center;gap:3px">
         ${i>0?`<button onclick="moverSlide(${i},-1)" style="flex:1;background:#e8f5e9;border:none;border-radius:5px;padding:3px;cursor:pointer;font-size:.7rem">◀</button>`:'<span style="flex:1"></span>'}
-        <button onclick="eliminarSlide(${i})" style="flex:1;background:#ffebee;color:#c62828;border:none;border-radius:5px;padding:3px;cursor:pointer;font-size:.7rem">🗑</button>
+        <button onclick="eliminarSlide(${i},'seq')" style="flex:1;background:#ffebee;color:#c62828;border:none;border-radius:5px;padding:3px;cursor:pointer;font-size:.7rem">🗑</button>
         ${i<introSlides.length-1?`<button onclick="moverSlide(${i},1)" style="flex:1;background:#e8f5e9;border:none;border-radius:5px;padding:3px;cursor:pointer;font-size:.7rem">▶</button>`:'<span style="flex:1"></span>'}
       </div>
     </div>`).join("");
-  // Mostrar duración total
   const totalSeg = introSlides.reduce((s,x)=>s+(x.duration||3),0);
   el.insertAdjacentHTML('beforeend',
     `<div style="width:100%;margin-top:6px;font-size:.74rem;color:var(--gr)">⏱ Duración total: <strong>${totalSeg}s</strong></div>`);
+}
+
+function renderIntroRndList() {
+  const el = document.getElementById("introRndList");
+  if(!el) return;
+  if(!introRndPool.length) {
+    el.innerHTML = `<div style="color:var(--gr);font-size:.78rem;padding:8px 0">Sin archivos en el grupo aleatorio</div>`;
+    return;
+  }
+  el.innerHTML = introRndPool.map((s,i) => `
+    <div style="flex-shrink:0;width:100px;background:var(--vbg);border-radius:10px;padding:6px;border:1.5px solid #d0e8d8;position:relative">
+      ${s.type==="video"
+        ? `<video src="${s.url}" style="width:100%;height:130px;object-fit:cover;border-radius:6px;display:block" muted></video>`
+        : `<img src="${s.url}" style="width:100%;height:130px;object-fit:cover;border-radius:6px;display:block">`}
+      <div style="position:absolute;top:8px;left:8px;background:rgba(0,0,0,.55);color:#fff;border-radius:50px;padding:2px 7px;font-size:.65rem;font-weight:800">
+        ${s.type==="video"?"🎬 Video":"🖼️ Img"}
+      </div>
+      <div style="display:flex;justify-content:center;margin-top:6px">
+        <button onclick="eliminarSlide(${i},'rnd')" style="width:100%;background:#ffebee;color:#c62828;border:none;border-radius:5px;padding:3px;cursor:pointer;font-size:.7rem">🗑 Quitar</button>
+      </div>
+    </div>`).join("");
+  el.insertAdjacentHTML('beforeend',
+    `<div style="width:100%;margin-top:6px;font-size:.74rem;color:var(--gr)">🎲 ${introRndPool.length} archivo${introRndPool.length!==1?'s':''} · se elige 1 al azar por visita</div>`);
 }
 
 function moverSlide(idx, dir) {
@@ -3744,53 +3846,59 @@ function moverSlide(idx, dir) {
   renderIntroSlides();
 }
 
-function eliminarSlide(idx) {
-  introSlides.splice(idx, 1);
-  renderIntroSlides();
+function eliminarSlide(idx, target) {
+  if(target === 'rnd') { introRndPool.splice(idx, 1); renderIntroRndList(); }
+  else                 { introSlides.splice(idx, 1);  renderIntroSlides();  }
 }
 
 async function saveIntro() {
   const btn = document.querySelector('[onclick="saveIntro()"]');
   if(btn) { btn.disabled = true; btn.textContent = "⏳ Guardando..."; }
   try {
-    // Verificar que no haya slides con base64 de video (demasiado grandes para Firestore)
-    const tieneVideoBase64 = introSlides.some(s => s.type === "video" && s.url.startsWith("data:"));
+    const tieneVideoBase64 = introSlides.some(s => s.type==="video" && s.url.startsWith("data:"))
+                          || introRndPool.some(s => s.type==="video" && s.url.startsWith("data:"));
     if(tieneVideoBase64) {
-      showToast("❌ El video no se subió correctamente a Cloudinary. Intentá subirlo de nuevo.", true);
-      if(btn) { btn.disabled = false; btn.textContent = "💾 Guardar configuración de intro"; }
+      showToast("❌ Un video no se subió a Cloudinary. Intentá de nuevo.", true);
+      if(btn) { btn.disabled=false; btn.textContent="💾 Guardar configuración de intro"; }
       return;
     }
-    // Guardar en Firestore
+    const rndDuration = parseInt(document.getElementById('introRndDuration')?.value)||5;
     await fs.setDoc(fs.doc(db,"config","intro"), {
-      active: document.getElementById("introActive").checked,
-      slides: introSlides,
-      media: introSlides[0]?.url || "",
-      mediaType: introSlides[0]?.type || "image",
-      duration: introSlides[0]?.duration || 3,
+      active:        document.getElementById("introActive").checked,
+      mode:          introMode,
+      slides:        introSlides,
+      randomPool:    introRndPool,
+      randomDuration: rndDuration,
+      // retrocompat
+      media:     introSlides[0]?.url || introRndPool[0]?.url || "",
+      mediaType: introSlides[0]?.type || introRndPool[0]?.type || "image",
+      duration:  introSlides[0]?.duration || rndDuration || 3,
       updatedAt: fs.serverTimestamp()
     });
     showToast("✅ Intro guardada correctamente");
-    // Actualizar banner de estado
+    // Actualizar banner
     const estadoEl = document.getElementById("introEstadoActual");
     if(estadoEl) {
       const active = document.getElementById("introActive").checked;
-      const totalSeg = introSlides.reduce((s,x)=>s+(x.duration||3),0);
-      if(!introSlides.length) {
-        estadoEl.textContent = "📭 Sin intro configurada";
-        estadoEl.style.background="#fff3e0"; estadoEl.style.color="#e65100";
+      const list   = introMode === 'secuencial' ? introSlides : introRndPool;
+      if(!list.length) {
+        estadoEl.textContent="📭 Sin intro configurada"; estadoEl.style.background="#fff3e0"; estadoEl.style.color="#e65100";
       } else if(!active) {
-        estadoEl.innerHTML = `⏸️ Intro desactivada · ${introSlides.length} imagen${introSlides.length!==1?"es":""} · ${totalSeg}s total`;
+        estadoEl.innerHTML=`⏸️ Intro desactivada · Modo <b>${introMode}</b> · ${list.length} archivo${list.length!==1?'s':''}`;
         estadoEl.style.background="#fff3e0"; estadoEl.style.color="#b45309";
+      } else if(introMode==='secuencial') {
+        const totalSeg = introSlides.reduce((s,x)=>s+(x.duration||3),0);
+        estadoEl.innerHTML=`✅ Intro activa · Modo <b>Secuencial</b> · ${introSlides.length} archivo${introSlides.length!==1?'s':''} · ${totalSeg}s total`;
+        estadoEl.style.background="#e8f5e9"; estadoEl.style.color="#1b5e20";
       } else {
-        estadoEl.innerHTML = `✅ Intro activa · ${introSlides.length} imagen${introSlides.length!==1?"es":""} · ${totalSeg}s total`;
+        estadoEl.innerHTML=`✅ Intro activa · Modo <b>Aleatorio</b> · ${introRndPool.length} archivo${introRndPool.length!==1?'s':''} en el grupo`;
         estadoEl.style.background="#e8f5e9"; estadoEl.style.color="#1b5e20";
       }
     }
   } catch(e) {
-    showToast("❌ Error al guardar: " + (e.message||e), true);
-    console.error("saveIntro error:", e);
+    showToast("❌ Error al guardar: "+(e.message||e), true);
   } finally {
-    if(btn) { btn.disabled = false; btn.textContent = "💾 Guardar configuración de intro"; }
+    if(btn) { btn.disabled=false; btn.textContent="💾 Guardar configuración de intro"; }
   }
 }
 
@@ -4675,6 +4783,10 @@ window.eliminarFeriado = eliminarFeriado;
 window.toggleFeriadoHorario = toggleFeriadoHorario;
 window.handleIntroFilesMulti = handleIntroFilesMulti;
 window.renderIntroSlides = renderIntroSlides;
+window.renderIntroRndList = renderIntroRndList;
+window.setIntroMode = setIntroMode;
+window.eliminarSlide = eliminarSlide;
+window.moverSlide = moverSlide;
 window.moverSlide = moverSlide;
 window.eliminarSlide = eliminarSlide;
 window.saveIntro = saveIntro;
