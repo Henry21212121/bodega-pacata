@@ -1027,10 +1027,12 @@ async function saveCatFisica() {
 }
 
 async function deleteCatFisica(id) {
-  if(!confirm('¿Eliminar esta categoría?')) return;
+  if(!confirm('¿Eliminar esta categoría? Quedará respaldada en la Papelera.')) return;
   try {
+    const snap = await fs.getDoc(fs.doc(db,'tempProducts',id));
+    if(snap.exists()) await saveToTrash("tempProducts", id, snap.data(), "coquette", `Categoría física: ${snap.data().nombre||id}`);
     await fs.deleteDoc(fs.doc(db,'tempProducts',id));
-    showToast('Categoría eliminada');
+    showToast('Categoría eliminada y respaldada');
   } catch(e) { showToast('Error: '+e.message, true); }
 }
 
@@ -1190,9 +1192,11 @@ function renderProdFisicaList() {
 }
 
 async function deleteProdFisica(id) {
-  if(!confirm('¿Eliminar este producto?')) return;
+  if(!confirm('¿Eliminar este producto? Quedará respaldado en la Papelera.')) return;
+  const snap = await fs.getDoc(fs.doc(db,'tempProducts',id));
+  if(snap.exists()) await saveToTrash("tempProducts", id, snap.data(), "coquette", `Producto físico: ${snap.data().nombre||id}`);
   await fs.deleteDoc(fs.doc(db,'tempProducts',id));
-  showToast('Producto eliminado');
+  showToast('Producto eliminado y respaldado');
 }
 
 // ── FIADOS MEJORADOS ─────────────────────────────────────
@@ -1507,6 +1511,25 @@ let currentProdTab = "catalogo";
 let payMethod = "efectivo";
 let editTempId = null;
 let allSales = [], allGastos = [], fiados = [];
+
+// ════════════════════════════════════
+// PAPELERA — guardar antes de borrar
+// ════════════════════════════════════
+async function saveToTrash(coleccion, docId, datos, origen, descripcion) {
+  try {
+    await fs.addDoc(fs.collection(db, "deleted_items"), {
+      coleccion,
+      docId,
+      datos,
+      origen:      origen || "coquette",
+      descripcion: descripcion || coleccion + "/" + docId,
+      fecha:       fs.serverTimestamp(),
+      restaurado:  false
+    });
+  } catch(e) {
+    console.warn("saveToTrash error:", e);
+  }
+}
 
 // ════════════════════════════════════
 // INIT
@@ -2256,9 +2279,10 @@ async function revertirVenta(saleId) {
         }
       }
     }
-    // Eliminar la venta
+    // Guardar en papelera antes de eliminar
+    await saveToTrash("sales_physical", saleId, sale, "coquette", `Venta revertida — ${resumen} — Bs.${(sale.total||0).toFixed(2)}`);
     await fs.deleteDoc(fs.doc(db,"sales_physical",saleId));
-    showToast("↩️ Venta revertida y stock devuelto");
+    showToast("↩️ Venta revertida, stock devuelto y respaldada en Papelera");
   } catch(e) {
     showToast("Error al revertir: "+e.message, true);
   }
@@ -3549,9 +3573,11 @@ async function saveCoquetteProd() {
 }
 
 async function deleteCqProd(id) {
-  if(!confirm('¿Eliminar este producto?')) return;
+  if(!confirm('¿Eliminar este producto? Quedará respaldado en la Papelera.')) return;
+  const snap = await fs.getDoc(fs.doc(db,'coquette_products',id));
+  if(snap.exists()) await saveToTrash("coquette_products", id, snap.data(), "coquette", `Producto COQUETTE: ${snap.data().nombre||id}`);
   await fs.deleteDoc(fs.doc(db,'coquette_products',id));
-  showToast('Eliminado');
+  showToast('Eliminado y respaldado en Papelera');
 }
 
 // ── SELECTOR DE CANTIDAD COQUETTE ──────────────────────
