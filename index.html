@@ -1401,9 +1401,34 @@ function filterCat(cat, btn) {
 }
 
 // ── RENDER PRODUCTS ────────────────
+// ── BÚSQUEDA FLEXIBLE: sin acentos + equivalencias fonéticas ──
+function normalizar(txt) {
+  return (txt||"")
+    .toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "") // quitar acentos
+    .replace(/[zc]/g, "s")   // zapato=sapato, cebolla=sebolla
+    .replace(/[qk]/g, "k")   // queso=keso
+    .replace(/[v]/g,  "b")   // vaca=baca
+    .replace(/[x]/g,  "s")   // exacto=esacto
+    .replace(/ll/g,   "y")   // lluvia=yubia
+    .replace(/[áàä]/g,"a").replace(/[éèë]/g,"e")
+    .replace(/[íìï]/g,"i").replace(/[óòö]/g,"o")
+    .replace(/[úùü]/g,"u")
+    .replace(/ñ/g,    "n")
+    .trim();
+}
+
+function matchBusqueda(nombre, q) {
+  if(!q) return true;
+  const nNombre = normalizar(nombre);
+  const nQ      = normalizar(q);
+  // Cada palabra del query debe estar contenida en el nombre
+  return nQ.split(/\s+/).every(palabra => nNombre.includes(palabra));
+}
+
 function renderProducts() {
   const wrap = document.getElementById("productsWrap");
-  const q = document.getElementById("searchInput").value.toLowerCase().trim();
+  const q = document.getElementById("searchInput").value.trim();
   wrap.innerHTML = "";
   let any = false;
 
@@ -1412,7 +1437,7 @@ function renderProducts() {
     const prods = Object.values(DB.products).filter(p => {
       if(p.cat !== cat.name) return false;
       if(p.estado === "oculto") return false;
-      if(q && !p.nombre.toLowerCase().includes(q)) return false;
+      if(q && !matchBusqueda(p.nombre, q)) return false;
       return true;
     }).sort((a,b) => a.nombre.localeCompare(b.nombre));
 
