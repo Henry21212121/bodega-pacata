@@ -398,11 +398,18 @@ input[type=file]{display:none;}
           <button class="rep-source-tab" onclick="setReportSource('conjunto',this)" style="flex:1;min-width:110px;padding:9px 6px;font-size:.8rem;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#eee;color:#555">📊 Conjunto</button>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center">
-          <select id="reportPeriod" style="padding:7px 12px;border:1.5px solid #d0e8d8;border-radius:8px;font-size:.85rem;outline:none">
+          <select id="reportPeriod" onchange="toggleRangoFechas()" style="padding:7px 12px;border:1.5px solid #d0e8d8;border-radius:8px;font-size:.85rem;outline:none">
             <option value="day">Hoy</option>
             <option value="week" selected>Esta semana</option>
             <option value="month">Este mes</option>
+            <option value="range">📅 Rango personalizado</option>
           </select>
+          <div id="reportRangoWrap" style="display:none;display:none;gap:6px;align-items:center;flex-wrap:wrap">
+            <label style="font-size:.8rem;color:var(--gr);font-weight:700">Desde</label>
+            <input type="date" id="reportFechaDesde" style="padding:6px 10px;border:1.5px solid #d0e8d8;border-radius:8px;font-size:.82rem;outline:none">
+            <label style="font-size:.8rem;color:var(--gr);font-weight:700">Hasta</label>
+            <input type="date" id="reportFechaHasta" style="padding:6px 10px;border:1.5px solid #d0e8d8;border-radius:8px;font-size:.82rem;outline:none">
+          </div>
           <select id="reportGroup" style="padding:7px 12px;border:1.5px solid #d0e8d8;border-radius:8px;font-size:.85rem;outline:none">
             <option value="products">Por productos</option>
             <option value="clients">Por clientes</option>
@@ -2511,12 +2518,14 @@ function resolveItemCostAdmin(i) {
   return { costoUnit, costoTotal };
 }
 
-function getReportTransacciones(from, src) {
+function getReportTransacciones(from, src, to) {
+  // to = fecha límite opcional (rango personalizado)
+  const inRange = (d) => d >= from && (!to || d <= to);
   if(src === "online") {
     return DB.orders.filter(o=>{
       if(!o.createdAt) return false;
       const d = new Date(o.createdAt.seconds*1000);
-      return d >= from && o.status !== "cancelled";
+      return inRange(d) && o.status !== "cancelled";
     }).map(o=>({
       fecha: o.createdAt, total: o.total||0,
       costo: (o.items||[]).reduce((s,i)=>s+((DB.products[i.id]?.costoUnit||0)*i.qty),0),
@@ -2531,7 +2540,7 @@ function getReportTransacciones(from, src) {
     return (DB.salesFisica||[]).filter(s=>{
       if(!s.createdAt) return false;
       const d = new Date(s.createdAt.seconds*1000);
-      return d >= from;
+      return inRange(d);
     }).map(s=>({
       fecha: s.createdAt, total: s.total||0,
       costo: (s.items||[]).reduce((sum,i)=>sum+resolveItemCostAdmin(i).costoTotal,0),
@@ -2546,9 +2555,9 @@ function getReportTransacciones(from, src) {
     return (DB.consumoPropio||[]).filter(c=>{
       if(!c.createdAt) return false;
       const d = new Date(c.createdAt.seconds*1000);
-      return d >= from;
+      return inRange(d);
     }).map(c=>({
-      fecha: c.createdAt, total: c.total||0, costo: c.total||0, // en consumo propio, venta = costo (no hay ganancia)
+      fecha: c.createdAt, total: c.total||0, costo: c.total||0,
       cliente: null, clienteKey: null,
       items: (c.items||[]).map(i=>({
         nombre:i.prodNombre, qty:i.qty, total:i.costoTotal||0, costo:i.costoTotal||0
@@ -2557,10 +2566,28 @@ function getReportTransacciones(from, src) {
   }
   // conjunto: junta las 3 fuentes
   return [
-    ...getReportTransacciones(from,"online"),
-    ...getReportTransacciones(from,"fisica"),
-    ...getReportTransacciones(from,"consumo")
+    ...getReportTransacciones(from,"online",to),
+    ...getReportTransacciones(from,"fisica",to),
+    ...getReportTransacciones(from,"consumo",to)
   ];
+}
+
+function toggleRangoFechas() {
+  const period = document.getElementById("reportPeriod").value;
+  const wrap = document.getElementById("reportRangoWrap");
+  if(period === "range") {
+    wrap.style.display = "flex";
+    // Poner fechas por defecto: inicio de mes hasta hoy
+    const hoy = new Date();
+    const primeroDia = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    const fmt = d => d.toISOString().split("T")[0];
+    if(!document.getElementById("reportFechaDesde").value)
+      document.getElementById("reportFechaDesde").value = fmt(primeroDia);
+    if(!document.getElementById("reportFechaHasta").value)
+      document.getElementById("reportFechaHasta").value = fmt(hoy);
+  } else {
+    wrap.style.display = "none";
+  }
 }
 
 function genReport() {
@@ -2568,19 +2595,42 @@ function genReport() {
   const group = document.getElementById("reportGroup").value;
   const now = new Date();
   let from = new Date();
-  if(period==="day") from = new Date(now.setHours(0,0,0,0));
-  else if(period==="week") { from = new Date(); from.setDate(from.getDate()-7); }
-  else { from = new Date(); from.setDate(1); from.setHours(0,0,0,0); }
+  let to = null; // null = sin límite de fecha final
 
-  const trans = getReportTransacciones(from, reportSource);
+  if(period==="day") {
+    from = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  } else if(period==="week") {
+    from = new Date(); from.setDate(from.getDate()-7);
+  } else if(period==="month") {
+    from = new Date(); from.setDate(1); from.setHours(0,0,0,0);
+  } else if(period==="range") {
+    const desdeVal = document.getElementById("reportFechaDesde").value;
+    const hastaVal = document.getElementById("reportFechaHasta").value;
+    if(!desdeVal) { showToast("Seleccioná una fecha de inicio", true); return; }
+    from = new Date(desdeVal + "T00:00:00");
+    to   = hastaVal ? new Date(hastaVal + "T23:59:59") : null;
+  }
+
+  const trans = getReportTransacciones(from, reportSource, to);
   const totalVentas = trans.reduce((s,t)=>s+t.total,0);
   const totalCosto  = trans.reduce((s,t)=>s+t.costo,0);
 
   const sourceLabel = {online:"🛒 Tienda Online", fisica:"🏪 Tienda Física", consumo:"👨‍👩‍👧 Consumo Propio", conjunto:"📊 Conjunto (las 3 fuentes)"}[reportSource];
   const utilLabel = reportSource==="consumo" ? "Costo total (sin venta, es consumo interno)" : "Utilidad estimada";
 
+  let periodoLabel;
+  if(period==="day") periodoLabel = "Hoy";
+  else if(period==="week") periodoLabel = "Esta semana";
+  else if(period==="month") periodoLabel = "Este mes";
+  else {
+    const desdeVal = document.getElementById("reportFechaDesde").value;
+    const hastaVal = document.getElementById("reportFechaHasta").value;
+    const fmtLbl = v => v ? new Date(v+"T00:00:00").toLocaleDateString("es-BO",{day:"2-digit",month:"short",year:"numeric"}) : "—";
+    periodoLabel = `${fmtLbl(desdeVal)} → ${fmtLbl(hastaVal)}`;
+  }
+
   let html = `<div class="report-section">
-    <h3>${sourceLabel} — ${period==="day"?"Hoy":period==="week"?"Esta semana":"Este mes"}</h3>
+    <h3>${sourceLabel} — ${periodoLabel}</h3>
     <div class="report-row"><span>Total transacciones</span><b>${trans.length}</b></div>
     <div class="report-row"><span>Ventas / Costo brutas</span><b>Bs. ${totalVentas.toFixed(2)}</b></div>
     <div class="report-row"><span>Costo de adquisición</span><b>Bs. ${totalCosto.toFixed(2)}</b></div>
@@ -4961,6 +5011,7 @@ window.saveAdmCqProd = saveAdmCqProd;
 window.toggleHideAdmCq = toggleHideAdmCq;
 window.deleteAdmCqProd = deleteAdmCqProd;
 window.setReportSource = setReportSource;
+window.toggleRangoFechas = toggleRangoFechas;
 window.renderCoquetteAdminList = renderCoquetteAdminList;
 </script>
 
