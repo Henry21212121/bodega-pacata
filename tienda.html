@@ -683,7 +683,7 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
     <div class="fld"><label>Nota (opcional)</label><input type="text" id="pagoParcNota" placeholder="Ej: Pagó con arroz..."></div>
     <div class="btn-row">
       <button class="btn btn-sec" onclick="closeModal('pagoParcModal')">Cancelar</button>
-      <button class="btn btn-v" onclick="savePagoParc()">💾 Guardar pago</button>
+      <button class="btn btn-v" id="btnGuardarPago" onclick="savePagoParc()">💾 Guardar pago</button>
     </div>
   </div>
 </div>
@@ -968,6 +968,54 @@ async function loadConfigData() {
       renderProdFisicaList();
     }
   );
+}
+
+// ── EDITAR / ELIMINAR FIADO ──────────────────────────────
+async function eliminarFiado(id) {
+  const f = fiados.find(x=>x.id===id);
+  if(!f) return;
+  const nombre = f.nombre || 'Sin nombre';
+  const saldo = (f.monto||0)-(f.pagado||0);
+  if(!confirm(`¿Eliminar el fiado de "${nombre}"?\nMonto: Bs.${(f.monto||0).toFixed(2)} · Saldo pendiente: Bs.${saldo.toFixed(2)}\n\nEsta acción quedará en la Papelera y se puede restaurar desde el Admin.`)) return;
+  try {
+    await saveToTrash('fiados', id, f, 'coquette', `Fiado: ${nombre} — Bs.${(f.monto||0).toFixed(2)}`);
+    await fs.deleteDoc(fs.doc(db,'fiados',id));
+    showToast(`🗑️ Fiado de "${nombre}" eliminado y respaldado`);
+    fiados = fiados.filter(x=>x.id!==id);
+    renderFiados();
+  } catch(e) { showToast('Error: '+e.message, true); }
+}
+
+function editarFiado(id) {
+  const f = fiados.find(x=>x.id===id);
+  if(!f) return;
+  document.getElementById('editFiadoId').value = id;
+  document.getElementById('editFiadoNombre').value = f.nombre||'';
+  document.getElementById('editFiadoCelular').value = f.celular||'';
+  document.getElementById('editFiadoMonto').value = f.monto||0;
+  document.getElementById('editFiadoNota').value = f.detalle||'';
+  openModal('editFiadoModal');
+}
+
+async function guardarEditFiado() {
+  const id = document.getElementById('editFiadoId').value;
+  const nombre  = document.getElementById('editFiadoNombre').value.trim();
+  const celular = document.getElementById('editFiadoCelular').value.trim();
+  const monto   = parseFloat(document.getElementById('editFiadoMonto').value)||0;
+  const nota    = document.getElementById('editFiadoNota').value.trim();
+  if(!nombre) { showToast('El nombre es obligatorio', true); return; }
+  if(!monto)  { showToast('El monto debe ser mayor a 0', true); return; }
+  const btn = document.getElementById('btnGuardarEditFiado');
+  if(btn) { btn.disabled=true; btn.textContent='⏳ Guardando...'; }
+  try {
+    await fs.updateDoc(fs.doc(db,'fiados',id), { nombre, celular, monto, detalle: nota });
+    showToast('✅ Fiado actualizado');
+    closeModal('editFiadoModal');
+  } catch(e) {
+    showToast('Error: '+e.message, true);
+  } finally {
+    if(btn) { btn.disabled=false; btn.textContent='💾 Guardar cambios'; }
+  }
 }
 
 // ── TOGGLE MICRÓFONO ──
@@ -1299,10 +1347,15 @@ function openPagoParc(id) {
   openModal('pagoParcModal');
 }
 
+let _pagoEnProceso = false;
 async function savePagoParc() {
+  if(_pagoEnProceso) return;
   const id = window._fiadoDetalleId;
   const monto = parseFloat(document.getElementById('pagoParcMonto').value)||0;
   if(!monto) { showToast('Ingresá el monto', true); return; }
+  _pagoEnProceso = true;
+  const btnPago = document.getElementById('btnGuardarPago');
+  if(btnPago) { btnPago.disabled=true; btnPago.textContent='⏳ Guardando...'; btnPago.style.opacity='0.6'; }
   const f = fiados.find(x=>x.id===id);
   if(!f) return;
   try {
@@ -1338,10 +1391,18 @@ async function savePagoParc() {
       esAbono: true,
       createdAt: fs.serverTimestamp()
     });
+    _pagoEnProceso = false;
+    const _btnP = document.getElementById('btnGuardarPago');
+    if(_btnP) { _btnP.disabled=false; _btnP.textContent='💰 Guardar pago'; _btnP.style.opacity='1'; }
     closeModal('pagoParcModal');
     closeModal('fiadoDetalleModal');
     showToast(`✅ Pago de Bs.${monto.toFixed(2)} registrado — Ganancia: Bs.${gananciaParc.toFixed(2)}`);
-  } catch(e) { showToast('Error: '+e.message, true); }
+  } catch(e) {
+    _pagoEnProceso = false;
+    const _btnP = document.getElementById('btnGuardarPago');
+    if(_btnP) { _btnP.disabled=false; _btnP.textContent='💰 Guardar pago'; _btnP.style.opacity='1'; }
+    showToast('Error: '+e.message, true);
+  }
 }
 
 // ── FIAR DESDE CARRITO ──────────────────────────────────
@@ -1415,9 +1476,14 @@ function calcFiarSaldo() {
   }
 }
 
+let _fiadoEnProceso = false;
 async function confirmarFiar() {
+  if(_fiadoEnProceso) return;
   const total = cartTotal();
   if(!total) { showToast('El carrito está vacío', true); return; }
+  const btnFiar = document.querySelector('#fiarCheckoutModal .btn-ro[onclick="confirmarFiar()"]');
+  _fiadoEnProceso = true;
+  if(btnFiar) { btnFiar.disabled=true; btnFiar.textContent='⏳ Registrando...'; btnFiar.style.opacity='0.6'; }
   const aCuenta = parseFloat(document.getElementById('fiarACuenta').value)||0;
   const saldo = total - aCuenta;
   const items = Object.values(cart);
@@ -1500,6 +1566,9 @@ async function confirmarFiar() {
   // NOTA: el fiado NO se registra en sales_physical acá — todavía no entró dinero a la caja.
   // Se registrará como venta real recién cuando se cobre (parcial o totalmente), ver cobrarFiado/savePagoParc.
 
+  _fiadoEnProceso = false;
+  const _btnFiarFin = document.querySelector('#fiarCheckoutModal .btn-ro[onclick="confirmarFiar()"]');
+  if(_btnFiarFin) { _btnFiarFin.disabled=false; _btnFiarFin.textContent='📋 Registrar fiado'; _btnFiarFin.style.opacity='1'; }
   closeModal('fiarModal');
   cart = {}; renderCart();
   showToast(`📋 Fiado de Bs.${total.toFixed(2)} registrado para ${nombre}`);
@@ -3153,8 +3222,10 @@ function renderFiados() {
         <td onclick="verDetalleFiado('${f.id}')" style="padding:7px 4px;text-align:right;font-size:.82rem;color:var(--v)">Bs.${pagado.toFixed(2)}</td>
         <td onclick="verDetalleFiado('${f.id}')" style="padding:7px 4px;text-align:right;font-weight:800;font-size:.82rem;color:${saldo>0?'var(--ro)':'var(--v)'}">Bs.${saldo.toFixed(2)}</td>
         <td onclick="verDetalleFiado('${f.id}')" style="padding:7px 4px;text-align:center;font-size:.7rem;color:var(--gr)">${ultPago}</td>
-        <td style="padding:7px 4px">
-          <button onclick="event.stopPropagation();verDetalleFiado('${f.id}')" style="background:var(--v);color:#fff;border:none;border-radius:8px;padding:5px 10px;font-size:.7rem;font-weight:800;cursor:pointer;white-space:nowrap">Ver / Cobrar</button>
+        <td style="padding:7px 4px;white-space:nowrap">
+          <button onclick="event.stopPropagation();verDetalleFiado('${f.id}')" style="background:var(--v);color:#fff;border:none;border-radius:8px;padding:5px 10px;font-size:.7rem;font-weight:800;cursor:pointer">Ver</button>
+          <button onclick="event.stopPropagation();editarFiado('${f.id}')" style="background:#1565C0;color:#fff;border:none;border-radius:8px;padding:5px 8px;font-size:.7rem;font-weight:800;cursor:pointer;margin-left:3px" title="Editar fiado">✏️</button>
+          <button onclick="event.stopPropagation();eliminarFiado('${f.id}')" style="background:var(--ro);color:#fff;border:none;border-radius:8px;padding:5px 8px;font-size:.7rem;font-weight:800;cursor:pointer;margin-left:3px" title="Eliminar fiado">🗑️</button>
         </td>
       </tr>`;
     }).join("");
@@ -4167,6 +4238,9 @@ window.confirmarFiar = confirmarFiar;
 window.verDetalleFiado = verDetalleFiado;
 window.openPagoParc = openPagoParc;
 window.savePagoParc = savePagoParc;
+window.editarFiado = editarFiado;
+window.eliminarFiado = eliminarFiado;
+window.guardarEditFiado = guardarEditFiado;
 window.openAddProdCoquette = openAddProdCoquette;
 window.makeCqCard = makeCqCard;
 window.saveCoquetteProd = saveCoquetteProd;
@@ -4258,5 +4332,34 @@ function showToast(msg,error=false){
   }
 })();
 </script>
+<!-- MODAL: EDITAR FIADO -->
+<div class="modal-ov" id="editFiadoModal">
+  <button onclick="closeModal('editFiadoModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10" title="Cerrar">✕</button>
+  <div class="modal-box" style="max-width:340px">
+    <div class="modal-title">✏️ Editar fiado</div>
+    <input type="hidden" id="editFiadoId">
+    <div class="fld">
+      <label>Nombre del cliente</label>
+      <input type="text" id="editFiadoNombre" placeholder="Nombre" class="inp">
+    </div>
+    <div class="fld">
+      <label>Celular</label>
+      <input type="tel" id="editFiadoCelular" placeholder="Celular (opcional)" class="inp">
+    </div>
+    <div class="fld">
+      <label>Monto total (Bs.)</label>
+      <input type="number" id="editFiadoMonto" min="0" step="0.5" class="inp">
+    </div>
+    <div class="fld">
+      <label>Detalle / nota</label>
+      <input type="text" id="editFiadoNota" placeholder="Detalle de artículos..." class="inp">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn btn-sec" onclick="closeModal('editFiadoModal')" style="flex:1">Cancelar</button>
+      <button class="btn btn-v" id="btnGuardarEditFiado" onclick="guardarEditFiado()" style="flex:2">💾 Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
