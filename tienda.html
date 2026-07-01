@@ -308,7 +308,7 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
     <div class="sell-left">
       <div class="search-bar" style="margin-top:8px">
         <span style="color:var(--gr)">🔍</span>
-        <input type="text" id="vendSearch" placeholder="Buscar producto..." oninput="onVendSearch()" autocomplete="off">
+        <input type="text" id="vendSearch" placeholder="Buscar producto..." oninput="onVendSearch()" onfocus="this.select()" autocomplete="off">
         <button onclick="clearVendSearch()" style="background:none;border:none;color:var(--gr);cursor:pointer;padding:0 2px">✕</button>
         <div class="search-suggestions" id="searchSuggestions" style="display:none"></div>
       </div>
@@ -580,7 +580,7 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 
     <div class="search-bar" style="margin-bottom:8px">
       <span style="color:var(--gr)">🔍</span>
-      <input type="text" id="consumoSearch" placeholder="Buscar producto..." oninput="onConsumoSearch()" autocomplete="off">
+      <input type="text" id="consumoSearch" placeholder="Buscar producto..." oninput="onConsumoSearch()" onfocus="this.select()" autocomplete="off">
       <button onclick="clearConsumoSearch()" style="background:none;border:none;color:var(--gr);cursor:pointer;padding:0 2px">✕</button>
     </div>
     <div id="consumoSearchResults" style="margin-bottom:10px"></div>
@@ -639,6 +639,21 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
         <button id="pesoGramosBtn" onclick="setPesoUnit('gramos')" class="btn btn-sec" style="flex:1">Gramos (g)</button>
       </div>
       <div style="font-size:.72rem;color:var(--gr);margin-top:8px;text-align:center" id="pesoUnitLabel">Unidad actual: <b>Libras</b></div>
+    </div>
+
+    <!-- Micrófono -->
+    <div style="background:#fff;border-radius:var(--rd);padding:14px;box-shadow:var(--sh);margin-bottom:12px">
+      <div class="section-title" style="margin-bottom:8px">🎤 Micrófono</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div>
+          <div style="font-weight:800;font-size:.9rem" id="micLabel">Activado</div>
+          <div style="font-size:.75rem;color:#aaa">Botón de voz en la barra superior</div>
+        </div>
+        <button id="btnMic" onclick="toggleMicConfig()"
+          style="padding:10px 20px;border:none;border-radius:10px;font-weight:800;font-size:.9rem;cursor:pointer;background:#e8f5e9;color:#1b5e20;min-width:120px;transition:all .2s">
+          Desactivar
+        </button>
+      </div>
     </div>
 
     <div style="background:var(--vbg);border-radius:10px;padding:12px;font-size:.8rem;color:var(--gr);text-align:center">
@@ -927,6 +942,9 @@ let fiarDeudorSeleccionado = null; // deudor elegido para fiar
 async function loadConfigData() {
   pesoUnit = localStorage.getItem('tienda_peso_unit') || 'libras';
   updatePesoUnitUI();
+  // Aplicar estado del micrófono
+  const micEnabled = localStorage.getItem('tienda_mic_enabled') !== 'false';
+  applyMicConfig(micEnabled);
 
   // Load categorías físicas from tempProducts (tipo='categoria_fisica')
   fs.onSnapshot(
@@ -950,6 +968,27 @@ async function loadConfigData() {
       renderProdFisicaList();
     }
   );
+}
+
+// ── TOGGLE MICRÓFONO ──
+function toggleMicConfig() {
+  const micEnabled = !(localStorage.getItem('tienda_mic_enabled') === 'false');
+  const nuevo = !micEnabled;
+  localStorage.setItem('tienda_mic_enabled', nuevo ? 'true' : 'false');
+  applyMicConfig(nuevo);
+}
+
+function applyMicConfig(enabled) {
+  const fab  = document.getElementById('micFab');
+  const btn  = document.getElementById('btnMic');
+  const lbl  = document.getElementById('micLabel');
+  if(fab) fab.style.display = enabled ? '' : 'none';
+  if(btn) {
+    btn.textContent  = enabled ? 'Desactivar' : 'Activar';
+    btn.style.background = enabled ? '#e8f5e9' : '#ffebee';
+    btn.style.color      = enabled ? '#1b5e20' : '#c62828';
+  }
+  if(lbl) lbl.textContent = enabled ? 'Activado' : 'Desactivado';
 }
 
 function setPesoUnit(unit) {
@@ -1862,7 +1901,10 @@ function makeProdCard(p, tipo) {
       <button class="qbtn" onclick="changeCartQty('${tipo}_${p.id}',1)" ${atMax?"disabled":""}>+</button>
     </div>`;
   } else {
-    ctrlHtml = `<button class="abtn" onclick="addToCart('${p.id}','${tipo}')">+ Agregar</button>`;
+    const stockInfo = (!modoCalculadora && p.stock != null && p.stock !== "")
+      ? `<div style="font-size:.65rem;color:var(--gr);text-align:center;margin-top:3px;font-weight:700">${p.stock > 0 ? `📦 ${p.stock} disponible${p.stock!==1?'s':''}` : ''}</div>`
+      : '';
+    ctrlHtml = `<button class="abtn" onclick="addToCart('${p.id}','${tipo}')">+ Agregar</button>${stockInfo}`;
   }
 
   return `<div class="pcard">
