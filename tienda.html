@@ -2861,10 +2861,19 @@ function renderDayPorArticulo() {
   const el = document.getElementById("dayTickets");
   if(!sales.length) { el.innerHTML=`<div style="text-align:center;padding:16px;color:var(--gr);font-size:.8rem">Sin ventas</div>`; return; }
   const agrupado = {};
+  // Normalizar nombre base: eliminar sufijos de lote como "(8 unidad)", "(6 unidades)", "(2 unid.)"
+  // y prefijos de cantidad como "2x1.5 ", para agrupar variantes del mismo producto
+  function nombreBase(nombre) {
+    if(!nombre) return "—";
+    // Eliminar paréntesis con cantidades al final: "(8 unidad)", "(2 unidades)", "(6 unid.)"
+    let base = nombre.replace(/\s*\(\d+[\d.,]*\s*(unidad|unidades|unid\.?|u\.?|kg|lb|gr|g)\)/gi, "").trim();
+    return base || nombre;
+  }
   sales.forEach(s => {
     const items = s.items||[{prodNombre:s.prodNombre,qty:s.qty,precio:s.precio}];
     items.forEach(i => {
-      const key = i.prodNombre || "—";
+      const rawNombre = i.prodNombre || "—";
+      const key = nombreBase(rawNombre);
       if(!agrupado[key]) agrupado[key] = {nombre:key, qty:0, total:0, ventas:0};
       agrupado[key].qty += (i.qty||0);
       agrupado[key].total += (i.precio||0)*(i.qty||0);
