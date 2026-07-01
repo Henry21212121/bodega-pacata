@@ -1031,6 +1031,37 @@ function matchBusqueda(nombre, q) {
   return nQ.split(/\s+/).every(p => nN.includes(p));
 }
 
+
+// ── ALARMA DE NUEVO PEDIDO ─────────────────────────────────
+function playNewOrderAlarm() {
+  try {
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    // Melodía de alerta: 3 grupos de 2 tonos ascendentes + vibración
+    const seq = [
+      {f:880, t:0.00, d:0.12, v:0.5},
+      {f:1108,t:0.13, d:0.12, v:0.5},
+      {f:880, t:0.35, d:0.12, v:0.5},
+      {f:1108,t:0.48, d:0.12, v:0.5},
+      {f:880, t:0.70, d:0.12, v:0.5},
+      {f:1108,t:0.83, d:0.18, v:0.6},
+      {f:1319,t:1.02, d:0.30, v:0.7},
+    ];
+    seq.forEach(({f,t,d,v}) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = f;
+      osc.type = 'square';
+      gain.gain.setValueAtTime(0, ctx.currentTime + t);
+      gain.gain.linearRampToValueAtTime(v, ctx.currentTime + t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + d);
+      osc.start(ctx.currentTime + t);
+      osc.stop(ctx.currentTime + t + d + 0.05);
+    });
+    // Vibración en móvil si está disponible
+    if(navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
+  } catch(e) { console.warn('Alarma audio error:', e); }
+}
 // ─── PAPELERA — FUNCIÓN CENTRAL ────────────────────────────
 // Guarda un documento en deleted_items antes de borrarlo
 async function saveToTrash(coleccion, docId, datos, origen, descripcion) {
@@ -1321,20 +1352,7 @@ async function loadAdminData() {
 
         if(hasNew && prevIds.size > 0) {
           // Play alert sound
-          try {
-            const ctx = new (window.AudioContext||window.webkitAudioContext)();
-            [523, 659, 784].forEach((freq, i) => {
-              const osc = ctx.createOscillator();
-              const gain = ctx.createGain();
-              osc.connect(gain); gain.connect(ctx.destination);
-              osc.frequency.value = freq;
-              osc.type = 'sine';
-              gain.gain.setValueAtTime(0.3, ctx.currentTime + i*0.15);
-              gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i*0.15 + 0.3);
-              osc.start(ctx.currentTime + i*0.15);
-              osc.stop(ctx.currentTime + i*0.15 + 0.3);
-            });
-          } catch(e) {}
+          playNewOrderAlarm();
           // Show new order badge
           const badge = document.getElementById('newOrderBadge');
           if(badge) {
