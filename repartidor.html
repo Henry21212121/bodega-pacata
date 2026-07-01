@@ -426,10 +426,19 @@ async function loadAll() {
   updateProfile();
   loadOrders();
   loadHistory();
-  // Real-time orders listener
+  // Real-time orders listener con alarma de nuevo pedido
+  let _knownRepOrderIds = new Set();
   fs.onSnapshot(
     fs.query(fs.collection(db,'orders'), fs.where('repartidorId','==',currentRep.id), fs.where('status','in',['preparing','new_order','confirmed','on_way','at_door'])),
-    snap => { myOrders = snap.docs.map(d=>({...d.data(),id:d.id})); renderOrders(); updateStats(); }
+    snap => {
+      const prevIds = new Set(_knownRepOrderIds);
+      myOrders = snap.docs.map(d=>({...d.data(),id:d.id}));
+      myOrders.forEach(o => _knownRepOrderIds.add(o.id));
+      // Detectar pedidos nuevos asignados
+      const hasNew = myOrders.some(o => !prevIds.has(o.id));
+      if(hasNew && prevIds.size > 0) playNewOrderAlarm();
+      renderOrders(); updateStats();
+    }
   );
   fs.onSnapshot(
     fs.query(fs.collection(db,'calificaciones'), fs.where('repartidorId','==',currentRep.id)),
@@ -437,6 +446,37 @@ async function loadAll() {
   );
 }
 
+
+// ── ALARMA DE NUEVO PEDIDO ─────────────────────────────────
+function playNewOrderAlarm() {
+  try {
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    // Melodía de alerta: 3 grupos de 2 tonos ascendentes + vibración
+    const seq = [
+      {f:880, t:0.00, d:0.12, v:0.5},
+      {f:1108,t:0.13, d:0.12, v:0.5},
+      {f:880, t:0.35, d:0.12, v:0.5},
+      {f:1108,t:0.48, d:0.12, v:0.5},
+      {f:880, t:0.70, d:0.12, v:0.5},
+      {f:1108,t:0.83, d:0.18, v:0.6},
+      {f:1319,t:1.02, d:0.30, v:0.7},
+    ];
+    seq.forEach(({f,t,d,v}) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = f;
+      osc.type = 'square';
+      gain.gain.setValueAtTime(0, ctx.currentTime + t);
+      gain.gain.linearRampToValueAtTime(v, ctx.currentTime + t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + d);
+      osc.start(ctx.currentTime + t);
+      osc.stop(ctx.currentTime + t + d + 0.05);
+    });
+    // Vibración en móvil si está disponible
+    if(navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
+  } catch(e) { console.warn('Alarma audio error:', e); }
+}
 async function loadOrders() {
   try {
     const snap = await fs.getDocs(fs.query(
