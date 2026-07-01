@@ -2419,6 +2419,7 @@ function renderAdmClients() {
         <button class="btn btn-v btn-sm" onclick="openClientDetail('${c.id}')">Ver</button>
         <button class="btn btn-sec btn-sm" onclick="sendMsgClient('${c.phone}','${c.name}')">💬</button>
         <button class="btn btn-ro btn-sm" onclick="blockClient('${c.id}')" title="${c.blocked?'Desbloquear':'Bloquear'}">${c.blocked?"🔓":"🚫"}</button>
+        <button class="btn btn-ro btn-sm" onclick="deleteClient('${c.id}')" title="Eliminar cliente" style="background:#b71c1c">🗑️</button>
       </td>
     </tr>`;
   }).join("");
@@ -2449,21 +2450,64 @@ async function openClientDetail(id) {
     }
   } catch(e) {}
 
+  // Calcular estadísticas avanzadas
+  const totalGastado = orders.reduce((s,o)=>s+(o.total||0),0);
+  const promedioTicket = orders.length ? totalGastado/orders.length : 0;
+  const primerPedido = orders.length ? new Date(Math.min(...orders.map(o=>o.createdAt?.seconds*1000||Infinity))) : null;
+  const ultimoPedido = orders.length ? new Date(Math.max(...orders.map(o=>o.createdAt?.seconds*1000||0))) : null;
+  const fmtDate = d => d ? d.toLocaleDateString('es-BO',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+  const fmtDT = d => d ? d.toLocaleString('es-BO',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+
+  // Historial completo de productos comprados
+  const allProds = {};
+  orders.forEach(o=>(o.items||[]).forEach(i=>{
+    const nombre = i.nombre||'—';
+    if(!allProds[nombre]) allProds[nombre] = {nombre, qty:0, total:0, veces:0};
+    allProds[nombre].qty   += (i.qty||0);
+    allProds[nombre].total += (i.subtotal||0);
+    allProds[nombre].veces++;
+  }));
+  const prodsSorted = Object.values(allProds).sort((a,b)=>b.qty-a.qty);
+
   document.getElementById("cdContent").innerHTML = `
-    <div style="font-size:.82rem;line-height:1.8;background:var(--vbg);padding:10px;border-radius:8px;margin-bottom:10px">
-      📱 ${c.phone}<br>📍 ${c.addr||'—'}<br>
-      🛒 ${c.orderCount||0} pedidos · Bs. ${(c.totalSpent||0).toFixed(2)} gastados
+    <!-- Datos básicos -->
+    <div style="font-size:.82rem;line-height:1.9;background:var(--vbg);padding:10px 12px;border-radius:8px;margin-bottom:10px">
+      📱 ${c.phone}<br>
+      📍 ${c.addr||'—'}<br>
+      🛒 ${orders.length} pedidos · <b>Bs. ${totalGastado.toFixed(2)}</b> gastados<br>
+      💳 Ticket promedio: <b>Bs. ${promedioTicket.toFixed(2)}</b><br>
+      📅 Primer pedido: ${fmtDate(primerPedido)}<br>
+      🕐 Último pedido: ${fmtDate(ultimoPedido)}
     </div>
     ${facadeHtml}
-    <div style="font-size:.8rem;font-weight:700;margin-bottom:6px">Productos favoritos:</div>
-    ${top.map(([n,q])=>`<div style="display:flex;justify-content:space-between;font-size:.78rem;padding:3px 0;border-bottom:1px solid #f5f5f5"><span>${n}</span><span>×${q}</span></div>`).join("")}
-    <div style="font-size:.8rem;font-weight:700;margin:10px 0 6px">Últimos pedidos:</div>
-    ${orders.slice(0,5).map(o=>{
-      const t = o.createdAt?.seconds ? new Date(o.createdAt.seconds*1000).toLocaleString('es-BO',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
-      return `<div style="font-size:.75rem;padding:4px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between">
-        <span>${o.code||'—'} ${statusChip(o.status)}</span><span style="font-size:.7rem;color:var(--gr)">${t} · Bs.${(o.total||0).toFixed(2)}</span>
-      </div>`;
-    }).join("")}`;
+
+    <!-- Productos favoritos (todos) -->
+    <div style="font-size:.82rem;font-weight:800;margin-bottom:6px;color:var(--v)">🛍️ Historial de productos comprados</div>
+    <div style="max-height:200px;overflow-y:auto;border:1px solid #e8f5e9;border-radius:8px;margin-bottom:12px">
+      ${prodsSorted.length ? prodsSorted.map((p,i)=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:.76rem;padding:6px 10px;${i%2===0?'background:#f9fdf9':''};${i===0?'border-left:3px solid var(--v)':''}">
+          <span style="font-weight:${i===0?'800':'500'}">${i===0?'🥇 ':''}${p.nombre}</span>
+          <span style="text-align:right;flex-shrink:0;margin-left:8px;color:var(--gr)">
+            <b style="color:#222">×${p.qty}</b> · Bs.${p.total.toFixed(2)}
+          </span>
+        </div>`).join('') : '<div style="padding:10px;color:var(--gr);font-size:.78rem;text-align:center">Sin compras registradas</div>'}
+    </div>
+
+    <!-- Últimos pedidos (todos expandibles) -->
+    <div style="font-size:.82rem;font-weight:800;margin-bottom:6px;color:var(--v)">📦 Historial de pedidos</div>
+    <div style="max-height:220px;overflow-y:auto;border:1px solid #e8f5e9;border-radius:8px">
+      ${orders.length ? [...orders].sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0)).map(o=>{
+        const t = o.createdAt?.seconds ? fmtDT(new Date(o.createdAt.seconds*1000)) : '—';
+        const itemsStr = (o.items||[]).map(i=>`${i.qty}× ${i.nombre}`).join(', ');
+        return `<div style="padding:7px 10px;border-bottom:1px solid #f0f0f0">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:.75rem;font-weight:700">${o.code||'—'} ${statusChip(o.status)}</span>
+            <span style="font-size:.72rem;color:var(--gr)">${t} · <b>Bs.${(o.total||0).toFixed(2)}</b></span>
+          </div>
+          <div style="font-size:.68rem;color:var(--gr);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${itemsStr||'—'}</div>
+        </div>`;
+      }).join('') : '<div style="padding:10px;color:var(--gr);font-size:.78rem;text-align:center">Sin pedidos</div>'}
+    </div>`;
   open2("clientDetail");
 }
 
