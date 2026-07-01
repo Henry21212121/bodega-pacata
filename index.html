@@ -1106,21 +1106,33 @@ async function loadAll() {
     catSnap.forEach(d => { DB.categories[d.id] = d.data(); });
 
     // Load products (real-time) — usa docChanges para manejar borrados y cambios de categoría
+    let _firstProductSnapshot = true;
     fs.onSnapshot(fs.collection(db,"products"), snap => {
-      snap.docChanges().forEach(change => {
-        if(change.type === "removed") {
-          // Producto eliminado — sacarlo del DB local
-          delete DB.products[change.doc.id];
-        } else {
-          // added o modified
-          const data = change.doc.data();
-          // Convert promos from Firestore objects back to arrays
+      if(_firstProductSnapshot) {
+        // En el primer snapshot, reemplazar todo el SEED con los datos reales de Firebase
+        // Esto garantiza que productos borrados en admin no aparezcan del SEED
+        DB.products = {};
+        snap.forEach(d => {
+          const data = d.data();
           if(data.promos && data.promos.length > 0 && typeof data.promos[0] === 'object' && 'q' in data.promos[0]) {
             data.promos = data.promos.map(t => [t.q, t.p]);
           }
-          DB.products[change.doc.id] = {...data, id:change.doc.id};
-        }
-      });
+          DB.products[d.id] = {...data, id:d.id};
+        });
+        _firstProductSnapshot = false;
+      } else {
+        snap.docChanges().forEach(change => {
+          if(change.type === "removed") {
+            delete DB.products[change.doc.id];
+          } else {
+            const data = change.doc.data();
+            if(data.promos && data.promos.length > 0 && typeof data.promos[0] === 'object' && 'q' in data.promos[0]) {
+              data.promos = data.promos.map(t => [t.q, t.p]);
+            }
+            DB.products[change.doc.id] = {...data, id:change.doc.id};
+          }
+        });
+      }
       buildCats();
       renderProducts();
       updateCartUI();
