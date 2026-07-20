@@ -863,9 +863,10 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
         style="width:100%;padding:9px;border:1.5px solid var(--vbg);border-radius:8px;font-size:.82rem;background:#1a1a2e;color:var(--tx)">
     </div>
 
-    <button onclick="guardarEdicionVenta()" style="width:100%;background:var(--v);color:#fff;border:none;border-radius:10px;padding:12px;font-size:.88rem;font-weight:900;cursor:pointer">
-      💾 Guardar corrección
-    </button>
+    <div class="btn-row">
+      <button class="btn btn-sec" onclick="cancelarEdicionVenta()">Cancelar</button>
+      <button class="btn btn-ro" onclick="guardarEdicionVenta()">💾 Guardar corrección</button>
+    </div>
   </div>
 </div>
 
@@ -1445,13 +1446,11 @@ async function confirmarFiar() {
 
     // Check if name already exists (warn but don't block)
     const existe = fiados.find(f=>f.nombre.toLowerCase()===nombre.toLowerCase());
-    if(existe && !window._fiarConfirmDup) {
-      window._fiarConfirmDup = true;
-      showToast(`⚠️ Ya existe "${existe.nombre}" con saldo Bs.${((existe.monto||0)-(existe.pagado||0)).toFixed(2)}. Tocá FIAR de nuevo para confirmar.`, true);
-      setTimeout(()=>{ window._fiarConfirmDup=false; }, 4000);
-      return;
+    if(existe) {
+      const saldoExiste = (existe.monto||0)-(existe.pagado||0);
+      const continuar = confirm(`⚠️ Ya existe "${existe.nombre}" con saldo Bs.${saldoExiste.toFixed(2)}.\n\n¿Registrar este fiado como un cliente NUEVO con el mismo nombre?\n\n(Si es la misma persona, cancelá y seleccionala de la lista de sugerencias en vez de escribir el nombre)`);
+      if(!continuar) return;
     }
-    window._fiarConfirmDup = false;
 
     const docRef = await fs.addDoc(fs.collection(db,'fiados'), {
       nombre, celular: celular||'',
@@ -1582,6 +1581,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const btn = e.target.closest("[data-key]");
     if(!btn) return;
     pinPress(btn.dataset.key);
+  });
+
+  // Permitir ingresar el PIN con el teclado físico (números, Backspace, Enter)
+  document.addEventListener("keydown", e => {
+    const loginScreen = document.getElementById("loginScreen");
+    if(!loginScreen || loginScreen.classList.contains("hidden")) return;
+    if(e.key >= "0" && e.key <= "9") { pinPress(e.key); e.preventDefault(); }
+    else if(e.key === "Backspace") { pinPress("C"); e.preventDefault(); }
+    else if(e.key === "Enter") { pinPress("OK"); e.preventDefault(); }
   });
 
   // Show loading while Firebase connects
@@ -2177,19 +2185,33 @@ function buscarProdEditarVenta(q) {
   document.getElementById('editAgregarSeleccionado').style.display = 'none';
   _editAgregarProd = null;
   if(!q.trim()) { el.innerHTML=''; return; }
-  const matches = (allProducts||[]).filter(p => p.nombre?.toLowerCase().includes(q.toLowerCase())).slice(0,6);
-  if(!matches.length) { el.innerHTML=`<div style="font-size:.74rem;color:var(--gr);padding:4px">Sin resultados</div>`; return; }
-  el.innerHTML = matches.map(p=>`
-    <div onclick="seleccionarProdEdit('${p.id}')" style="padding:6px 8px;cursor:pointer;border-radius:6px;font-size:.78rem;margin-bottom:2px;background:var(--vbg)">
-      ${p.nombre} <span style="color:var(--v);font-weight:700">Bs.${(p.precio||0).toFixed(2)}</span>
-    </div>`).join('');
+  const ql = q.toLowerCase();
+  // Buscar en catálogo, productos temporales y COQUETTE, igual que en Consumo propio
+  const candidatos = [
+    ...Object.values(DB.products||{}).filter(p=>p.estado!=="oculto").map(p=>({...p,_tipo:"catalogo"})),
+    ...(DB.tempProds||[]).map(p=>({...p,_tipo:"temporal"})),
+    ...(cqProds||[]).filter(p=>!p.oculto).map(p=>({...p,_tipo:"coquette"})),
+  ].filter(p => p.nombre?.toLowerCase().includes(ql)).slice(0, 8);
+
+  if(!candidatos.length) { el.innerHTML=`<div style="font-size:.74rem;color:var(--gr);padding:4px">Sin resultados</div>`; return; }
+  el.innerHTML = candidatos.map(p=>{
+    const precio = p._tipo==="coquette" ? (p.precioUnit||0) : (p.precio||0);
+    return `<div onclick="seleccionarProdEdit('${p.id}','${p._tipo}')" style="padding:6px 8px;cursor:pointer;border-radius:6px;font-size:.78rem;margin-bottom:2px;background:var(--vbg)">
+      ${p.nombre} <span style="color:var(--v);font-weight:700">Bs.${precio.toFixed(2)}</span>
+    </div>`;
+  }).join('');
 }
 
-function seleccionarProdEdit(prodId) {
-  const p = (allProducts||[]).find(x=>x.id===prodId);
+function seleccionarProdEdit(prodId, tipo) {
+  let p;
+  if(tipo === "catalogo") p = DB.products[prodId];
+  else if(tipo === "temporal") p = (DB.tempProds||[]).find(x=>x.id===prodId);
+  else p = (cqProds||[]).find(x=>x.id===prodId);
   if(!p) return;
-  _editAgregarProd = p;
-  document.getElementById('editAgregarNombre').textContent = `${p.nombre} — Bs.${(p.precio||0).toFixed(2)}`;
+  const precio = tipo === "coquette" ? (p.precioUnit||0) : (p.precio||0);
+  const costoUnit = tipo === "coquette" ? (p.precioUnit||0) : (p.costoUnit||0);
+  _editAgregarProd = { id: p.id, nombre: p.nombre, precio, costoUnit, _tipo: tipo };
+  document.getElementById('editAgregarNombre').textContent = `${p.nombre} — Bs.${precio.toFixed(2)}`;
   document.getElementById('editAgregarSeleccionado').style.display = 'block';
   document.getElementById('editAgregarResultados').innerHTML = '';
   document.getElementById('editAgregarBuscar').value = p.nombre;
@@ -2206,7 +2228,7 @@ function confirmarAgregarItemEdit() {
     _editVentaItems[existeIdx].qty += qty;
     _editVentaItems[existeIdx].subtotal = _editVentaItems[existeIdx].qty * precio;
   } else {
-    const costoUnit = _editAgregarProd.precioUnit||0;
+    const costoUnit = _editAgregarProd.costoUnit||0;
     _editVentaItems.push({ prodId:_editAgregarProd.id, prodNombre:_editAgregarProd.nombre, qty, precio, subtotal:qty*precio, costoUnit, costoTotal:costoUnit*qty, ganancia:(precio-costoUnit)*qty });
   }
   document.getElementById('editAgregarBuscar').value='';
@@ -2214,6 +2236,10 @@ function confirmarAgregarItemEdit() {
   document.getElementById('editAgregarResultados').innerHTML='';
   _editAgregarProd = null;
   renderEditarItems();
+}
+
+function cancelarEdicionVenta() {
+  closeModal('editarVentaModal');
 }
 
 async function guardarEdicionVenta() {
@@ -3986,6 +4012,7 @@ window.buscarProdEditarVenta = buscarProdEditarVenta;
 window.seleccionarProdEdit = seleccionarProdEdit;
 window.confirmarAgregarItemEdit = confirmarAgregarItemEdit;
 window.guardarEdicionVenta = guardarEdicionVenta;
+window.cancelarEdicionVenta = cancelarEdicionVenta;
 window.repararVentasAntiguas = repararVentasAntiguas;
 window.editarCostoLibre = editarCostoLibre;
 window.renderDayObservados = renderDayObservados;
