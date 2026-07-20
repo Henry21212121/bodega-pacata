@@ -308,7 +308,7 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
     <div class="sell-left">
       <div class="search-bar" style="margin-top:8px">
         <span style="color:var(--gr)">🔍</span>
-        <input type="text" id="vendSearch" placeholder="Buscar producto..." oninput="onVendSearch()" onfocus="this.select()" autocomplete="off">
+        <input type="text" id="vendSearch" placeholder="Buscar producto..." oninput="onVendSearch()" autocomplete="off">
         <button onclick="clearVendSearch()" style="background:none;border:none;color:var(--gr);cursor:pointer;padding:0 2px">✕</button>
         <div class="search-suggestions" id="searchSuggestions" style="display:none"></div>
       </div>
@@ -337,7 +337,7 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
         </div>
         <div style="display:flex;justify-content:space-between;margin-bottom:10px;font-size:.95rem">
           <span style="color:var(--gr);font-weight:700">Total</span>
-          <span style="font-weight:900;color:#fff;font-size:1.6rem;background:#1565C0;border-radius:10px;padding:4px 14px;box-shadow:0 2px 8px rgba(21,101,192,.4)" id="cartTotal">Bs. 0.00</span>
+          <span style="font-weight:900;color:var(--v);font-size:1.15rem" id="cartTotal">Bs. 0.00</span>
         </div>
         <div style="display:flex;gap:8px">
           <button class="sell-btn" id="sellBtn" onclick="openCheckout()" disabled style="flex:2">
@@ -580,7 +580,7 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 
     <div class="search-bar" style="margin-bottom:8px">
       <span style="color:var(--gr)">🔍</span>
-      <input type="text" id="consumoSearch" placeholder="Buscar producto..." oninput="onConsumoSearch()" onfocus="this.select()" autocomplete="off">
+      <input type="text" id="consumoSearch" placeholder="Buscar producto..." oninput="onConsumoSearch()" autocomplete="off">
       <button onclick="clearConsumoSearch()" style="background:none;border:none;color:var(--gr);cursor:pointer;padding:0 2px">✕</button>
     </div>
     <div id="consumoSearchResults" style="margin-bottom:10px"></div>
@@ -641,21 +641,6 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
       <div style="font-size:.72rem;color:var(--gr);margin-top:8px;text-align:center" id="pesoUnitLabel">Unidad actual: <b>Libras</b></div>
     </div>
 
-    <!-- Micrófono -->
-    <div style="background:#fff;border-radius:var(--rd);padding:14px;box-shadow:var(--sh);margin-bottom:12px">
-      <div class="section-title" style="margin-bottom:8px">🎤 Micrófono</div>
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-        <div>
-          <div style="font-weight:800;font-size:.9rem" id="micLabel">Activado</div>
-          <div style="font-size:.75rem;color:#aaa">Botón de voz en la barra superior</div>
-        </div>
-        <button id="btnMic" onclick="toggleMicConfig()"
-          style="padding:10px 20px;border:none;border-radius:10px;font-weight:800;font-size:.9rem;cursor:pointer;background:#e8f5e9;color:#1b5e20;min-width:120px;transition:all .2s">
-          Desactivar
-        </button>
-      </div>
-    </div>
-
     <div style="background:var(--vbg);border-radius:10px;padding:12px;font-size:.8rem;color:var(--gr);text-align:center">
       📦 Los productos COQUETTE se gestionan en la pestaña <b>🥬 Productos</b>
     </div>
@@ -683,7 +668,7 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
     <div class="fld"><label>Nota (opcional)</label><input type="text" id="pagoParcNota" placeholder="Ej: Pagó con arroz..."></div>
     <div class="btn-row">
       <button class="btn btn-sec" onclick="closeModal('pagoParcModal')">Cancelar</button>
-      <button class="btn btn-v" id="btnGuardarPago" onclick="savePagoParc()">💾 Guardar pago</button>
+      <button class="btn btn-v" onclick="savePagoParc()">💾 Guardar pago</button>
     </div>
   </div>
 </div>
@@ -942,9 +927,6 @@ let fiarDeudorSeleccionado = null; // deudor elegido para fiar
 async function loadConfigData() {
   pesoUnit = localStorage.getItem('tienda_peso_unit') || 'libras';
   updatePesoUnitUI();
-  // Aplicar estado del micrófono
-  const micEnabled = localStorage.getItem('tienda_mic_enabled') !== 'false';
-  applyMicConfig(micEnabled);
 
   // Load categorías físicas from tempProducts (tipo='categoria_fisica')
   fs.onSnapshot(
@@ -968,75 +950,6 @@ async function loadConfigData() {
       renderProdFisicaList();
     }
   );
-}
-
-// ── EDITAR / ELIMINAR FIADO ──────────────────────────────
-async function eliminarFiado(id) {
-  const f = fiados.find(x=>x.id===id);
-  if(!f) return;
-  const nombre = f.nombre || 'Sin nombre';
-  const saldo = (f.monto||0)-(f.pagado||0);
-  if(!confirm(`¿Eliminar el fiado de "${nombre}"?\nMonto: Bs.${(f.monto||0).toFixed(2)} · Saldo pendiente: Bs.${saldo.toFixed(2)}\n\nEsta acción quedará en la Papelera y se puede restaurar desde el Admin.`)) return;
-  try {
-    await saveToTrash('fiados', id, f, 'coquette', `Fiado: ${nombre} — Bs.${(f.monto||0).toFixed(2)}`);
-    await fs.deleteDoc(fs.doc(db,'fiados',id));
-    showToast(`🗑️ Fiado de "${nombre}" eliminado y respaldado`);
-    fiados = fiados.filter(x=>x.id!==id);
-    renderFiados();
-  } catch(e) { showToast('Error: '+e.message, true); }
-}
-
-function editarFiado(id) {
-  const f = fiados.find(x=>x.id===id);
-  if(!f) return;
-  document.getElementById('editFiadoId').value = id;
-  document.getElementById('editFiadoNombre').value = f.nombre||'';
-  document.getElementById('editFiadoCelular').value = f.celular||'';
-  document.getElementById('editFiadoMonto').value = f.monto||0;
-  document.getElementById('editFiadoNota').value = f.detalle||'';
-  openModal('editFiadoModal');
-}
-
-async function guardarEditFiado() {
-  const id = document.getElementById('editFiadoId').value;
-  const nombre  = document.getElementById('editFiadoNombre').value.trim();
-  const celular = document.getElementById('editFiadoCelular').value.trim();
-  const monto   = parseFloat(document.getElementById('editFiadoMonto').value)||0;
-  const nota    = document.getElementById('editFiadoNota').value.trim();
-  if(!nombre) { showToast('El nombre es obligatorio', true); return; }
-  if(!monto)  { showToast('El monto debe ser mayor a 0', true); return; }
-  const btn = document.getElementById('btnGuardarEditFiado');
-  if(btn) { btn.disabled=true; btn.textContent='⏳ Guardando...'; }
-  try {
-    await fs.updateDoc(fs.doc(db,'fiados',id), { nombre, celular, monto, detalle: nota });
-    showToast('✅ Fiado actualizado');
-    closeModal('editFiadoModal');
-  } catch(e) {
-    showToast('Error: '+e.message, true);
-  } finally {
-    if(btn) { btn.disabled=false; btn.textContent='💾 Guardar cambios'; }
-  }
-}
-
-// ── TOGGLE MICRÓFONO ──
-function toggleMicConfig() {
-  const micEnabled = !(localStorage.getItem('tienda_mic_enabled') === 'false');
-  const nuevo = !micEnabled;
-  localStorage.setItem('tienda_mic_enabled', nuevo ? 'true' : 'false');
-  applyMicConfig(nuevo);
-}
-
-function applyMicConfig(enabled) {
-  const fab  = document.getElementById('micFab');
-  const btn  = document.getElementById('btnMic');
-  const lbl  = document.getElementById('micLabel');
-  if(fab) fab.style.display = enabled ? '' : 'none';
-  if(btn) {
-    btn.textContent  = enabled ? 'Desactivar' : 'Activar';
-    btn.style.background = enabled ? '#e8f5e9' : '#ffebee';
-    btn.style.color      = enabled ? '#1b5e20' : '#c62828';
-  }
-  if(lbl) lbl.textContent = enabled ? 'Activado' : 'Desactivado';
 }
 
 function setPesoUnit(unit) {
@@ -1114,12 +1027,10 @@ async function saveCatFisica() {
 }
 
 async function deleteCatFisica(id) {
-  if(!confirm('¿Eliminar esta categoría? Quedará respaldada en la Papelera.')) return;
+  if(!confirm('¿Eliminar esta categoría?')) return;
   try {
-    const snap = await fs.getDoc(fs.doc(db,'tempProducts',id));
-    if(snap.exists()) await saveToTrash("tempProducts", id, snap.data(), "coquette", `Categoría física: ${snap.data().nombre||id}`);
     await fs.deleteDoc(fs.doc(db,'tempProducts',id));
-    showToast('Categoría eliminada y respaldada');
+    showToast('Categoría eliminada');
   } catch(e) { showToast('Error: '+e.message, true); }
 }
 
@@ -1279,11 +1190,9 @@ function renderProdFisicaList() {
 }
 
 async function deleteProdFisica(id) {
-  if(!confirm('¿Eliminar este producto? Quedará respaldado en la Papelera.')) return;
-  const snap = await fs.getDoc(fs.doc(db,'tempProducts',id));
-  if(snap.exists()) await saveToTrash("tempProducts", id, snap.data(), "coquette", `Producto físico: ${snap.data().nombre||id}`);
+  if(!confirm('¿Eliminar este producto?')) return;
   await fs.deleteDoc(fs.doc(db,'tempProducts',id));
-  showToast('Producto eliminado y respaldado');
+  showToast('Producto eliminado');
 }
 
 // ── FIADOS MEJORADOS ─────────────────────────────────────
@@ -1347,62 +1256,68 @@ function openPagoParc(id) {
   openModal('pagoParcModal');
 }
 
-let _pagoEnProceso = false;
 async function savePagoParc() {
-  if(_pagoEnProceso) return;
   const id = window._fiadoDetalleId;
   const monto = parseFloat(document.getElementById('pagoParcMonto').value)||0;
   if(!monto) { showToast('Ingresá el monto', true); return; }
-  _pagoEnProceso = true;
-  const btnPago = document.getElementById('btnGuardarPago');
-  if(btnPago) { btnPago.disabled=true; btnPago.textContent='⏳ Guardando...'; btnPago.style.opacity='0.6'; }
   const f = fiados.find(x=>x.id===id);
   if(!f) return;
   try {
     const nota = document.getElementById('pagoParcNota').value.trim();
-    // Calcular capital+ganancia proporcional al pago
-    const montoTotal = f.monto || monto;
+
+    // ── Calcular cuánto capital ya se pagó (sumando todos los pagos anteriores)
     const costoTotalFiado = (f.items||[]).reduce((s,i)=>{
       const c = i.costoTotal != null ? i.costoTotal : (i.costoUnit||0)*(i.qty||1);
       return s + c;
     }, 0);
-    const proporcion = montoTotal > 0 ? monto / montoTotal : 0;
-    const costoParc = costoTotalFiado * proporcion;
-    const gananciaParc = monto - costoParc;
-    // Save pago
+    const gananciaTotal  = (f.monto||0) - costoTotalFiado;
+    const totalPagadoAnt = f.pagado || 0; // ya pagado antes de este pago
+
+    // Capital ya cubierto por pagos anteriores
+    const capitalYaPagado  = Math.min(totalPagadoAnt, costoTotalFiado);
+    const capitalRestante  = Math.max(0, costoTotalFiado - capitalYaPagado);
+
+    // Este pago: primero cubre capital restante, luego ganancia
+    const costoParc     = Math.min(monto, capitalRestante);
+    const gananciaParc  = Math.max(0, monto - costoParc);
+
+    // Guardar en pagos_fiado
     await fs.addDoc(fs.collection(db,'pagos_fiado'), {
-      fiadoId: id, monto,
-      nota,
+      fiadoId: id, monto, nota,
+      costoParc, gananciaParc,
       createdAt: fs.serverTimestamp()
     });
-    // Update fiado total pagado
-    const newPagado = (f.pagado||0) + monto;
-    const saldo = (f.monto||0) - newPagado;
+
+    // Actualizar fiado
+    const newPagado = totalPagadoAnt + monto;
+    const saldo     = (f.monto||0) - newPagado;
     await fs.updateDoc(fs.doc(db,'fiados',id), {
       pagado: newPagado,
       cobrado: saldo <= 0,
       lastPagoAt: fs.serverTimestamp()
     });
-    // Registrar en caja con capital+ganancia proporcionales
+
+    // Registrar en ventas del día con distribución correcta
     await fs.addDoc(fs.collection(db,'sales_physical'), {
-      items: [{prodNombre:'Abono fiado: '+(f.nombre||''), qty:1, precio:monto, subtotal:monto, costoUnit:costoParc, costoTotal:costoParc, ganancia:gananciaParc, esAbono:true}],
-      total: monto, payMethod: 'efectivo',
-      nota: 'Pago parcial de fiado'+(nota?': '+nota:''),
-      esAbono: true,
+      items: [{
+        prodNombre: `Pago fiado: ${f.nombre||''}`,
+        qty: 1, precio: monto, subtotal: monto,
+        costoUnit: costoParc, costoTotal: costoParc,
+        ganancia: gananciaParc,
+        esPagoFiado: true
+      }],
+      total:    monto,
+      payMethod:'efectivo',
+      nota:     `Pago fiado ${f.nombre||''}${nota ? ': '+nota : ''} — Capital: Bs.${costoParc.toFixed(2)}, Ganancia: Bs.${gananciaParc.toFixed(2)}`,
+      esPagoFiado: true,
+      fiadoId:  id,
       createdAt: fs.serverTimestamp()
     });
-    _pagoEnProceso = false;
-    const _btnP = document.getElementById('btnGuardarPago');
-    if(_btnP) { _btnP.disabled=false; _btnP.textContent='💰 Guardar pago'; _btnP.style.opacity='1'; }
+
     closeModal('pagoParcModal');
     closeModal('fiadoDetalleModal');
-    showToast(`✅ Pago de Bs.${monto.toFixed(2)} registrado — Ganancia: Bs.${gananciaParc.toFixed(2)}`);
-  } catch(e) {
-    _pagoEnProceso = false;
-    const _btnP = document.getElementById('btnGuardarPago');
-    if(_btnP) { _btnP.disabled=false; _btnP.textContent='💰 Guardar pago'; _btnP.style.opacity='1'; }
-    showToast('Error: '+e.message, true);
-  }
+    showToast(`✅ Pago de Bs.${monto.toFixed(2)} registrado — Capital: Bs.${costoParc.toFixed(2)}, Ganancia: Bs.${gananciaParc.toFixed(2)}`);
+  } catch(e) { showToast('Error: '+e.message, true); }
 }
 
 // ── FIAR DESDE CARRITO ──────────────────────────────────
@@ -1432,7 +1347,7 @@ function buscarDeudor() {
   const sug = document.getElementById('fiarSugerencias');
   if(!q) { sug.style.display='none'; return; }
   // Search in all fiados (including cobrados for reference)
-  const matches = fiados.filter(f=>matchBusqueda(f.nombre||"", q));
+  const matches = fiados.filter(f=>f.nombre.toLowerCase().includes(q));
   if(!matches.length) { sug.style.display='none'; return; }
   sug.innerHTML = matches.map(f=>{
     const saldo = (f.monto||0)-(f.pagado||0);
@@ -1476,14 +1391,9 @@ function calcFiarSaldo() {
   }
 }
 
-let _fiadoEnProceso = false;
 async function confirmarFiar() {
-  if(_fiadoEnProceso) return;
   const total = cartTotal();
   if(!total) { showToast('El carrito está vacío', true); return; }
-  const btnFiar = document.querySelector('#fiarCheckoutModal .btn-ro[onclick="confirmarFiar()"]');
-  _fiadoEnProceso = true;
-  if(btnFiar) { btnFiar.disabled=true; btnFiar.textContent='⏳ Registrando...'; btnFiar.style.opacity='0.6'; }
   const aCuenta = parseFloat(document.getElementById('fiarACuenta').value)||0;
   const saldo = total - aCuenta;
   const items = Object.values(cart);
@@ -1563,12 +1473,32 @@ async function confirmarFiar() {
     }
   }
 
-  // NOTA: el fiado NO se registra en sales_physical acá — todavía no entró dinero a la caja.
-  // Se registrará como venta real recién cuando se cobre (parcial o totalmente), ver cobrarFiado/savePagoParc.
+  // Calcular capital total del fiado
+  const costoTotalFiado = itemsArr.reduce((s,i)=> s + (i.costoTotal != null ? i.costoTotal : (i.costoUnit||0)*(i.qty||1)), 0);
+  const gananciaTotal   = total - costoTotalFiado;
 
-  _fiadoEnProceso = false;
-  const _btnFiarFin = document.querySelector('#fiarCheckoutModal .btn-ro[onclick="confirmarFiar()"]');
-  if(_btnFiarFin) { _btnFiarFin.disabled=false; _btnFiarFin.textContent='📋 Registrar fiado'; _btnFiarFin.style.opacity='1'; }
+  // Calcular distribución del a cuenta (primero capital, luego ganancia)
+  const capitalCubierto = Math.min(aCuenta, costoTotalFiado);
+  const gananciaCubierta = Math.max(0, aCuenta - costoTotalFiado);
+
+  // Registrar en ventas del día (siempre, aunque aCuenta sea 0)
+  await fs.addDoc(fs.collection(db, 'sales_physical'), {
+    items: itemsArr.map(i => ({...i, esFiado: true})),
+    total:      aCuenta,          // lo que entró a caja hoy
+    totalFiado: total,            // monto total del fiado
+    saldoFiado: saldo,            // lo que queda pendiente
+    costoTotal: capitalCubierto,  // capital cubierto hoy
+    ganancia:   gananciaCubierta, // ganancia cubierta hoy
+    payMethod:  'fiado',
+    clienteNombre: nombre,
+    fiadoId,
+    esFiado: true,
+    nota: aCuenta > 0
+      ? `Fiado ${nombre} — a cuenta Bs.${aCuenta.toFixed(2)}, saldo Bs.${saldo.toFixed(2)}`
+      : `Fiado ${nombre} — sin pago inicial, saldo Bs.${saldo.toFixed(2)}`,
+    createdAt: fs.serverTimestamp()
+  });
+
   closeModal('fiarModal');
   cart = {}; renderCart();
   showToast(`📋 Fiado de Bs.${total.toFixed(2)} registrado para ${nombre}`);
@@ -1619,46 +1549,6 @@ let currentProdTab = "catalogo";
 let payMethod = "efectivo";
 let editTempId = null;
 let allSales = [], allGastos = [], fiados = [];
-
-// ── BÚSQUEDA FLEXIBLE: sin acentos + equivalencias fonéticas ──
-function normalizar(txt) {
-  return (txt||"")
-    .toLowerCase()
-    .normalize("NFD").replace(/[̀-ͯ]/g, "")
-    .replace(/[zc]/g, "s")
-    .replace(/[qk]/g, "k")
-    .replace(/v/g,    "b")
-    .replace(/x/g,    "s")
-    .replace(/ll/g,   "y")
-    .replace(/ñ/g, "n")
-    .trim();
-}
-
-function matchBusqueda(nombre, q) {
-  if(!q) return true;
-  const nN = normalizar(nombre);
-  const nQ = normalizar(q);
-  return nQ.split(/\s+/).every(p => nN.includes(p));
-}
-
-// ════════════════════════════════════
-// PAPELERA — guardar antes de borrar
-// ════════════════════════════════════
-async function saveToTrash(coleccion, docId, datos, origen, descripcion) {
-  try {
-    await fs.addDoc(fs.collection(db, "deleted_items"), {
-      coleccion,
-      docId,
-      datos,
-      origen:      origen || "coquette",
-      descripcion: descripcion || coleccion + "/" + docId,
-      fecha:       fs.serverTimestamp(),
-      restaurado:  false
-    });
-  } catch(e) {
-    console.warn("saveToTrash error:", e);
-  }
-}
 
 // ════════════════════════════════════
 // INIT
@@ -1835,7 +1725,7 @@ function onVendSearch() {
   const allProds = [
     ...Object.values(DB.products).filter(p=>p.estado!=="oculto").map(p=>({...p,_tipo:"catalogo"})),
     ...cqProds.filter(p=>!p.oculto).map(p=>({...p,_tipo:"coquette"}))
-  ].filter(p=>matchBusqueda(p.nombre||"", q));
+  ].filter(p=>p.nombre?.toLowerCase().includes(q));
 
   // Hide regular product grid, show search results in grid format
   const wrap = document.getElementById("vendProdsWrap");
@@ -1970,10 +1860,7 @@ function makeProdCard(p, tipo) {
       <button class="qbtn" onclick="changeCartQty('${tipo}_${p.id}',1)" ${atMax?"disabled":""}>+</button>
     </div>`;
   } else {
-    const stockInfo = (!modoCalculadora && p.stock != null && p.stock !== "")
-      ? `<div style="font-size:.65rem;color:var(--gr);text-align:center;margin-top:3px;font-weight:700">${p.stock > 0 ? `📦 ${p.stock} disponible${p.stock!==1?'s':''}` : ''}</div>`
-      : '';
-    ctrlHtml = `<button class="abtn" onclick="addToCart('${p.id}','${tipo}')">+ Agregar</button>${stockInfo}`;
+    ctrlHtml = `<button class="abtn" onclick="addToCart('${p.id}','${tipo}')">+ Agregar</button>`;
   }
 
   return `<div class="pcard">
@@ -2290,7 +2177,7 @@ function buscarProdEditarVenta(q) {
   document.getElementById('editAgregarSeleccionado').style.display = 'none';
   _editAgregarProd = null;
   if(!q.trim()) { el.innerHTML=''; return; }
-  const matches = (allProducts||[]).filter(p => matchBusqueda(p.nombre||"", q)).slice(0,6);
+  const matches = (allProducts||[]).filter(p => p.nombre?.toLowerCase().includes(q.toLowerCase())).slice(0,6);
   if(!matches.length) { el.innerHTML=`<div style="font-size:.74rem;color:var(--gr);padding:4px">Sin resultados</div>`; return; }
   el.innerHTML = matches.map(p=>`
     <div onclick="seleccionarProdEdit('${p.id}')" style="padding:6px 8px;cursor:pointer;border-radius:6px;font-size:.78rem;margin-bottom:2px;background:var(--vbg)">
@@ -2411,10 +2298,9 @@ async function revertirVenta(saleId) {
         }
       }
     }
-    // Guardar en papelera antes de eliminar
-    await saveToTrash("sales_physical", saleId, sale, "coquette", `Venta revertida — ${resumen} — Bs.${(sale.total||0).toFixed(2)}`);
+    // Eliminar la venta
     await fs.deleteDoc(fs.doc(db,"sales_physical",saleId));
-    showToast("↩️ Venta revertida, stock devuelto y respaldada en Papelera");
+    showToast("↩️ Venta revertida y stock devuelto");
   } catch(e) {
     showToast("Error al revertir: "+e.message, true);
   }
@@ -2654,24 +2540,44 @@ function renderDayStats() {
   const sales = filterByPeriod(allSales, period);
   const gastos = filterByPeriod(allGastos, period);
   // Separar ventas reales de cobros de fiados
-  const ventasReales = sales.filter(s => !s.esAbono);
+  // Separar por tipo
+  const ventasReales = sales.filter(s => !s.esAbono && !s.esFiado && !s.esPagoFiado);
   const cobrosAbono  = sales.filter(s =>  s.esAbono);
-  const totalV = ventasReales.reduce((s,x)=>s+(x.total||0),0);
-  const totalG = gastos.reduce((s,x)=>s+(x.monto||0),0);
-  const totalAbonos = cobrosAbono.reduce((s,x)=>s+(x.total||0),0);
-  const totalGanancia = ventasReales.reduce((s,x)=>s+(x.items||[]).reduce((s2,i)=>s2+resolveItemCost(i).ganancia,0),0);
-  const totalCosto = ventasReales.reduce((s,x)=>s+(x.items||[]).reduce((s2,i)=>s2+resolveItemCost(i).costoTotal,0),0);
-  document.getElementById("dVentas").textContent="Bs."+totalV.toFixed(2);
-  document.getElementById("dQty").textContent=ventasReales.length;
+  const fiadosHoy    = sales.filter(s =>  s.esFiado);      // nuevos fiados registrados hoy
+  const pagosHoy     = sales.filter(s =>  s.esPagoFiado);  // pagos parciales/totales de fiado
+
+  const totalV        = ventasReales.reduce((s,x)=>s+(x.total||0),0);
+  const totalG        = gastos.reduce((s,x)=>s+(x.monto||0),0);
+  const totalAbonos   = cobrosAbono.reduce((s,x)=>s+(x.total||0),0);
+
+  // Cobros de fiado del día (a cuenta + pagos parciales)
+  const totalFiadoACuenta = fiadosHoy.reduce((s,x)=>s+(x.total||0),0);
+  const totalPagosFiado   = pagosHoy.reduce((s,x)=>s+(x.total||0),0);
+  const totalCobrosFiado  = totalFiadoACuenta + totalPagosFiado + totalAbonos;
+
+  // Ganancia y capital: ventas normales + cobros de fiado
+  const gananciaVentas  = ventasReales.reduce((s,x)=>s+(x.items||[]).reduce((s2,i)=>s2+resolveItemCost(i).ganancia,0),0);
+  const gananciaFiados  = [...fiadosHoy,...pagosHoy].reduce((s,x)=>s+(x.ganancia||0),0);
+  const totalGanancia   = gananciaVentas + gananciaFiados;
+
+  const capitalVentas   = ventasReales.reduce((s,x)=>s+(x.items||[]).reduce((s2,i)=>s2+resolveItemCost(i).costoTotal,0),0);
+  const capitalFiados   = [...fiadosHoy,...pagosHoy].reduce((s,x)=>s+(x.costoTotal||0),0);
+  const totalCosto      = capitalVentas + capitalFiados;
+
+  // Total ingresado hoy = ventas normales + lo cobrado de fiados
+  const totalIngresoReal = totalV + totalCobrosFiado;
+
+  document.getElementById("dVentas").textContent="Bs."+totalIngresoReal.toFixed(2);
+  document.getElementById("dQty").textContent=ventasReales.length + fiadosHoy.length + pagosHoy.length;
   document.getElementById("dGastos").textContent="Bs."+totalG.toFixed(2);
-  document.getElementById("dNeto").textContent="Bs."+(totalV-totalG).toFixed(2);
+  document.getElementById("dNeto").textContent="Bs."+(totalIngresoReal-totalG).toFixed(2);
   const ganEl = document.getElementById("dGanancia");
   if(ganEl) ganEl.textContent="Bs."+totalGanancia.toFixed(2);
   const capEl = document.getElementById("dCapital");
   if(capEl) capEl.textContent="Bs."+totalCosto.toFixed(2);
   // Cobros de fiados del día
   const abonosEl = document.getElementById("dAbonos");
-  if(abonosEl) abonosEl.textContent="Bs."+totalAbonos.toFixed(2);
+  if(abonosEl) abonosEl.textContent="Bs."+totalCobrosFiado.toFixed(2);
   // Fiados pendientes (total global)
   const fiadosEl = document.getElementById("dFiados");
   if(fiadosEl) {
@@ -2772,6 +2678,51 @@ function renderDayPorVenta() {
     const editsHechos = (s.editLog||[]).length;
     const puedeEditar = !esAbono && diasDesde <= 3 && editsHechos < 3;
     const razonNoEditar = esAbono ? '' : diasDesde > 3 ? 'Venta de más de 3 días' : editsHechos >= 3 ? 'Máx. 3 ediciones alcanzado' : '';
+
+    const esFiado     = !!s.esFiado;
+    const esPagoFiado = !!s.esPagoFiado;
+
+    if(esFiado) {
+      const aCuenta  = s.total||0;
+      const totalFiado = s.totalFiado||0;
+      const saldoF   = s.saldoFiado||0;
+      const costoF   = s.costoTotal||0;
+      const ganF     = s.ganancia||0;
+      return `<div class="ticket" style="border-left:4px solid #1565C0;padding:10px 12px;background:#e3f0fd">
+        <div class="ticket-header" style="margin-bottom:4px">
+          <span style="font-weight:900;color:#1565C0">📋 Fiado — ${s.clienteNombre||''}</span>
+          <span class="ticket-time">${fmtFechaCorta(t)}</span>
+        </div>
+        <div style="font-size:.78rem;color:#333;margin-bottom:4px">
+          Total fiado: <b>Bs.${totalFiado.toFixed(2)}</b>
+          ${aCuenta>0 ? ` · A cuenta: <b style="color:#1565C0">Bs.${aCuenta.toFixed(2)}</b>` : ' · <span style="color:#888">Sin pago inicial</span>'}
+          · Saldo: <b style="color:var(--ro)">Bs.${saldoF.toFixed(2)}</b>
+        </div>
+        ${aCuenta>0 ? `<div style="font-size:.72rem;color:#555">Capital cobrado hoy: Bs.${costoF.toFixed(2)} · Ganancia hoy: Bs.${ganF.toFixed(2)}</div>` : ''}
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+          <button onclick="revertirVenta('${s.id}')" style="background:none;border:1.5px solid var(--ro);color:var(--ro);border-radius:8px;padding:4px 9px;font-size:.68rem;font-weight:800;cursor:pointer">↩️ Revertir</button>
+          <div style="font-weight:900;font-size:.92rem;color:#1565C0">Bs.${aCuenta.toFixed(2)} hoy</div>
+        </div>
+      </div>`;
+    }
+
+    if(esPagoFiado) {
+      const costoP = items[0]?.costoTotal||0;
+      const ganP   = items[0]?.ganancia||0;
+      return `<div class="ticket" style="border-left:4px solid #0288d1;padding:10px 12px;background:#e1f5fe">
+        <div class="ticket-header" style="margin-bottom:4px">
+          <span style="font-weight:900;color:#0288d1">💰 Pago fiado — ${items[0]?.prodNombre?.replace('Pago fiado: ','').replace('Cobro total fiado: ','')||''}</span>
+          <span class="ticket-time">${fmtFechaCorta(t)}</span>
+        </div>
+        <div style="font-size:.72rem;color:#555;margin-bottom:4px">
+          Capital: Bs.${costoP.toFixed(2)} · Ganancia: Bs.${ganP.toFixed(2)}
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+          <button onclick="revertirVenta('${s.id}')" style="background:none;border:1.5px solid var(--ro);color:var(--ro);border-radius:8px;padding:4px 9px;font-size:.68rem;font-weight:800;cursor:pointer">↩️ Revertir</button>
+          <div style="font-weight:900;font-size:.92rem;color:#0288d1">Bs.${(s.total||0).toFixed(2)}</div>
+        </div>
+      </div>`;
+    }
 
     if(esAbono) return `<div class="ticket" style="border-left:3px solid #6a1b9a;padding:10px 12px;opacity:.85">
       <div class="ticket-header" style="margin-bottom:4px">
@@ -2930,19 +2881,10 @@ function renderDayPorArticulo() {
   const el = document.getElementById("dayTickets");
   if(!sales.length) { el.innerHTML=`<div style="text-align:center;padding:16px;color:var(--gr);font-size:.8rem">Sin ventas</div>`; return; }
   const agrupado = {};
-  // Normalizar nombre base: eliminar sufijos de lote como "(8 unidad)", "(6 unidades)", "(2 unid.)"
-  // y prefijos de cantidad como "2x1.5 ", para agrupar variantes del mismo producto
-  function nombreBase(nombre) {
-    if(!nombre) return "—";
-    // Eliminar paréntesis con cantidades al final: "(8 unidad)", "(2 unidades)", "(6 unid.)"
-    let base = nombre.replace(/\s*\(\d+[\d.,]*\s*(unidad|unidades|unid\.?|u\.?|kg|lb|gr|g)\)/gi, "").trim();
-    return base || nombre;
-  }
   sales.forEach(s => {
     const items = s.items||[{prodNombre:s.prodNombre,qty:s.qty,precio:s.precio}];
     items.forEach(i => {
-      const rawNombre = i.prodNombre || "—";
-      const key = nombreBase(rawNombre);
+      const key = i.prodNombre || "—";
       if(!agrupado[key]) agrupado[key] = {nombre:key, qty:0, total:0, ventas:0};
       agrupado[key].qty += (i.qty||0);
       agrupado[key].total += (i.precio||0)*(i.qty||0);
@@ -3222,10 +3164,8 @@ function renderFiados() {
         <td onclick="verDetalleFiado('${f.id}')" style="padding:7px 4px;text-align:right;font-size:.82rem;color:var(--v)">Bs.${pagado.toFixed(2)}</td>
         <td onclick="verDetalleFiado('${f.id}')" style="padding:7px 4px;text-align:right;font-weight:800;font-size:.82rem;color:${saldo>0?'var(--ro)':'var(--v)'}">Bs.${saldo.toFixed(2)}</td>
         <td onclick="verDetalleFiado('${f.id}')" style="padding:7px 4px;text-align:center;font-size:.7rem;color:var(--gr)">${ultPago}</td>
-        <td style="padding:7px 4px;white-space:nowrap">
-          <button onclick="event.stopPropagation();verDetalleFiado('${f.id}')" style="background:var(--v);color:#fff;border:none;border-radius:8px;padding:5px 10px;font-size:.7rem;font-weight:800;cursor:pointer">Ver</button>
-          <button onclick="event.stopPropagation();editarFiado('${f.id}')" style="background:#1565C0;color:#fff;border:none;border-radius:8px;padding:5px 8px;font-size:.7rem;font-weight:800;cursor:pointer;margin-left:3px" title="Editar fiado">✏️</button>
-          <button onclick="event.stopPropagation();eliminarFiado('${f.id}')" style="background:var(--ro);color:#fff;border:none;border-radius:8px;padding:5px 8px;font-size:.7rem;font-weight:800;cursor:pointer;margin-left:3px" title="Eliminar fiado">🗑️</button>
+        <td style="padding:7px 4px">
+          <button onclick="event.stopPropagation();verDetalleFiado('${f.id}')" style="background:var(--v);color:#fff;border:none;border-radius:8px;padding:5px 10px;font-size:.7rem;font-weight:800;cursor:pointer;white-space:nowrap">Ver / Cobrar</button>
         </td>
       </tr>`;
     }).join("");
@@ -3435,28 +3375,39 @@ async function saveFiado(){
   await fs.addDoc(fs.collection(db,"fiados"),{nombre,monto,detalle:document.getElementById("fiadoDetalle").value.trim(),cobrado:false,createdAt:fs.serverTimestamp()});
   closeModal("fiadoModal");showToast("📋 Fiado registrado");
 }
-async function cobrarFiado(id,saldoPendiente){
-  if(!confirm(`¿Marcar como cobrado el saldo de Bs.${saldoPendiente.toFixed(2)}?`))return;
+async function cobrarFiado(id, saldoPendiente) {
+  if(!confirm(`¿Marcar como cobrado el saldo de Bs.${saldoPendiente.toFixed(2)}?`)) return;
   const f = fiados.find(x=>x.id===id);
   try {
-    await fs.updateDoc(fs.doc(db,"fiados",id),{cobrado:true,pagado:(f?.monto)||saldoPendiente,cobradoAt:fs.serverTimestamp()});
+    await fs.updateDoc(fs.doc(db,"fiados",id), { cobrado:true, pagado:(f?.monto)||saldoPendiente, cobradoAt:fs.serverTimestamp() });
     if(saldoPendiente > 0) {
-      const montoTotal = f?.monto || saldoPendiente;
       const costoTotalFiado = (f?.items||[]).reduce((s,i)=>{
         const c = i.costoTotal != null ? i.costoTotal : (i.costoUnit||0)*(i.qty||1);
         return s + c;
       }, 0);
-      const proporcion = montoTotal > 0 ? saldoPendiente / montoTotal : 0;
-      const costoParc = costoTotalFiado * proporcion;
-      const gananciaParc = saldoPendiente - costoParc;
+      // Capital ya cubierto por pagos anteriores
+      const totalPagadoAnt  = (f?.pagado||0) - saldoPendiente; // lo pagado antes de este cobro
+      const capitalYaPagado = Math.min(Math.max(0, totalPagadoAnt), costoTotalFiado);
+      const capitalRestante = Math.max(0, costoTotalFiado - capitalYaPagado);
+      // Este cobro: primero capital, luego ganancia
+      const costoParc    = Math.min(saldoPendiente, capitalRestante);
+      const gananciaParc = Math.max(0, saldoPendiente - costoParc);
+
       await fs.addDoc(fs.collection(db,'sales_physical'), {
-        items: [{prodNombre:'Saldo cobrado fiado: '+(f?.nombre||''), qty:1, precio:saldoPendiente, subtotal:saldoPendiente, costoUnit:costoParc, costoTotal:costoParc, ganancia:gananciaParc, esAbono:true}],
-        total: saldoPendiente, payMethod: 'efectivo',
-        nota: 'Cobro de fiado: '+(f?.nombre||''),
-        esAbono: true,
+        items: [{
+          prodNombre: `Cobro total fiado: ${f?.nombre||''}`,
+          qty:1, precio:saldoPendiente, subtotal:saldoPendiente,
+          costoUnit:costoParc, costoTotal:costoParc,
+          ganancia:gananciaParc, esPagoFiado:true
+        }],
+        total:    saldoPendiente,
+        payMethod:'efectivo',
+        nota: `Cobro total fiado ${f?.nombre||''} — Capital: Bs.${costoParc.toFixed(2)}, Ganancia: Bs.${gananciaParc.toFixed(2)}`,
+        esPagoFiado: true,
+        fiadoId: id,
         createdAt: fs.serverTimestamp()
       });
-      showToast(`✅ Fiado cobrado — Ganancia: Bs.${gananciaParc.toFixed(2)}`);
+      showToast(`✅ Fiado cobrado — Capital: Bs.${costoParc.toFixed(2)}, Ganancia: Bs.${gananciaParc.toFixed(2)}`);
     } else {
       showToast("✅ Fiado marcado como cobrado");
     }
@@ -3716,11 +3667,9 @@ async function saveCoquetteProd() {
 }
 
 async function deleteCqProd(id) {
-  if(!confirm('¿Eliminar este producto? Quedará respaldado en la Papelera.')) return;
-  const snap = await fs.getDoc(fs.doc(db,'coquette_products',id));
-  if(snap.exists()) await saveToTrash("coquette_products", id, snap.data(), "coquette", `Producto COQUETTE: ${snap.data().nombre||id}`);
+  if(!confirm('¿Eliminar este producto?')) return;
   await fs.deleteDoc(fs.doc(db,'coquette_products',id));
-  showToast('Eliminado y respaldado en Papelera');
+  showToast('Eliminado');
 }
 
 // ── SELECTOR DE CANTIDAD COQUETTE ──────────────────────
@@ -4067,7 +4016,7 @@ function onConsumoSearch() {
     ...Object.values(DB.products||{}).filter(p=>p.estado!=="oculto").map(p=>({...p,_tipo:"catalogo"})),
     ...(DB.tempProds||[]).map(p=>({...p,_tipo:"temporal"})),
     ...(cqProds||[]).filter(p=>!p.oculto).map(p=>({...p,_tipo:"coquette"})),
-  ].filter(p => matchBusqueda(p.nombre||"", q)).slice(0, 12);
+  ].filter(p => p.nombre?.toLowerCase().includes(q)).slice(0, 12);
 
   if(!candidatos.length) { el.innerHTML = `<div style="font-size:.78rem;color:var(--gr);padding:8px">Sin resultados</div>`; return; }
 
@@ -4238,9 +4187,6 @@ window.confirmarFiar = confirmarFiar;
 window.verDetalleFiado = verDetalleFiado;
 window.openPagoParc = openPagoParc;
 window.savePagoParc = savePagoParc;
-window.editarFiado = editarFiado;
-window.eliminarFiado = eliminarFiado;
-window.guardarEditFiado = guardarEditFiado;
 window.openAddProdCoquette = openAddProdCoquette;
 window.makeCqCard = makeCqCard;
 window.saveCoquetteProd = saveCoquetteProd;
@@ -4332,34 +4278,5 @@ function showToast(msg,error=false){
   }
 })();
 </script>
-<!-- MODAL: EDITAR FIADO -->
-<div class="modal-ov" id="editFiadoModal">
-  <button onclick="closeModal('editFiadoModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10" title="Cerrar">✕</button>
-  <div class="modal-box" style="max-width:340px">
-    <div class="modal-title">✏️ Editar fiado</div>
-    <input type="hidden" id="editFiadoId">
-    <div class="fld">
-      <label>Nombre del cliente</label>
-      <input type="text" id="editFiadoNombre" placeholder="Nombre" class="inp">
-    </div>
-    <div class="fld">
-      <label>Celular</label>
-      <input type="tel" id="editFiadoCelular" placeholder="Celular (opcional)" class="inp">
-    </div>
-    <div class="fld">
-      <label>Monto total (Bs.)</label>
-      <input type="number" id="editFiadoMonto" min="0" step="0.5" class="inp">
-    </div>
-    <div class="fld">
-      <label>Detalle / nota</label>
-      <input type="text" id="editFiadoNota" placeholder="Detalle de artículos..." class="inp">
-    </div>
-    <div style="display:flex;gap:8px;margin-top:14px">
-      <button class="btn btn-sec" onclick="closeModal('editFiadoModal')" style="flex:1">Cancelar</button>
-      <button class="btn btn-v" id="btnGuardarEditFiado" onclick="guardarEditFiado()" style="flex:2">💾 Guardar cambios</button>
-    </div>
-  </div>
-</div>
-
 </body>
 </html>
