@@ -308,7 +308,7 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
     <div class="sell-left">
       <div class="search-bar" style="margin-top:8px">
         <span style="color:var(--gr)">🔍</span>
-        <input type="text" id="vendSearch" placeholder="Buscar producto..." oninput="onVendSearch()" autocomplete="off">
+        <input type="text" id="vendSearch" placeholder="Buscar producto..." oninput="onVendSearch()" onfocus="this.select()" autocomplete="off">
         <button onclick="clearVendSearch()" style="background:none;border:none;color:var(--gr);cursor:pointer;padding:0 2px">✕</button>
         <div class="search-suggestions" id="searchSuggestions" style="display:none"></div>
       </div>
@@ -513,7 +513,7 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
     </div>
 
     <div class="section-title" id="dayDetailTitle">🧾 Ventas del período</div>
-    <button id="btnRepararVentas" onclick="repararVentasAntiguas()" style="display:none;width:100%;background:#fff3cd;color:#856404;border:1.5px solid #ffeeba;border-radius:10px;padding:9px;font-size:.78rem;font-weight:800;cursor:pointer;margin-bottom:10px">
+    <button id="btnRepararVentas" onclick="abrirRepararVentas()" style="display:none;width:100%;background:#fff3cd;color:#856404;border:1.5px solid #ffeeba;border-radius:10px;padding:9px;font-size:.78rem;font-weight:800;cursor:pointer;margin-bottom:10px">
       🔧 <span id="repararVentasTexto">Reparar ventas antiguas</span>
     </button>
     <div id="dayTickets"><div style="text-align:center;padding:20px;color:var(--gr);font-size:.82rem">Sin ventas</div></div>
@@ -815,6 +815,24 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 </div>
 
 <!-- MODAL: COMPRA -->
+
+<!-- MODAL: SELECCIONAR VENTAS A REPARAR -->
+<div class="modal-ov" id="repararVentasModal">
+  <button onclick="closeModal('repararVentasModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10">✕</button>
+  <div class="modal-box" style="max-width:560px">
+    <div class="modal-title">🔧 Reparar ventas con datos incompletos</div>
+    <div style="font-size:.75rem;color:var(--gr);margin-bottom:10px">
+      Se completará el nombre de los productos y se recalculará el costo/ganancia con los precios actuales del catálogo. Esto no cambia los montos cobrados. Elegí cuáles reparar:
+    </div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;font-weight:800;margin-bottom:8px;cursor:pointer">
+      <input type="checkbox" id="chkTodasReparar" checked onchange="toggleTodasReparar(this.checked)" style="width:16px;height:16px;accent-color:var(--v)"> Seleccionar todas
+    </label>
+    <div id="repararVentasLista" style="max-height:320px;overflow-y:auto;margin-bottom:12px"></div>
+    <button onclick="ejecutarRepararSeleccionadas()" style="width:100%;background:var(--v);color:#fff;border:none;border-radius:10px;padding:12px;font-size:.88rem;font-weight:900;cursor:pointer">
+      🔧 Reparar seleccionadas
+    </button>
+  </div>
+</div>
 
 <!-- MODAL: EDITAR VENTA -->
 <div class="modal-ov" id="editarVentaModal">
@@ -2496,11 +2514,49 @@ function checkVentasParaReparar() {
   }
 }
 
-async function repararVentasAntiguas() {
+function describirItemsVenta(s) {
+  const items = s.items||[{prodNombre:s.prodNombre,qty:s.qty,precio:s.precio}];
+  return items.map(i => {
+    const nombre = i.prodNombre || i.nombre || '⚠️ sin nombre';
+    const marcado = !i.prodNombre;
+    return `${marcado?'<span style="color:var(--ro);font-weight:800">⚠️ </span>':''}${nombre} × ${i.qty||0} ${i.costoUnit==null?'<span style="color:var(--ro)">(sin costo)</span>':''}`;
+  }).join('<br>');
+}
+
+function abrirRepararVentas() {
   const candidatas = (allSales||[]).filter(ventaNecesitaReparo);
   if(!candidatas.length) { showToast('No hay ventas para reparar', false); return; }
-  const ok = confirm(`Se van a corregir ${candidatas.length} venta(s) antigua(s):\n\n• Se completará el nombre de los productos\n• Se recalculará el costo/ganancia con los precios actuales del catálogo\n\nEsto no cambia los montos cobrados, solo arregla los datos del reporte.\n\n¿Continuar?`);
-  if(!ok) return;
+  const el = document.getElementById('repararVentasLista');
+  el.innerHTML = candidatas.map(s => {
+    const fecha = s.createdAt?.seconds ? new Date(s.createdAt.seconds*1000).toLocaleString('es-BO',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+    return `<label style="display:flex;gap:8px;align-items:flex-start;padding:10px;border:1.5px solid var(--vbg);border-radius:10px;margin-bottom:8px;cursor:pointer">
+      <input type="checkbox" class="chkRepararVenta" data-id="${s.id}" checked style="width:16px;height:16px;margin-top:2px;accent-color:var(--v);flex-shrink:0">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--gr);margin-bottom:3px">
+          <span>${fecha}</span><span>Total: Bs.${(s.total||0).toFixed(2)}</span>
+        </div>
+        <div style="font-size:.78rem;line-height:1.4">${describirItemsVenta(s)}</div>
+      </div>
+    </label>`;
+  }).join('');
+  openModal('repararVentasModal');
+}
+
+function toggleTodasReparar(checked) {
+  document.querySelectorAll('.chkRepararVenta').forEach(c => c.checked = checked);
+}
+
+async function ejecutarRepararSeleccionadas() {
+  const ids = Array.from(document.querySelectorAll('.chkRepararVenta:checked')).map(c=>c.dataset.id);
+  if(!ids.length) { showToast('No seleccionaste ninguna venta', true); return; }
+  const candidatas = (allSales||[]).filter(s => ids.includes(s.id));
+  await repararVentasAntiguas(candidatas);
+  closeModal('repararVentasModal');
+}
+
+async function repararVentasAntiguas(candidatasParam) {
+  const candidatas = candidatasParam || (allSales||[]).filter(ventaNecesitaReparo);
+  if(!candidatas.length) { showToast('No hay ventas para reparar', false); return; }
 
   const btn = document.getElementById('btnRepararVentas');
   if(btn) { btn.disabled = true; btn.textContent = '⏳ Reparando...'; }
@@ -2900,6 +2956,33 @@ async function editarCostoLibre(saleId, itemIdx, valor) {
   }
 }
 
+// ── Interpreta el nombre de un producto para sacar la cantidad real de
+// unidades base que representa (ej: "Pan 2x1.5 (8 unidad)" = 8 panes,
+// "Huevo (maple)" = 30 huevos, "Huevo (medio maple)" = 15 huevos).
+// Devuelve el nombre "limpio" (sin el paréntesis/palabra de cantidad) para
+// poder agrupar todas las presentaciones del mismo producto juntas, y el
+// factor por el que hay que multiplicar el qty vendido.
+function parseUnidadesReales(nombreOriginal) {
+  let nombre = (nombreOriginal||'—').trim();
+  let factor = 1;
+
+  // "(N unidad)" / "(N unid)" / "(N und)" / "(N u)" — lote explícito
+  const mParen = nombre.match(/\(\s*(\d+)\s*(unidades|unidad|unids?|unds?|u)\.?\s*\)/i);
+  if(mParen) {
+    factor = parseInt(mParen[1], 10) || 1;
+    nombre = nombre.replace(mParen[0], '').trim();
+  } else {
+    const lower = nombre.toLowerCase();
+    if(/medio\s*maple/.test(lower)) { factor = 15; nombre = nombre.replace(/\(?\s*medio\s*maple\s*\)?/i,'').trim(); }
+    else if(/\bmaple\b/.test(lower)) { factor = 30; nombre = nombre.replace(/\(?\s*maple\s*\)?/i,'').trim(); }
+    else if(/media\s*docena/.test(lower)) { factor = 6; nombre = nombre.replace(/\(?\s*media\s*docena\s*\)?/i,'').trim(); }
+    else if(/\bdocena\b/.test(lower)) { factor = 12; nombre = nombre.replace(/\(?\s*docena\s*\)?/i,'').trim(); }
+  }
+
+  nombre = nombre.replace(/\s{2,}/g,' ').replace(/[-–,]\s*$/,'').trim();
+  return { nombreBase: nombre || nombreOriginal || '—', factor };
+}
+
 function renderDayPorArticulo() {
   document.getElementById("dayDetailTitle").textContent = "📦 Productos más vendidos";
   const period = document.getElementById("dayPeriod")?.value||"today";
@@ -2910,9 +2993,11 @@ function renderDayPorArticulo() {
   sales.forEach(s => {
     const items = s.items||[{prodNombre:s.prodNombre,qty:s.qty,precio:s.precio}];
     items.forEach(i => {
-      const key = i.prodNombre || "—";
+      const { nombreBase, factor } = parseUnidadesReales(i.prodNombre || "—");
+      const key = nombreBase;
+      const qtyReal = (i.qty||0) * factor;
       if(!agrupado[key]) agrupado[key] = {nombre:key, qty:0, total:0, ventas:0};
-      agrupado[key].qty += (i.qty||0);
+      agrupado[key].qty += qtyReal;
       agrupado[key].total += (i.precio||0)*(i.qty||0);
       agrupado[key].ventas++;
     });
@@ -4014,6 +4099,9 @@ window.confirmarAgregarItemEdit = confirmarAgregarItemEdit;
 window.guardarEdicionVenta = guardarEdicionVenta;
 window.cancelarEdicionVenta = cancelarEdicionVenta;
 window.repararVentasAntiguas = repararVentasAntiguas;
+window.abrirRepararVentas = abrirRepararVentas;
+window.toggleTodasReparar = toggleTodasReparar;
+window.ejecutarRepararSeleccionadas = ejecutarRepararSeleccionadas;
 window.editarCostoLibre = editarCostoLibre;
 window.renderDayObservados = renderDayObservados;
 window.repararItemIndividual = repararItemIndividual;
