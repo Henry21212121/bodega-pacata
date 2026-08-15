@@ -307,6 +307,7 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
   <button class="tab-btn active" onclick="showTab('vender',this)"><span class="tab-icon">💰</span><span>Vender</span></button>
   <button class="tab-btn" onclick="showTab('productos',this)"><span class="tab-icon">🥬</span><span>Productos</span></button>
   <button class="tab-btn" onclick="showTab('mi-dia',this)"><span class="tab-icon">📊</span><span>Mi Día</span></button>
+  <button class="tab-btn" onclick="showTab('reportes',this)"><span class="tab-icon">📈</span><span>Reportes</span></button>
   <button class="tab-btn" onclick="showTab('fiados',this)"><span class="tab-icon">📋</span><span>Fiados</span></button>
   <button class="tab-btn" onclick="showTab('consumo',this)"><span class="tab-icon">👨‍👩‍👧</span><span>Consumo propio</span></button>
   <button class="tab-btn" onclick="showTab('configuracion',this)"><span class="tab-icon">⚙️</span><span>Config</span></button>
@@ -540,6 +541,34 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
     <div class="section-title">💸 Gastos</div>
     <button class="btn btn-sec" onclick="openAddGasto()" style="width:100%;margin-bottom:8px;padding:9px;font-size:.82rem">+ Registrar gasto</button>
     <div id="dayGastos"></div>
+  </div>
+</div>
+
+<!-- ══ TAB REPORTES ══ -->
+<div class="tab-content" id="tab-reportes">
+  <div class="inner">
+    <div class="section-title" style="margin:10px 0 8px">📈 Reportes de ventas día a día</div>
+    <div style="font-size:.78rem;color:var(--gr);margin-bottom:10px">
+      Elegí un rango de fechas y vas a ver el detalle de cada día por separado (útil para revisar una semana, un mes, etc.)
+    </div>
+
+    <!-- Rango de fechas y accesos rápidos -->
+    <div style="background:#fff;border-radius:var(--rd);box-shadow:var(--sh);padding:12px;margin-bottom:12px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+        <div class="fld" style="margin:0;flex:1;min-width:130px"><label>Desde</label><input type="date" id="repFrom"></div>
+        <div class="fld" style="margin:0;flex:1;min-width:130px"><label>Hasta</label><input type="date" id="repTo"></div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+        <button class="btn btn-sec" style="padding:6px 10px;font-size:.75rem" onclick="setRangoReporte(0)">Hoy</button>
+        <button class="btn btn-sec" style="padding:6px 10px;font-size:.75rem" onclick="setRangoReporte(6)">Últimos 7 días</button>
+        <button class="btn btn-sec" style="padding:6px 10px;font-size:.75rem" onclick="setRangoReporte(14)">Últimos 15 días</button>
+        <button class="btn btn-sec" style="padding:6px 10px;font-size:.75rem" onclick="setRangoReporte(29)">Últimos 30 días</button>
+      </div>
+      <button id="btnGenerarReporte" class="btn btn-v" style="width:100%;padding:10px;font-size:.85rem" onclick="generarReportePorDia()">📊 Generar reporte</button>
+    </div>
+
+    <div id="reporteResumenWrap"></div>
+    <div id="reporteDiasWrap"></div>
   </div>
 </div>
 
@@ -1782,6 +1811,7 @@ function showTab(name, btn) {
   document.getElementById("tab-"+name).classList.add("active");
   btn.classList.add("active");
   if(name==="mi-dia") { renderDayStats(); renderDayDetail(); renderDayGastos(); }
+  if(name==="reportes") { initReportesTab(); }
 }
 
 // ════════════════════════════════════
@@ -3220,6 +3250,264 @@ async function saveGasto() {
 }
 
 // ════════════════════════════════════
+// REPORTES — detalle día a día por rango de fechas
+// ════════════════════════════════════
+function initReportesTab() {
+  if(!document.getElementById('repFrom').value) setRangoReporte(6);
+}
+
+function setRangoReporte(diasAtras) {
+  const hoy = new Date();
+  const desde = new Date(); desde.setDate(hoy.getDate()-diasAtras);
+  document.getElementById('repFrom').value = fechaKeyLocal(desde);
+  document.getElementById('repTo').value = fechaKeyLocal(hoy);
+  generarReportePorDia();
+}
+
+function fechaKeyLocal(d) {
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+
+function tsToDate(ts) {
+  return ts?.seconds ? new Date(ts.seconds*1000) : new Date(ts||Date.now());
+}
+
+async function generarReportePorDia() {
+  const fromStr = document.getElementById('repFrom').value;
+  const toStr = document.getElementById('repTo').value;
+  if(!fromStr || !toStr) { showToast('Elegí la fecha de inicio y de fin', true); return; }
+  const from = new Date(fromStr+"T00:00:00");
+  const to = new Date(toStr+"T23:59:59");
+  if(from > to) { showToast('La fecha "Desde" no puede ser posterior a "Hasta"', true); return; }
+  const diasRango = Math.round((to-from)/86400000)+1;
+  if(diasRango > 92) { showToast('El rango es muy amplio (máx. 92 días), acortalo un poco', true); return; }
+
+  const btn = document.getElementById('btnGenerarReporte');
+  if(btn) { btn.disabled = true; btn.textContent = '⏳ Generando...'; }
+
+  try {
+    // Consulta directa a Firestore (no depende de la caché limitada a 200 ventas de Mi Día)
+    const [salesSnap, gastosSnap] = await Promise.all([
+      fs.getDocs(fs.query(fs.collection(db,'sales_physical'),
+        fs.where('createdAt','>=',from), fs.where('createdAt','<=',to), fs.orderBy('createdAt','asc'))),
+      fs.getDocs(fs.query(fs.collection(db,'gastos_physical'),
+        fs.where('createdAt','>=',from), fs.where('createdAt','<=',to), fs.orderBy('createdAt','asc')))
+    ]);
+    const sales = salesSnap.docs.map(d=>({...d.data(),id:d.id}));
+    const gastos = gastosSnap.docs.map(d=>({...d.data(),id:d.id}));
+    _ultimoReporte = { sales, gastos, from, to };
+    renderReportePorDia(sales, gastos, from, to);
+  } catch(e) {
+    showToast('Error generando el reporte: '+e.message, true);
+  } finally {
+    if(btn) { btn.disabled = false; btn.textContent = '📊 Generar reporte'; }
+  }
+}
+
+let _ultimoReporte = null;
+
+function agruparPorDia(sales, gastos, from, to) {
+  const dias = {}; // key YYYY-MM-DD -> {sales:[],gastos:[]}
+  const cursor = new Date(from);
+  while(cursor <= to) {
+    dias[fechaKeyLocal(cursor)] = { sales:[], gastos:[] };
+    cursor.setDate(cursor.getDate()+1);
+  }
+  sales.forEach(s => {
+    const key = fechaKeyLocal(tsToDate(s.createdAt));
+    if(!dias[key]) dias[key] = { sales:[], gastos:[] };
+    dias[key].sales.push(s);
+  });
+  gastos.forEach(g => {
+    const key = fechaKeyLocal(tsToDate(g.createdAt));
+    if(!dias[key]) dias[key] = { sales:[], gastos:[] };
+    dias[key].gastos.push(g);
+  });
+  return dias;
+}
+
+function calcStatsDia(diaData) {
+  const ventasReales = diaData.sales.filter(s => !s.esAbono && !s.esFiado && !s.esPagoFiado);
+  const otrasEntradas = diaData.sales.filter(s => s.esAbono || s.esPagoFiado); // cobros de fiado
+  const total = ventasReales.reduce((s,x)=>s+(x.total||0),0) + otrasEntradas.reduce((s,x)=>s+(x.total||0),0);
+  const capital = diaData.sales.reduce((s,x)=>s+(x.items||[]).reduce((s2,i)=>s2+resolveItemCost(i).costoTotal,0),0);
+  const ganancia = diaData.sales.reduce((s,x)=>s+(x.items||[]).reduce((s2,i)=>s2+resolveItemCost(i).ganancia,0),0);
+  const gastosTotal = diaData.gastos.reduce((s,x)=>s+(x.monto||0),0);
+  const transacciones = diaData.sales.length;
+  return { total, capital, ganancia, gastosTotal, transacciones, neto: ganancia-gastosTotal };
+}
+
+function renderReportePorDia(sales, gastos, from, to) {
+  const dias = agruparPorDia(sales, gastos, from, to);
+  const claves = Object.keys(dias).sort(); // asc
+
+  // ── Tabla resumen (una fila por día) ──
+  let totV=0, totCap=0, totGan=0, totGas=0, totTx=0;
+  const filas = claves.map(key => {
+    const st = calcStatsDia(dias[key]);
+    totV+=st.total; totCap+=st.capital; totGan+=st.ganancia; totGas+=st.gastosTotal; totTx+=st.transacciones;
+    const fechaFmt = new Date(key+"T00:00:00").toLocaleDateString('es-BO',{weekday:'short',day:'2-digit',month:'2-digit'});
+    const sinMovimiento = st.transacciones===0 && st.gastosTotal===0;
+    return `<tr style="${sinMovimiento?'color:var(--gr)':''};cursor:pointer" onclick="toggleDetalleDia('${key}')">
+      <td style="font-weight:800">${fechaFmt}</td>
+      <td>Bs.${st.total.toFixed(2)}</td>
+      <td>${st.transacciones}</td>
+      <td>Bs.${st.capital.toFixed(2)}</td>
+      <td style="color:var(--v);font-weight:700">Bs.${st.ganancia.toFixed(2)}</td>
+      <td style="color:var(--ro)">Bs.${st.gastosTotal.toFixed(2)}</td>
+      <td style="font-weight:800">Bs.${st.neto.toFixed(2)}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('reporteResumenWrap').innerHTML = `
+    <div style="background:#fff;border-radius:var(--rd);box-shadow:var(--sh);padding:10px;margin-bottom:14px;overflow-x:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div class="section-title" style="margin:0">🧾 Resumen por día (${claves.length} día${claves.length!==1?'s':''})</div>
+        <button class="btn btn-or" style="padding:6px 10px;font-size:.72rem" onclick="exportarReportePorDia()">📄 Exportar / Imprimir</button>
+      </div>
+      <div style="font-size:.68rem;color:var(--gr);margin-bottom:6px">Tocá una fila para ver el detalle de ventas de ese día</div>
+      <table style="width:100%;border-collapse:collapse;font-size:.75rem;min-width:520px">
+        <thead><tr style="background:var(--vbg)">
+          <th style="padding:6px;text-align:left">Fecha</th>
+          <th style="padding:6px;text-align:left">Ventas</th>
+          <th style="padding:6px;text-align:left">Transacc.</th>
+          <th style="padding:6px;text-align:left">Capital</th>
+          <th style="padding:6px;text-align:left">Ganancia</th>
+          <th style="padding:6px;text-align:left">Gastos</th>
+          <th style="padding:6px;text-align:left">Neto</th>
+        </tr></thead>
+        <tbody>${filas || `<tr><td colspan="7" style="text-align:center;padding:14px;color:var(--gr)">Sin datos en el rango</td></tr>`}</tbody>
+        <tfoot><tr style="background:var(--vbg);font-weight:900">
+          <td style="padding:6px">TOTAL</td>
+          <td style="padding:6px">Bs.${totV.toFixed(2)}</td>
+          <td style="padding:6px">${totTx}</td>
+          <td style="padding:6px">Bs.${totCap.toFixed(2)}</td>
+          <td style="padding:6px;color:var(--v)">Bs.${totGan.toFixed(2)}</td>
+          <td style="padding:6px;color:var(--ro)">Bs.${totGas.toFixed(2)}</td>
+          <td style="padding:6px">Bs.${(totGan-totGas).toFixed(2)}</td>
+        </tr></tfoot>
+      </table>
+    </div>`;
+
+  // ── Detalle día a día (colapsable, listas de ventas de cada día) ──
+  const bloques = claves.slice().reverse().map(key => {
+    const diaData = dias[key];
+    const st = calcStatsDia(diaData);
+    const fechaFmt = new Date(key+"T00:00:00").toLocaleDateString('es-BO',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+    const filasVenta = diaData.sales.length
+      ? diaData.sales.map(s => {
+          const hora = tsToDate(s.createdAt).toLocaleTimeString('es-BO',{hour:'2-digit',minute:'2-digit'});
+          const items = s.items||[{prodNombre:s.prodNombre,qty:s.qty}];
+          const resumenProd = items.map(i=>`${i.qty||1}× ${i.prodNombre||i.nombre||'—'}`).join(', ');
+          const tipoLabel = s.esFiado ? '📋 Fiado' : (s.esAbono||s.esPagoFiado) ? '💰 Cobro fiado' : (s.payMethod==='qr'?'📱 QR':'💵 Efectivo');
+          return `<tr>
+            <td style="padding:5px;white-space:nowrap">${hora}</td>
+            <td style="padding:5px">${resumenProd}</td>
+            <td style="padding:5px;white-space:nowrap">${tipoLabel}</td>
+            <td style="padding:5px;font-weight:700;white-space:nowrap">Bs.${(s.total||0).toFixed(2)}</td>
+          </tr>`;
+        }).join('')
+      : `<tr><td colspan="4" style="padding:10px;text-align:center;color:var(--gr)">Sin ventas este día</td></tr>`;
+    const filasGasto = diaData.gastos.length
+      ? `<div style="font-size:.72rem;font-weight:800;color:var(--ro);margin:8px 0 4px">💸 Gastos del día</div>` +
+        diaData.gastos.map(g=>`<div style="display:flex;justify-content:space-between;font-size:.75rem;padding:3px 0;border-bottom:1px dashed var(--vbg)"><span>${g.desc}</span><span style="color:var(--ro);font-weight:700">Bs.${(g.monto||0).toFixed(2)}</span></div>`).join('')
+      : '';
+
+    return `<div style="background:#fff;border-radius:var(--rd);box-shadow:var(--sh);margin-bottom:10px;overflow:hidden">
+      <div style="padding:11px 13px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleDetalleDia('${key}')">
+        <div>
+          <div style="font-weight:800;font-size:.85rem;text-transform:capitalize">${fechaFmt}</div>
+          <div style="font-size:.72rem;color:var(--gr)">${st.transacciones} venta${st.transacciones!==1?'s':''} · Ganancia Bs.${st.ganancia.toFixed(2)}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-weight:900;color:var(--v)">Bs.${st.total.toFixed(2)}</div>
+          <div id="chev-${key}" style="font-size:.7rem;color:var(--gr)">▾ ver detalle</div>
+        </div>
+      </div>
+      <div id="detalle-${key}" style="display:none;padding:0 13px 13px;border-top:1px solid var(--vbg)">
+        <table style="width:100%;border-collapse:collapse;font-size:.75rem;margin-top:8px">
+          <thead><tr style="color:var(--gr);font-size:.68rem"><th style="text-align:left;padding:5px">Hora</th><th style="text-align:left;padding:5px">Productos</th><th style="text-align:left;padding:5px">Pago</th><th style="text-align:left;padding:5px">Total</th></tr></thead>
+          <tbody>${filasVenta}</tbody>
+        </table>
+        ${filasGasto}
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('reporteDiasWrap').innerHTML = `<div class="section-title" style="margin-bottom:8px">📅 Detalle día a día</div>` + (bloques || '');
+}
+
+function toggleDetalleDia(key) {
+  const el = document.getElementById('detalle-'+key);
+  const chev = document.getElementById('chev-'+key);
+  if(!el) return;
+  const abierto = el.style.display !== 'none';
+  el.style.display = abierto ? 'none' : 'block';
+  if(chev) chev.textContent = abierto ? '▾ ver detalle' : '▴ ocultar detalle';
+}
+
+function exportarReportePorDia() {
+  if(!_ultimoReporte) { showToast('Generá el reporte primero', true); return; }
+  const { sales, gastos, from, to } = _ultimoReporte;
+  const dias = agruparPorDia(sales, gastos, from, to);
+  const claves = Object.keys(dias).sort();
+
+  let totV=0, totCap=0, totGan=0, totGas=0;
+  let bodyHtml = '';
+  claves.forEach(key => {
+    const diaData = dias[key];
+    const st = calcStatsDia(diaData);
+    totV+=st.total; totCap+=st.capital; totGan+=st.ganancia; totGas+=st.gastosTotal;
+    const fechaFmt = new Date(key+"T00:00:00").toLocaleDateString('es-BO',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+    bodyHtml += `<h2>📅 ${fechaFmt} — Total Bs.${st.total.toFixed(2)}</h2>`;
+    if(diaData.sales.length) {
+      bodyHtml += `<table><thead><tr><th>Hora</th><th>Productos</th><th>Pago</th><th>Total</th></tr></thead><tbody>`;
+      diaData.sales.forEach(s => {
+        const hora = tsToDate(s.createdAt).toLocaleTimeString('es-BO',{hour:'2-digit',minute:'2-digit'});
+        const items = s.items||[{prodNombre:s.prodNombre,qty:s.qty}];
+        const resumenProd = items.map(i=>`${i.qty||1}× ${i.prodNombre||i.nombre||'—'}`).join(', ');
+        const tipoLabel = s.esFiado ? 'Fiado' : (s.esAbono||s.esPagoFiado) ? 'Cobro fiado' : (s.payMethod==='qr'?'QR':'Efectivo');
+        bodyHtml += `<tr><td>${hora}</td><td>${resumenProd}</td><td>${tipoLabel}</td><td>Bs.${(s.total||0).toFixed(2)}</td></tr>`;
+      });
+      bodyHtml += `</tbody></table>`;
+    } else {
+      bodyHtml += `<p style="color:#888;font-size:10px">Sin ventas este día</p>`;
+    }
+    if(diaData.gastos.length) {
+      bodyHtml += `<table><thead><tr><th>Gasto</th><th>Monto</th></tr></thead><tbody>`;
+      diaData.gastos.forEach(g => { bodyHtml += `<tr><td>${g.desc}</td><td>Bs.${(g.monto||0).toFixed(2)}</td></tr>`; });
+      bodyHtml += `</tbody></table>`;
+    }
+  });
+
+  const w = window.open("","_blank");
+  const fromLbl = new Date(from).toLocaleDateString('es-BO');
+  const toLbl = new Date(to).toLocaleDateString('es-BO');
+  let html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Reporte día a día — Tienda COQUETTE</title>
+  <style>body{font-family:Arial,sans-serif;font-size:11px;margin:15px;}
+  h1{color:#2d7a45;font-size:14px;}h2{color:#2d7a45;font-size:12px;margin:14px 0 5px;border-bottom:1.5px solid #c8e6c9;padding-bottom:3px;}
+  table{width:100%;border-collapse:collapse;margin-bottom:8px;}
+  th{background:#c8e6c9;color:#1a4d2a;padding:5px 7px;border:1.5px solid #7cb98a;text-align:left}
+  td{padding:4px 7px;border:1px solid #9ecfaa;}
+  tr:nth-child(even)td{background:#f0f9f2;}
+  .tot{font-weight:900;color:#1b5e20;}</style></head><body>
+  <h1>🌸 Tienda COQUETTE — Reporte día a día</h1>
+  <p style="color:#666;font-size:10px">Del ${fromLbl} al ${toLbl} — Generado: ${new Date().toLocaleString("es-BO")}</p>
+  ${bodyHtml}
+  <h2>📊 Totales del período</h2>
+  <table>
+  <tr><td><b>Ventas totales</b></td><td class="tot">Bs.${totV.toFixed(2)}</td></tr>
+  <tr><td><b>Capital (costo)</b></td><td>Bs.${totCap.toFixed(2)}</td></tr>
+  <tr><td><b>Ganancia</b></td><td class="tot">Bs.${totGan.toFixed(2)}</td></tr>
+  <tr><td><b>Gastos</b></td><td style="color:#e53935">Bs.${totGas.toFixed(2)}</td></tr>
+  <tr><td><b>Neto</b></td><td class="tot">Bs.${(totGan-totGas).toFixed(2)}</td></tr>
+  </table>
+  <scr`+`ipt>window.print();</scr`+`ipt></body></html>`;
+  w.document.write(html);
+}
+
+// ════════════════════════════════════
 // FIADOS
 // ════════════════════════════════════
 let modoSeleccionFiados = false;
@@ -4350,6 +4638,11 @@ window.confirmConsumoPropio = confirmConsumoPropio;
 window.openAddGasto = openAddGasto;
 window.saveGasto = saveGasto;
 window.downloadDayReportDialog = downloadDayReportDialog;
+window.initReportesTab = initReportesTab;
+window.setRangoReporte = setRangoReporte;
+window.generarReportePorDia = generarReportePorDia;
+window.toggleDetalleDia = toggleDetalleDia;
+window.exportarReportePorDia = exportarReportePorDia;
 window.onDayPeriodChange = onDayPeriodChange;
 window.setDayView = setDayView;
 window.openFiarCheckout = openFiarCheckout;
