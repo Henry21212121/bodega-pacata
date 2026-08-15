@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fraunces:wght@700;900&display=swap" rel="stylesheet">
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc,
+  import { getFirestore, enableIndexedDbPersistence, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc,
            onSnapshot, collection, query, where, orderBy, limit, serverTimestamp, increment, writeBatch }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   const app = initializeApp({
@@ -21,6 +21,18 @@
     appId: "1:181692159948:web:9712799cdac1834d88af69"
   });
   const db = getFirestore(app);
+  // Modo offline: guarda todo en caché local (IndexedDB) y reintenta
+  // automáticamente las subidas cuando vuelve la conexión, sin duplicados.
+  enableIndexedDbPersistence(db).then(() => {
+    window._offlineReady = true;
+  }).catch(err => {
+    window._offlineReady = false;
+    if(err.code === 'failed-precondition') {
+      console.warn('Modo offline: ya hay otra pestaña de esta tienda abierta, solo una puede usar la caché local.');
+    } else if(err.code === 'unimplemented') {
+      console.warn('Este navegador no soporta el modo offline.');
+    }
+  });
   window._db = db;
   window._fs = { doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc,
                  onSnapshot, collection, query, where, orderBy, limit,
@@ -280,6 +292,13 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
   <!-- Banner modo calculadora -->
   <div id="modoCalcBanner" class="modo-calc-banner" style="display:none">
     🧮 <b>MODO CALCULADORA</b> — Las ventas no modifican el stock ni se guardan en la base de datos
+  </div>
+  <!-- Banner de conexión / sincronización -->
+  <div id="offlineBanner" style="display:none;background:#e53935;color:#fff;text-align:center;font-size:.74rem;font-weight:800;padding:6px 10px;">
+    📴 SIN CONEXIÓN — Trabajando localmente, se sincronizará solo cuando vuelva el internet
+  </div>
+  <div id="syncingBanner" style="display:none;background:#f07d10;color:#fff;text-align:center;font-size:.74rem;font-weight:800;padding:6px 10px;">
+    🔄 Sincronizando <span id="syncingCount">0</span> registro(s) pendiente(s)...
   </div>
 </header>
 
@@ -1530,6 +1549,33 @@ let pinInput = "";
 let cart = {};        // id -> {prod, qty, tipo}
 let modoCalculadora = localStorage.getItem('modoCalc') === 'true';
 
+// ════════════════════════════════════
+// CONEXIÓN / MODO OFFLINE
+// ════════════════════════════════════
+let _pendingWrites = { sales:0, gastos:0, consumo:0, fiados:0 };
+
+function actualizarBannerConexion() {
+  const offlineB = document.getElementById('offlineBanner');
+  const syncB = document.getElementById('syncingBanner');
+  if(!offlineB || !syncB) return;
+  const totalPend = Object.values(_pendingWrites).reduce((a,b)=>a+b,0);
+  const conectado = navigator.onLine;
+  if(!conectado) {
+    offlineB.style.display = 'block';
+    syncB.style.display = 'none';
+  } else if(totalPend > 0) {
+    offlineB.style.display = 'none';
+    syncB.style.display = 'block';
+    const cEl = document.getElementById('syncingCount');
+    if(cEl) cEl.textContent = totalPend;
+  } else {
+    offlineB.style.display = 'none';
+    syncB.style.display = 'none';
+  }
+}
+window.addEventListener('online', () => { showToast('🌐 Internet recuperado, sincronizando...'); actualizarBannerConexion(); });
+window.addEventListener('offline', () => { showToast('📴 Sin conexión — se sigue trabajando localmente', true); actualizarBannerConexion(); });
+
 function toggleModoCalc() {
   modoCalculadora = !modoCalculadora;
   localStorage.setItem('modoCalc', modoCalculadora);
@@ -1616,6 +1662,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   waitForDB();
   updateHeader();
+  actualizarBannerConexion();
   setInterval(updateHeader, 30000);
   document.addEventListener("wheel", () => {
     if(document.activeElement.type === "number") document.activeElement.blur();
@@ -1643,23 +1690,31 @@ async function loadAll() {
     renderVendProds();
   });
 
-  fs.onSnapshot(fs.query(fs.collection(db,"sales_physical"), fs.orderBy("createdAt","desc"), fs.limit(200)), snap => {
+  fs.onSnapshot(fs.query(fs.collection(db,"sales_physical"), fs.orderBy("createdAt","desc"), fs.limit(200)), {includeMetadataChanges:true}, snap => {
     allSales = snap.docs.map(d=>({...d.data(),id:d.id}));
+    _pendingWrites.sales = snap.docs.filter(d=>d.metadata.hasPendingWrites).length;
     renderDayStats(); renderDayDetail();
     checkVentasParaReparar();
+    actualizarBannerConexion();
   });
 
-  fs.onSnapshot(fs.query(fs.collection(db,"gastos_physical"), fs.orderBy("createdAt","desc"), fs.limit(100)), snap => {
+  fs.onSnapshot(fs.query(fs.collection(db,"gastos_physical"), fs.orderBy("createdAt","desc"), fs.limit(100)), {includeMetadataChanges:true}, snap => {
     allGastos = snap.docs.map(d=>({...d.data(),id:d.id}));
+    _pendingWrites.gastos = snap.docs.filter(d=>d.metadata.hasPendingWrites).length;
     renderDayStats(); renderDayGastos();
+    actualizarBannerConexion();
   });
 
-  fs.onSnapshot(fs.query(fs.collection(db,"consumo_propio"), fs.orderBy("createdAt","desc"), fs.limit(100)), snap => {
+  fs.onSnapshot(fs.query(fs.collection(db,"consumo_propio"), fs.orderBy("createdAt","desc"), fs.limit(100)), {includeMetadataChanges:true}, snap => {
     allConsumo = snap.docs.map(d=>({...d.data(),id:d.id}));
+    _pendingWrites.consumo = snap.docs.filter(d=>d.metadata.hasPendingWrites).length;
     renderConsumoHistorial();
+    actualizarBannerConexion();
   });
 
-  fs.onSnapshot(fs.collection(db,"fiados"), snap => {
+  fs.onSnapshot(fs.collection(db,"fiados"), {includeMetadataChanges:true}, snap => {
+    _pendingWrites.fiados = snap.docs.filter(d=>d.metadata.hasPendingWrites).length;
+    actualizarBannerConexion();
     fiados = snap.docs.map(d=>({...d.data(),id:d.id}))
       .filter(f => !f.cobrado)
       .sort((a,b)=> (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
@@ -1888,6 +1943,9 @@ function makeProdCard(p, tipo) {
   } else {
     ctrlHtml = `<button class="abtn" onclick="addToCart('${p.id}','${tipo}')">+ Agregar</button>`;
   }
+  const stockInfo = (!modoCalculadora && p.stock != null && p.stock !== "")
+    ? `<div style="font-size:.65rem;color:var(--gr);text-align:center;margin-top:3px;font-weight:700">${p.stock > 0 ? `📦 ${p.stock} disponible${p.stock!==1?'s':''}` : ''}</div>`
+    : '';
 
   return `<div class="pcard">
     <div class="pcard-img-wrap">
@@ -1901,6 +1959,7 @@ function makeProdCard(p, tipo) {
       <div class="pcard-price">Bs. ${(p.precio||0).toFixed(2)}</div>
       ${promoHtml}
       ${ctrlHtml}
+      ${stockInfo}
     </div>
   </div>`;
 }
