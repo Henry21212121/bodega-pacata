@@ -138,6 +138,9 @@
 
   <div class="search-bar">
     <input id="searchInput" type="text" placeholder="🔍 Buscar producto..." oninput="renderList()">
+    <select id="catFilter" onchange="renderList()" style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:.82rem;outline:none;background:#fff;color:var(--tx);cursor:pointer;max-width:130px">
+      <option value="">Todas las cats.</option>
+    </select>
     <button class="filter-toggle" id="btnSinFoto" onclick="toggleSinFotoFilter()">Sin foto</button>
   </div>
   <div class="stats-bar" id="statsBar">Cargando...</div>
@@ -306,6 +309,12 @@ async function loadData() {
     catSnap.forEach(d => { DB.categories[d.id] = {...d.data(), id:d.id}; });
     prodSnap.forEach(d => { DB.products[d.id] = {...d.data(), id:d.id}; });
     if(sub) sub.textContent = 'Bodega Pacata';
+    // Poblar select de categorías
+    const catSel = document.getElementById('catFilter');
+    if(catSel) {
+      const cats = [...new Set(Object.values(DB.products).map(p=>p.cat||'Sin categoría'))].sort();
+      cats.forEach(c => { const o=document.createElement('option'); o.value=c; o.textContent=c; catSel.appendChild(o); });
+    }
     renderList();
   } catch(e) {
     if(sub) sub.textContent = 'Sin conexión';
@@ -327,9 +336,11 @@ function toggleSinFotoFilter() {
 window.toggleSinFotoFilter = toggleSinFotoFilter;
 
 function renderList() {
-  const q = (document.getElementById('searchInput')?.value||'').toLowerCase().trim();
+  const q   = (document.getElementById('searchInput')?.value||'').toLowerCase().trim();
+  const cat = document.getElementById('catFilter')?.value||'';
   let prods = Object.values(DB.products);
   if(_sinFotoFilter) prods = prods.filter(p => !p.img);
+  if(cat) prods = prods.filter(p => (p.cat||'Sin categoría') === cat);
   if(q) prods = prods.filter(p => (p.nombre||'').toLowerCase().includes(q) || (p.cat||'').toLowerCase().includes(q));
   prods.sort((a,b) => {
     const ca = a.cat||'', cb = b.cat||'';
