@@ -80,10 +80,20 @@
   .adj-lbl{color:#ccc;font-size:.72rem;font-weight:700;width:70px;flex-shrink:0;}
   .adj-val{color:#fff;font-size:.72rem;font-weight:800;width:32px;text-align:right;flex-shrink:0;}
   .adj-slider{flex:1;accent-color:var(--vl);height:4px;cursor:pointer;}
-  /* Tabs */
-  .crop-tabs{display:flex;background:#111;border-top:1px solid #333;}
+  /* Tabs — ahora debajo de la imagen */
+  .crop-tabs{display:flex;background:#111;border-top:1px solid #333;border-bottom:1px solid #333;}
   .crop-tab{flex:1;padding:9px 4px;font-size:.72rem;font-weight:700;color:#888;border:none;background:transparent;cursor:pointer;transition:color .15s;}
   .crop-tab.active{color:var(--vl);}
+  /* Fondo panel */
+  .bg-panel{background:#1a1a1a;padding:12px 14px 16px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;}
+  .bg-toggle{display:flex;align-items:center;gap:10px;cursor:pointer;}
+  .bg-toggle input[type=checkbox]{width:20px;height:20px;accent-color:var(--vl);cursor:pointer;}
+  .bg-toggle span{color:#ccc;font-size:.82rem;font-weight:700;}
+  .bg-color-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .bg-preset{width:30px;height:30px;border-radius:50%;border:2.5px solid transparent;cursor:pointer;transition:border-color .15s;flex-shrink:0;}
+  .bg-preset.sel{border-color:#fff;}
+  .bg-tolerance-row{display:flex;align-items:center;gap:8px;}
+  .bg-adj-canvas{max-width:100%;max-height:200px;border-radius:8px;align-self:center;}
 
   /* ── UPLOAD PROGRESS ── */
   #uploadOverlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;}
@@ -154,15 +164,17 @@
     <button class="crop-btn" onclick="cancelCrop()">Cancelar</button>
     <button class="crop-btn primary" onclick="confirmCrop()">✓ Guardar</button>
   </div>
-  <div class="crop-tabs">
-    <button class="crop-tab active" id="tabCrop" onclick="switchCropTab('crop')">✂️ Recortar</button>
-    <button class="crop-tab" id="tabAdj" onclick="switchCropTab('adj')">🎨 Ajustar</button>
-  </div>
-  <!-- Crop view -->
+  <!-- Imagen/canvas siempre arriba -->
   <div class="crop-area-wrap" id="cropAreaWrap">
     <canvas id="cropCanvas"></canvas>
   </div>
-  <!-- Adjust panel (hidden in crop tab) -->
+  <!-- Tabs DEBAJO de la imagen -->
+  <div class="crop-tabs">
+    <button class="crop-tab active" id="tabCrop" onclick="switchCropTab('crop')">✂️ Recortar</button>
+    <button class="crop-tab" id="tabAdj" onclick="switchCropTab('adj')">🎨 Ajustar</button>
+    <button class="crop-tab" id="tabBg" onclick="switchCropTab('bg')">🪄 Fondo</button>
+  </div>
+  <!-- Panel ajustes (oculto por defecto) -->
   <div class="adjust-panel" id="adjPanel" style="display:none">
     <div class="adj-row">
       <span class="adj-lbl">Brillo</span>
@@ -184,6 +196,29 @@
       <input class="adj-slider" type="range" id="slSharp" min="0" max="10" value="0" oninput="updateAdj()">
       <span class="adj-val" id="vlSharp">0</span>
     </div>
+  </div>
+  <!-- Panel fondo (oculto por defecto) -->
+  <div class="bg-panel" id="bgPanel" style="display:none">
+    <label class="bg-toggle">
+      <input type="checkbox" id="bgRemoveChk" onchange="onBgRemoveToggle()">
+      <span>🪄 Quitar fondo (detecta fondo claro/uniforme)</span>
+    </label>
+    <div id="bgColorSection">
+      <div style="color:#aaa;font-size:.72rem;font-weight:700;margin-bottom:6px">Color de fondo</div>
+      <div class="bg-color-row" id="bgPresets">
+        <!-- Presets generados por JS -->
+      </div>
+      <div class="bg-color-row" style="margin-top:8px;align-items:center">
+        <span style="color:#aaa;font-size:.72rem;flex-shrink:0">Personalizado:</span>
+        <input type="color" id="bgColorPicker" value="#ffffff" oninput="onBgColorChange(this.value)" style="width:36px;height:30px;border:none;background:transparent;cursor:pointer;padding:0;border-radius:6px;overflow:hidden">
+      </div>
+    </div>
+    <div class="bg-tolerance-row">
+      <span class="adj-lbl" style="color:#aaa;font-size:.72rem;font-weight:700;width:70px;flex-shrink:0">Tolerancia</span>
+      <input class="adj-slider" type="range" id="bgTolerance" min="5" max="80" value="30" oninput="onBgToleranceChange()">
+      <span class="adj-val" style="color:#fff;font-size:.72rem;font-weight:800;width:32px;text-align:right" id="bgToleranceVal">30</span>
+    </div>
+    <canvas id="bgPreviewCanvas" class="bg-adj-canvas"></canvas>
   </div>
 </div>
 
@@ -232,8 +267,15 @@ let _cropState = {           // estado del drag en la vista de recorte
   dragging: false, lastX: 0, lastY: 0,
   pinchDist: 0
 };
-let _cropTab = 'crop';       // 'crop' | 'adj'
+let _cropTab = 'crop';       // 'crop' | 'adj' | 'bg'
 let _srcBitmap = null;       // ImageBitmap original para redibujar
+
+// ── Fondo state ──
+const BG_PRESETS = ['#ffffff','#f0f0f0','#000000','#1a1a2e','#e8f5e9','#fff9c4','#fce4ec','#e3f2fd'];
+const BG_LS_KEY  = 'bodega_foto_bgcolor';
+let _bgColor     = '#ffffff';    // color de fondo activo
+let _bgRemove    = false;        // ¿quitar fondo?
+let _bgPreviewOk = false;        // ¿ya se calculó la preview?
 
 // ══════════════════════════════════════
 //  TOAST
@@ -414,6 +456,17 @@ function openCropModal(bmp) {
   _srcBitmap = bmp;
   _cropTab = 'crop';
   _cropState = { offsetX:0, offsetY:0, scale:1, dragging:false, lastX:0, lastY:0, pinchDist:0 };
+  // Reset fondo
+  _bgRemove = false;
+  _bgPreviewOk = false;
+  _bgColor = (() => { try { return localStorage.getItem(BG_LS_KEY)||'#ffffff'; } catch(e){ return '#ffffff'; } })();
+  const bgChk = document.getElementById('bgRemoveChk');
+  if(bgChk) bgChk.checked = false;
+  const bgPicker = document.getElementById('bgColorPicker');
+  if(bgPicker) bgPicker.value = _bgColor;
+  _buildBgPresets();
+  const bgPrev = document.getElementById('bgPreviewCanvas');
+  if(bgPrev) { bgPrev.width=0; bgPrev.height=0; bgPrev.style.display='none'; }
   // Reset sliders
   ['slBright','slContrast','slSat','slSharp'].forEach(id=>{
     const el = document.getElementById(id);
@@ -442,12 +495,22 @@ window.cancelCrop = cancelCrop;
 
 async function confirmCrop() {
   if(!_srcBitmap || !_activeProdId) return;
-  // Generate final 600×600 canvas with adjustments
+  // Generate final 600×600 canvas with adjustments + fondo
   const finalCanvas = document.createElement('canvas');
   finalCanvas.width = 600; finalCanvas.height = 600;
   const ctx = finalCanvas.getContext('2d');
+  // 1. fondo de color
+  const [br,bg_,bb] = hexToRgb(_bgColor);
+  ctx.fillStyle = _bgColor;
+  ctx.fillRect(0,0,600,600);
+  // 2. imagen recortada
   _drawCroppedToCtx(ctx, 600, 600);
+  // 3. ajustes de color
   _applyAdjustments(ctx, 600, 600);
+  // 4. quitar fondo si está activado
+  if(_bgRemove) {
+    _applyBgRemoval(ctx, 600, 600, br, bg_, bb);
+  }
   finalCanvas.toBlob(async blob => {
     if(!blob) { showToast('Error al procesar imagen', true); return; }
     document.getElementById('cropModal').classList.add('hidden');
@@ -458,11 +521,17 @@ window.confirmCrop = confirmCrop;
 
 function switchCropTab(tab) {
   _cropTab = tab;
+  // imagen SIEMPRE visible
+  document.getElementById('cropAreaWrap').style.display = '';
+  // tabs activos
   document.getElementById('tabCrop').classList.toggle('active', tab==='crop');
   document.getElementById('tabAdj').classList.toggle('active', tab==='adj');
-  document.getElementById('cropAreaWrap').style.display = tab==='crop' ? '' : 'none';
+  document.getElementById('tabBg').classList.toggle('active', tab==='bg');
+  // paneles debajo de la imagen
   document.getElementById('adjPanel').style.display = tab==='adj' ? '' : 'none';
+  document.getElementById('bgPanel').style.display  = tab==='bg'  ? '' : 'none';
   if(tab==='adj') drawAdjPreview();
+  if(tab==='bg' && _bgRemove && !_bgPreviewOk) drawBgPreview();
 }
 window.switchCropTab = switchCropTab;
 
@@ -703,6 +772,126 @@ function hue2rgb(p,q,t){
   if(t<1/2) return q;
   if(t<2/3) return p+(q-p)*(2/3-t)*6;
   return p;
+}
+
+// ══════════════════════════════════════
+//  FONDO — helpers y lógica
+// ══════════════════════════════════════
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return [r,g,b];
+}
+
+function _buildBgPresets() {
+  const container = document.getElementById('bgPresets');
+  if(!container) return;
+  container.innerHTML = '';
+  BG_PRESETS.forEach(color => {
+    const btn = document.createElement('button');
+    btn.className = 'bg-preset' + (_bgColor===color?' sel':'');
+    btn.style.background = color;
+    if(color==='#ffffff') btn.style.border='2.5px solid '+(_bgColor===color?'#fff':'#555');
+    btn.onclick = () => { onBgColorChange(color); };
+    container.appendChild(btn);
+  });
+}
+
+function onBgColorChange(color) {
+  _bgColor = color;
+  try { localStorage.setItem(BG_LS_KEY, color); } catch(e){}
+  const picker = document.getElementById('bgColorPicker');
+  if(picker) picker.value = color;
+  _buildBgPresets();
+  _bgPreviewOk = false;
+  if(_bgRemove) drawBgPreview();
+}
+window.onBgColorChange = onBgColorChange;
+
+function onBgRemoveToggle() {
+  _bgRemove = document.getElementById('bgRemoveChk').checked;
+  _bgPreviewOk = false;
+  if(_bgRemove) drawBgPreview();
+  else {
+    // limpiar preview
+    const c = document.getElementById('bgPreviewCanvas');
+    if(c) { c.style.display='none'; }
+  }
+}
+window.onBgRemoveToggle = onBgRemoveToggle;
+
+function onBgToleranceChange() {
+  const sl  = document.getElementById('bgTolerance');
+  const val = document.getElementById('bgToleranceVal');
+  if(sl && val) val.textContent = sl.value;
+  _bgPreviewOk = false;
+  if(_bgRemove) drawBgPreview();
+}
+window.onBgToleranceChange = onBgToleranceChange;
+
+function drawBgPreview() {
+  if(!_srcBitmap) return;
+  const SIZE = 300;
+  let previewCanvas = document.getElementById('bgPreviewCanvas');
+  previewCanvas.width  = SIZE;
+  previewCanvas.height = SIZE;
+  previewCanvas.style.display = '';
+
+  const ctx = previewCanvas.getContext('2d');
+  // fondo de color
+  ctx.fillStyle = _bgColor;
+  ctx.fillRect(0,0,SIZE,SIZE);
+  // imagen recortada
+  _drawCroppedToCtx(ctx, SIZE, SIZE);
+  // quitar fondo
+  const [br,bg_,bb] = hexToRgb(_bgColor);
+  _applyBgRemoval(ctx, SIZE, SIZE, br, bg_, bb);
+  _bgPreviewOk = true;
+}
+
+function _applyBgRemoval(ctx, w, h, fillR, fillG, fillB) {
+  const tolerance = parseInt(document.getElementById('bgTolerance')?.value||30);
+  const imgd = ctx.getImageData(0,0,w,h);
+  const d    = imgd.data;
+  const visited = new Uint8Array(w*h);
+
+  // Muestra de color de fondo: promedio de las 4 esquinas (3×3 px cada una)
+  let sumR=0, sumG=0, sumB=0, cnt=0;
+  const corners = [[0,0],[w-3,0],[0,h-3],[w-3,h-3]];
+  corners.forEach(([cx,cy])=>{
+    for(let dy=0;dy<3;dy++) for(let dx=0;dx<3;dx++){
+      const idx=((cy+dy)*w+(cx+dx))*4;
+      sumR+=d[idx]; sumG+=d[idx+1]; sumB+=d[idx+2]; cnt++;
+    }
+  });
+  const bgR=sumR/cnt, bgG=sumG/cnt, bgB=sumB/cnt;
+
+  // BFS flood-fill desde las 4 esquinas
+  const queue = [];
+  const push = (x,y) => { const i=y*w+x; if(!visited[i]){ visited[i]=1; queue.push(x,y); } };
+  corners.forEach(([cx,cy])=>push(Math.min(cx,w-1),Math.min(cy,h-1)));
+  // también bordes superior e inferior
+  for(let x=0;x<w;x++){ push(x,0); push(x,h-1); }
+  for(let y=0;y<h;y++){ push(0,y); push(w-1,y); }
+
+  let qi=0;
+  while(qi < queue.length) {
+    const x=queue[qi++], y=queue[qi++];
+    const idx=(y*w+x)*4;
+    const dr=d[idx]-bgR, dg=d[idx+1]-bgG, db=d[idx+2]-bgB;
+    const dist=Math.sqrt(dr*dr+dg*dg+db*db);
+    if(dist > tolerance*2.2) continue;  // fuera de tolerancia = parte del producto
+    // pintar con color de fondo
+    d[idx]=fillR; d[idx+1]=fillG; d[idx+2]=fillB;
+    // vecinos 4-conectados
+    if(x>0)   push(x-1,y);
+    if(x<w-1) push(x+1,y);
+    if(y>0)   push(x,y-1);
+    if(y<h-1) push(x,y+1);
+  }
+
+  ctx.putImageData(imgd,0,0);
 }
 
 // ══════════════════════════════════════
