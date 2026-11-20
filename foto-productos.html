@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>📷 Fotos de Productos — Bodega Pacata</title>
+<style>
+  :root{
+    --v:#2e7d32;--vl:#43a047;--vbg:#e8f5e9;
+    --ro:#c62828;--or:#e65100;
+    --tx:#222;--gr:#777;--bg:#f5f7f5;
+    --card:#fff;--border:#d0e8d8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;}
+
+  /* ── LOGIN ── */
+  #loginScreen{position:fixed;inset:0;background:var(--v);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;transition:opacity .3s;}
+  #loginScreen.hidden{opacity:0;pointer-events:none;}
+  .login-logo{font-size:3rem;margin-bottom:8px;}
+  .login-title{color:#fff;font-size:1.3rem;font-weight:800;margin-bottom:4px;}
+  .login-sub{color:rgba(255,255,255,.75);font-size:.82rem;margin-bottom:28px;}
+  .pin-dots{display:flex;gap:14px;margin-bottom:24px;}
+  .pin-dot{width:16px;height:16px;border-radius:50%;border:2.5px solid rgba(255,255,255,.6);background:transparent;transition:background .15s;}
+  .pin-dot.filled{background:#fff;border-color:#fff;}
+  .keypad{display:grid;grid-template-columns:repeat(3,72px);gap:10px;}
+  .kbtn{width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,.18);border:none;color:#fff;font-size:1.3rem;font-weight:700;cursor:pointer;transition:background .15s;display:flex;align-items:center;justify-content:center;}
+  .kbtn:active{background:rgba(255,255,255,.35);}
+  .kbtn.empty{background:transparent;pointer-events:none;}
+  .pin-err{color:#ffcdd2;font-size:.8rem;min-height:1.2em;margin-top:8px;text-align:center;}
+
+  /* ── HEADER ── */
+  .app-header{background:var(--v);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100;}
+  .app-header h1{font-size:1rem;font-weight:800;flex:1;}
+  .hdr-btn{background:rgba(255,255,255,.18);border:none;color:#fff;border-radius:8px;padding:6px 11px;font-size:.8rem;font-weight:700;cursor:pointer;}
+  .hdr-btn:active{background:rgba(255,255,255,.3);}
+
+  /* ── SEARCH BAR ── */
+  .search-bar{padding:10px 14px;background:var(--card);border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;}
+  .search-bar input{flex:1;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:.88rem;outline:none;background:#fff;}
+  .search-bar input:focus{border-color:var(--v);}
+  .filter-toggle{background:var(--vbg);border:1.5px solid var(--border);border-radius:8px;padding:7px 12px;font-size:.8rem;font-weight:700;cursor:pointer;color:var(--v);white-space:nowrap;}
+  .filter-toggle.active{background:var(--v);color:#fff;border-color:var(--v);}
+
+  /* ── STATS BAR ── */
+  .stats-bar{background:var(--vbg);padding:8px 14px;font-size:.76rem;color:var(--v);font-weight:700;border-bottom:1px solid var(--border);}
+
+  /* ── PRODUCT LIST ── */
+  .prod-list{padding:10px 14px;display:flex;flex-direction:column;gap:6px;}
+  .cat-label{font-size:.72rem;font-weight:800;color:var(--gr);letter-spacing:.05em;margin-top:10px;margin-bottom:2px;text-transform:uppercase;}
+  .cat-label:first-child{margin-top:0;}
+  .prod-row{background:var(--card);border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 4px rgba(0,0,0,.06);cursor:pointer;transition:box-shadow .15s;}
+  .prod-row:active{box-shadow:0 2px 8px rgba(46,125,50,.2);}
+  .prod-row-thumb{width:44px;height:44px;border-radius:8px;overflow:hidden;background:var(--vbg);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.3rem;border:2px dashed var(--border);}
+  .prod-row-thumb img{width:100%;height:100%;object-fit:cover;}
+  .prod-row-info{flex:1;min-width:0;}
+  .prod-row-name{font-size:.88rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .prod-row-cat{font-size:.7rem;color:var(--gr);}
+  .foto-badge{flex-shrink:0;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:800;}
+  .foto-ok{background:#e8f5e9;color:#2e7d32;}
+  .foto-no{background:#ffebee;color:var(--ro);}
+
+  /* ── CAMERA INPUT ── */
+  #cameraInput{display:none;}
+
+  /* ── CROP / ADJUST MODAL ── */
+  #cropModal{position:fixed;inset:0;background:#111;z-index:200;display:flex;flex-direction:column;overflow:hidden;}
+  #cropModal.hidden{display:none;}
+  .crop-header{background:#1a1a1a;color:#fff;padding:12px 14px;display:flex;align-items:center;gap:8px;}
+  .crop-header h2{flex:1;font-size:.95rem;font-weight:800;}
+  .crop-btn{background:rgba(255,255,255,.12);border:none;color:#fff;border-radius:8px;padding:7px 13px;font-size:.8rem;font-weight:700;cursor:pointer;}
+  .crop-btn.primary{background:var(--v);}
+  .crop-btn:active{opacity:.7;}
+  /* Crop area */
+  .crop-area-wrap{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;touch-action:none;}
+  #cropCanvas{cursor:grab;touch-action:none;max-width:100%;max-height:100%;}
+  /* Sliders */
+  .adjust-panel{background:#1a1a1a;padding:10px 14px 16px;display:flex;flex-direction:column;gap:7px;}
+  .adj-row{display:flex;align-items:center;gap:8px;}
+  .adj-lbl{color:#ccc;font-size:.72rem;font-weight:700;width:70px;flex-shrink:0;}
+  .adj-val{color:#fff;font-size:.72rem;font-weight:800;width:32px;text-align:right;flex-shrink:0;}
+  .adj-slider{flex:1;accent-color:var(--vl);height:4px;cursor:pointer;}
+  /* Tabs */
+  .crop-tabs{display:flex;background:#111;border-top:1px solid #333;}
+  .crop-tab{flex:1;padding:9px 4px;font-size:.72rem;font-weight:700;color:#888;border:none;background:transparent;cursor:pointer;transition:color .15s;}
+  .crop-tab.active{color:var(--vl);}
+
+  /* ── UPLOAD PROGRESS ── */
+  #uploadOverlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;}
+  #uploadOverlay.hidden{display:none;}
+  .upload-spinner{width:48px;height:48px;border:4px solid rgba(255,255,255,.2);border-top-color:var(--vl);border-radius:50%;animation:spin .7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .upload-msg{color:#fff;font-size:.9rem;font-weight:700;}
+
+  /* ── TOAST ── */
+  #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#333;color:#fff;padding:9px 18px;border-radius:20px;font-size:.82rem;font-weight:700;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;z-index:400;white-space:nowrap;}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  #toast.err{background:var(--ro);}
+</style>
+</head>
+<body>
+
+<!-- ══ LOGIN ══ -->
+<div id="loginScreen">
+  <div class="login-logo">📷</div>
+  <div class="login-title">Fotos de Productos</div>
+  <div class="login-sub" id="loginSub">Bodega Pacata</div>
+  <div class="pin-dots">
+    <div class="pin-dot" id="dot0"></div>
+    <div class="pin-dot" id="dot1"></div>
+    <div class="pin-dot" id="dot2"></div>
+    <div class="pin-dot" id="dot3"></div>
+  </div>
+  <div class="keypad">
+    <button class="kbtn" data-key="1">1</button>
+    <button class="kbtn" data-key="2">2</button>
+    <button class="kbtn" data-key="3">3</button>
+    <button class="kbtn" data-key="4">4</button>
+    <button class="kbtn" data-key="5">5</button>
+    <button class="kbtn" data-key="6">6</button>
+    <button class="kbtn" data-key="7">7</button>
+    <button class="kbtn" data-key="8">8</button>
+    <button class="kbtn" data-key="9">9</button>
+    <button class="kbtn empty"></button>
+    <button class="kbtn" data-key="0">0</button>
+    <button class="kbtn" data-key="C" style="font-size:1rem">⌫</button>
+  </div>
+  <div class="pin-err" id="pinErr"></div>
+</div>
+
+<!-- ══ APP (oculto hasta login) ══ -->
+<div id="appMain" class="hidden" style="display:none">
+  <div class="app-header">
+    <span style="font-size:1.3rem">📷</span>
+    <h1>Fotos de Productos</h1>
+    <button class="hdr-btn" onclick="doLogout()">Salir</button>
+  </div>
+
+  <div class="search-bar">
+    <input id="searchInput" type="text" placeholder="🔍 Buscar producto..." oninput="renderList()">
+    <button class="filter-toggle" id="btnSinFoto" onclick="toggleSinFotoFilter()">Sin foto</button>
+  </div>
+  <div class="stats-bar" id="statsBar">Cargando...</div>
+  <div class="prod-list" id="prodList"><div style="text-align:center;padding:30px;color:var(--gr)">Cargando productos...</div></div>
+</div>
+
+<!-- ══ CROP / ADJUST MODAL ══ -->
+<div id="cropModal" class="hidden">
+  <div class="crop-header">
+    <h2 id="cropProdName">Recortar foto</h2>
+    <button class="crop-btn" onclick="cancelCrop()">Cancelar</button>
+    <button class="crop-btn primary" onclick="confirmCrop()">✓ Guardar</button>
+  </div>
+  <div class="crop-tabs">
+    <button class="crop-tab active" id="tabCrop" onclick="switchCropTab('crop')">✂️ Recortar</button>
+    <button class="crop-tab" id="tabAdj" onclick="switchCropTab('adj')">🎨 Ajustar</button>
+  </div>
+  <!-- Crop view -->
+  <div class="crop-area-wrap" id="cropAreaWrap">
+    <canvas id="cropCanvas"></canvas>
+  </div>
+  <!-- Adjust panel (hidden in crop tab) -->
+  <div class="adjust-panel" id="adjPanel" style="display:none">
+    <div class="adj-row">
+      <span class="adj-lbl">Brillo</span>
+      <input class="adj-slider" type="range" id="slBright" min="-100" max="100" value="0" oninput="updateAdj()">
+      <span class="adj-val" id="vlBright">0</span>
+    </div>
+    <div class="adj-row">
+      <span class="adj-lbl">Contraste</span>
+      <input class="adj-slider" type="range" id="slContrast" min="-100" max="100" value="0" oninput="updateAdj()">
+      <span class="adj-val" id="vlContrast">0</span>
+    </div>
+    <div class="adj-row">
+      <span class="adj-lbl">Saturación</span>
+      <input class="adj-slider" type="range" id="slSat" min="-100" max="100" value="0" oninput="updateAdj()">
+      <span class="adj-val" id="vlSat">0</span>
+    </div>
+    <div class="adj-row">
+      <span class="adj-lbl">Nitidez</span>
+      <input class="adj-slider" type="range" id="slSharp" min="0" max="10" value="0" oninput="updateAdj()">
+      <span class="adj-val" id="vlSharp">0</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══ UPLOAD OVERLAY ══ -->
+<div id="uploadOverlay" class="hidden">
+  <div class="upload-spinner"></div>
+  <div class="upload-msg" id="uploadMsg">Subiendo foto...</div>
+</div>
+
+<!-- ══ CAMERA INPUT ══ -->
+<input type="file" id="cameraInput" accept="image/*" capture="environment">
+
+<div id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import * as _fs from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAb55k7sLr8xpYhElxSyfxRW0CsZ5h5fKI",
+  authDomain: "prueba-02-2d59e.firebaseapp.com",
+  projectId: "prueba-02-2d59e",
+  storageBucket: "prueba-02-2d59e.firebasestorage.app",
+  messagingSenderId: "1007202588620",
+  appId: "1:1007202588620:web:ab5c1f7e72c01df6c5832c"
+};
+
+const CLOUD_NAME = "db9s1kpcf";
+const CLOUD_PRESET = "bodega_unsigned";
+
+const app = initializeApp(firebaseConfig);
+const db  = _fs.getFirestore(app);
+const fs  = _fs;
+
+// ══════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════
+let DB = { products:{}, categories:{}, config:{} };
+let _pinInput = "";
+let _sinFotoFilter = false;
+let _activeProdId = null;    // producto al que se le está asignando la foto
+let _srcImageData = null;    // ImageData original del recorte (sin ajustes)
+let _cropState = {           // estado del drag en la vista de recorte
+  offsetX: 0, offsetY: 0,
+  scale: 1,
+  dragging: false, lastX: 0, lastY: 0,
+  pinchDist: 0
+};
+let _cropTab = 'crop';       // 'crop' | 'adj'
+let _srcBitmap = null;       // ImageBitmap original para redibujar
+
+// ══════════════════════════════════════
+//  TOAST
+// ══════════════════════════════════════
+let _toastTimer = null;
+function showToast(msg, isErr=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (isErr?' err':'');
+  if(_toastTimer) clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(()=>{ t.className=''; }, 2800);
+}
+
+// ══════════════════════════════════════
+//  LOGIN
+// ══════════════════════════════════════
+document.querySelectorAll('.kbtn[data-key]').forEach(btn => {
+  btn.addEventListener('click', () => pinPress(btn.dataset.key));
+});
+document.addEventListener('keydown', e => {
+  const ls = document.getElementById('loginScreen');
+  if(!ls || ls.classList.contains('hidden')) return;
+  if(e.key >= '0' && e.key <= '9') { pinPress(e.key); e.preventDefault(); }
+  else if(e.key === 'Backspace') { pinPress('C'); e.preventDefault(); }
+  else if(e.key === 'Enter') { checkPin(); e.preventDefault(); }
+});
+
+function pinPress(k) {
+  const err = document.getElementById('pinErr');
+  if(err) err.textContent = '';
+  if(k === 'C') { _pinInput = _pinInput.slice(0,-1); }
+  else { if(_pinInput.length >= 4) return; _pinInput += String(k); if(_pinInput.length === 4) checkPin(); }
+  updatePinDots();
+}
+
+function updatePinDots() {
+  for(let i=0;i<4;i++) document.getElementById('dot'+i)?.classList.toggle('filled', i<_pinInput.length);
+}
+
+function checkPin() {
+  const correct = DB.config?.pinAdmin || DB.config?.pin || '1234';
+  if(_pinInput === correct) {
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('appMain').style.display = '';
+    _pinInput = ''; updatePinDots();
+  } else {
+    const err = document.getElementById('pinErr');
+    if(err) err.textContent = 'PIN incorrecto';
+    _pinInput = ''; updatePinDots();
+  }
+}
+
+function doLogout() {
+  _pinInput = ''; updatePinDots();
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('appMain').style.display = 'none';
+}
+window.doLogout = doLogout;
+
+// ══════════════════════════════════════
+//  FIREBASE — CARGA
+// ══════════════════════════════════════
+async function loadData() {
+  const sub = document.getElementById('loginSub');
+  if(sub) sub.textContent = 'Conectando...';
+  try {
+    const [cfgSnap, catSnap, prodSnap] = await Promise.all([
+      fs.getDoc(fs.doc(db, 'config', 'main')),
+      fs.getDocs(fs.collection(db, 'categories')),
+      fs.getDocs(fs.collection(db, 'products'))
+    ]);
+    if(cfgSnap.exists()) DB.config = cfgSnap.data();
+    catSnap.forEach(d => { DB.categories[d.id] = {...d.data(), id:d.id}; });
+    prodSnap.forEach(d => { DB.products[d.id] = {...d.data(), id:d.id}; });
+    if(sub) sub.textContent = 'Bodega Pacata';
+    renderList();
+  } catch(e) {
+    if(sub) sub.textContent = 'Sin conexión';
+    showToast('Error cargando datos: '+e.message, true);
+  }
+}
+
+loadData();
+
+// ══════════════════════════════════════
+//  RENDER LIST
+// ══════════════════════════════════════
+function toggleSinFotoFilter() {
+  _sinFotoFilter = !_sinFotoFilter;
+  const btn = document.getElementById('btnSinFoto');
+  btn.classList.toggle('active', _sinFotoFilter);
+  renderList();
+}
+window.toggleSinFotoFilter = toggleSinFotoFilter;
+
+function renderList() {
+  const q = (document.getElementById('searchInput')?.value||'').toLowerCase().trim();
+  let prods = Object.values(DB.products);
+  if(_sinFotoFilter) prods = prods.filter(p => !p.img);
+  if(q) prods = prods.filter(p => (p.nombre||'').toLowerCase().includes(q) || (p.cat||'').toLowerCase().includes(q));
+  prods.sort((a,b) => {
+    const ca = a.cat||'', cb = b.cat||'';
+    if(ca !== cb) return ca.localeCompare(cb);
+    return (a.nombre||'').localeCompare(b.nombre||'');
+  });
+
+  // Stats
+  const total = Object.values(DB.products).length;
+  const conFoto = Object.values(DB.products).filter(p=>p.img).length;
+  const pct = total ? Math.round(conFoto/total*100) : 0;
+  document.getElementById('statsBar').textContent =
+    `${conFoto} con foto · ${total-conFoto} sin foto · ${pct}% completado · ${prods.length} visibles`;
+
+  if(!prods.length) {
+    document.getElementById('prodList').innerHTML = '<div style="text-align:center;padding:30px;color:var(--gr)">Sin productos para este filtro</div>';
+    return;
+  }
+
+  // Group by category
+  let html = '';
+  let lastCat = null;
+  for(const p of prods) {
+    const cat = p.cat||'Sin categoría';
+    if(cat !== lastCat) {
+      html += `<div class="cat-label">${cat}</div>`;
+      lastCat = cat;
+    }
+    const imgEl = p.img ? `<img src="${p.img}" alt="">` : (DB.categories[p.cat]?.emoji||'📦');
+    const hasFoto = !!p.img;
+    html += `<div class="prod-row" onclick="openCamera('${p.id}')">
+      <div class="prod-row-thumb">${imgEl}</div>
+      <div class="prod-row-info">
+        <div class="prod-row-name">${_esc(p.nombre)}</div>
+        <div class="prod-row-cat">${_esc(cat)}</div>
+      </div>
+      <div class="foto-badge ${hasFoto?'foto-ok':'foto-no'}">${hasFoto?'✓':'✗'}</div>
+    </div>`;
+  }
+  document.getElementById('prodList').innerHTML = html;
+}
+
+function _esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ══════════════════════════════════════
+//  CAMERA — abrir
+// ══════════════════════════════════════
+function openCamera(prodId) {
+  _activeProdId = prodId;
+  const inp = document.getElementById('cameraInput');
+  inp.value = '';
+  inp.click();
+}
+window.openCamera = openCamera;
+
+document.getElementById('cameraInput').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if(!file || !_activeProdId) return;
+  try {
+    const bmp = await createImageBitmap(file);
+    openCropModal(bmp);
+  } catch(err) {
+    showToast('No se pudo leer la imagen', true);
+  }
+});
+
+// ══════════════════════════════════════
+//  CROP MODAL
+// ══════════════════════════════════════
+function openCropModal(bmp) {
+  _srcBitmap = bmp;
+  _cropTab = 'crop';
+  _cropState = { offsetX:0, offsetY:0, scale:1, dragging:false, lastX:0, lastY:0, pinchDist:0 };
+  // Reset sliders
+  ['slBright','slContrast','slSat','slSharp'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.value = id==='slSharp'?0:0;
+  });
+  ['vlBright','vlContrast','vlSat','vlSharp'].forEach(id=>{
+    const el = document.getElementById(id); if(el) el.textContent='0';
+  });
+
+  const prod = DB.products[_activeProdId];
+  const name = document.getElementById('cropProdName');
+  if(name) name.textContent = prod?.nombre || 'Recortar foto';
+
+  switchCropTab('crop');
+  document.getElementById('cropModal').classList.remove('hidden');
+  drawCrop();
+}
+
+function cancelCrop() {
+  document.getElementById('cropModal').classList.add('hidden');
+  _srcBitmap = null;
+  _srcImageData = null;
+  _activeProdId = null;
+}
+window.cancelCrop = cancelCrop;
+
+async function confirmCrop() {
+  if(!_srcBitmap || !_activeProdId) return;
+  // Generate final 600×600 canvas with adjustments
+  const finalCanvas = document.createElement('canvas');
+  finalCanvas.width = 600; finalCanvas.height = 600;
+  const ctx = finalCanvas.getContext('2d');
+  _drawCroppedToCtx(ctx, 600, 600);
+  _applyAdjustments(ctx, 600, 600);
+  finalCanvas.toBlob(async blob => {
+    if(!blob) { showToast('Error al procesar imagen', true); return; }
+    document.getElementById('cropModal').classList.add('hidden');
+    await uploadPhoto(blob);
+  }, 'image/jpeg', 0.88);
+}
+window.confirmCrop = confirmCrop;
+
+function switchCropTab(tab) {
+  _cropTab = tab;
+  document.getElementById('tabCrop').classList.toggle('active', tab==='crop');
+  document.getElementById('tabAdj').classList.toggle('active', tab==='adj');
+  document.getElementById('cropAreaWrap').style.display = tab==='crop' ? '' : 'none';
+  document.getElementById('adjPanel').style.display = tab==='adj' ? '' : 'none';
+  if(tab==='adj') drawAdjPreview();
+}
+window.switchCropTab = switchCropTab;
+
+// ── Crop canvas draw ──────────────────
+function drawCrop() {
+  if(!_srcBitmap) return;
+  const wrap = document.getElementById('cropAreaWrap');
+  const canvas = document.getElementById('cropCanvas');
+  const size = Math.min(wrap.clientWidth, wrap.clientHeight, 400);
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,size,size);
+
+  // Fit bitmap into square maintaining aspect
+  const bw = _srcBitmap.width, bh = _srcBitmap.height;
+  const baseScale = size / Math.min(bw, bh);
+  const sc = baseScale * _cropState.scale;
+  const dw = bw * sc, dh = bh * sc;
+
+  // Center offsets clamped so image always covers the square
+  const minOx = size - dw, maxOx = 0;
+  const minOy = size - dh, maxOy = 0;
+  _cropState.offsetX = Math.max(minOx, Math.min(maxOx, _cropState.offsetX));
+  _cropState.offsetY = Math.max(minOy, Math.min(maxOy, _cropState.offsetY));
+
+  ctx.drawImage(_srcBitmap, _cropState.offsetX, _cropState.offsetY, dw, dh);
+
+  // Grid overlay
+  ctx.strokeStyle = 'rgba(255,255,255,.35)';
+  ctx.lineWidth = 1;
+  for(let i=1;i<3;i++){
+    ctx.beginPath(); ctx.moveTo(size/3*i,0); ctx.lineTo(size/3*i,size); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,size/3*i); ctx.lineTo(size,size/3*i); ctx.stroke();
+  }
+  // Border
+  ctx.strokeStyle='rgba(255,255,255,.8)';ctx.lineWidth=2;
+  ctx.strokeRect(1,1,size-2,size-2);
+}
+
+function _drawCroppedToCtx(ctx, size, _h) {
+  if(!_srcBitmap) return;
+  const wrap = document.getElementById('cropAreaWrap');
+  const previewSize = Math.min(wrap.clientWidth, wrap.clientHeight, 400);
+  const bw = _srcBitmap.width, bh = _srcBitmap.height;
+  const baseScale = previewSize / Math.min(bw, bh);
+  const sc = baseScale * _cropState.scale;
+  const dw = bw * sc, dh = bh * sc;
+  // Map preview coords to source coords
+  const srcX = -_cropState.offsetX / sc;
+  const srcY = -_cropState.offsetY / sc;
+  const srcW = previewSize / sc;
+  const srcH = previewSize / sc;
+  ctx.drawImage(_srcBitmap, srcX, srcY, srcW, srcH, 0, 0, size, size);
+}
+
+// ── Touch / mouse drag on crop canvas ──
+const cropCanvas = document.getElementById('cropCanvas');
+cropCanvas.addEventListener('mousedown', e => {
+  _cropState.dragging = true;
+  _cropState.lastX = e.clientX;
+  _cropState.lastY = e.clientY;
+  cropCanvas.style.cursor = 'grabbing';
+});
+document.addEventListener('mousemove', e => {
+  if(!_cropState.dragging) return;
+  _cropState.offsetX += e.clientX - _cropState.lastX;
+  _cropState.offsetY += e.clientY - _cropState.lastY;
+  _cropState.lastX = e.clientX;
+  _cropState.lastY = e.clientY;
+  drawCrop();
+});
+document.addEventListener('mouseup', () => {
+  _cropState.dragging = false;
+  cropCanvas.style.cursor = 'grab';
+});
+cropCanvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  _cropState.scale = Math.max(0.5, Math.min(5, _cropState.scale - e.deltaY * 0.001));
+  drawCrop();
+}, {passive:false});
+
+// Touch
+cropCanvas.addEventListener('touchstart', e => {
+  if(e.touches.length === 1) {
+    _cropState.dragging = true;
+    _cropState.lastX = e.touches[0].clientX;
+    _cropState.lastY = e.touches[0].clientY;
+  } else if(e.touches.length === 2) {
+    _cropState.dragging = false;
+    _cropState.pinchDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY);
+  }
+  e.preventDefault();
+}, {passive:false});
+
+cropCanvas.addEventListener('touchmove', e => {
+  if(e.touches.length === 1 && _cropState.dragging) {
+    _cropState.offsetX += e.touches[0].clientX - _cropState.lastX;
+    _cropState.offsetY += e.touches[0].clientY - _cropState.lastY;
+    _cropState.lastX = e.touches[0].clientX;
+    _cropState.lastY = e.touches[0].clientY;
+    drawCrop();
+  } else if(e.touches.length === 2) {
+    const dist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY);
+    if(_cropState.pinchDist) {
+      _cropState.scale = Math.max(0.5, Math.min(5, _cropState.scale * (dist / _cropState.pinchDist)));
+      drawCrop();
+    }
+    _cropState.pinchDist = dist;
+  }
+  e.preventDefault();
+}, {passive:false});
+
+cropCanvas.addEventListener('touchend', () => {
+  _cropState.dragging = false;
+  _cropState.pinchDist = 0;
+});
+
+// ══════════════════════════════════════
+//  ADJUST — preview en canvas 300×300
+// ══════════════════════════════════════
+let _adjCanvas = null;
+
+function drawAdjPreview() {
+  if(!_srcBitmap) return;
+  if(!_adjCanvas) {
+    _adjCanvas = document.createElement('canvas');
+    _adjCanvas.width = 300; _adjCanvas.height = 300;
+    _adjCanvas.style.cssText = 'max-width:100%;max-height:280px;border-radius:8px;';
+    const wrap = document.getElementById('adjPanel');
+    wrap.insertBefore(_adjCanvas, wrap.firstChild);
+  }
+  const ctx = _adjCanvas.getContext('2d');
+  _drawCroppedToCtx(ctx, 300, 300);
+  _applyAdjustments(ctx, 300, 300);
+}
+
+function updateAdj() {
+  ['Bright','Contrast','Sat','Sharp'].forEach(id => {
+    const sl = document.getElementById('sl'+id);
+    const vl = document.getElementById('vl'+id);
+    if(sl && vl) vl.textContent = sl.value;
+  });
+  drawAdjPreview();
+}
+window.updateAdj = updateAdj;
+
+function _applyAdjustments(ctx, w, h) {
+  const bright   = parseInt(document.getElementById('slBright')?.value||0);
+  const contrast = parseInt(document.getElementById('slContrast')?.value||0);
+  const sat      = parseInt(document.getElementById('slSat')?.value||0);
+  const sharp    = parseInt(document.getElementById('slSharp')?.value||0);
+
+  if(bright===0 && contrast===0 && sat===0 && sharp===0) return;
+
+  let imgd = ctx.getImageData(0, 0, w, h);
+  let d = imgd.data;
+
+  // Brightness + Contrast + Saturation — work per pixel
+  if(bright!==0 || contrast!==0 || sat!==0) {
+    const bf = bright / 100;          // -1..1
+    const cf = contrast / 100;        // -1..1
+    const factor = (259*(cf*255+255))/(255*(259-cf*255));
+
+    for(let i=0; i<d.length; i+=4) {
+      let r=d[i], g=d[i+1], b=d[i+2];
+
+      // Brightness
+      r = r + bf*255; g = g + bf*255; b = b + bf*255;
+
+      // Contrast
+      r = factor*(r-128)+128; g = factor*(g-128)+128; b = factor*(b-128)+128;
+
+      // Saturation via HSL
+      if(sat !== 0) {
+        const rn=Math.max(0,Math.min(255,r))/255,
+              gn=Math.max(0,Math.min(255,g))/255,
+              bn=Math.max(0,Math.min(255,b))/255;
+        const max=Math.max(rn,gn,bn), min=Math.min(rn,gn,bn);
+        const l=(max+min)/2;
+        let s=0, h=0;
+        if(max!==min){
+          const delta=max-min;
+          s=l>0.5?delta/(2-max-min):delta/(max+min);
+          if(max===rn) h=((gn-bn)/delta+( gn<bn?6:0))/6;
+          else if(max===gn) h=((bn-rn)/delta+2)/6;
+          else h=((rn-gn)/delta+4)/6;
+        }
+        const newS = Math.max(0, Math.min(1, s + sat/100));
+        const [nr,ng,nb] = hslToRgb(h, newS, l);
+        r=nr*255; g=ng*255; b=nb*255;
+      }
+
+      d[i]   = Math.max(0,Math.min(255,r));
+      d[i+1] = Math.max(0,Math.min(255,g));
+      d[i+2] = Math.max(0,Math.min(255,b));
+    }
+  }
+
+  // Sharpness — convolución 3×3 (unsharp mask kernel)
+  if(sharp > 0) {
+    const amt = sharp / 10;   // 0..1
+    const kernel = [
+       0,       -amt,      0,
+      -amt, 1+4*amt,    -amt,
+       0,       -amt,      0
+    ];
+    const src = new Uint8ClampedArray(d);
+    for(let y=1; y<h-1; y++) {
+      for(let x=1; x<w-1; x++) {
+        const idx=(y*w+x)*4;
+        for(let c=0;c<3;c++){
+          d[idx+c] = Math.max(0,Math.min(255,
+            kernel[0]*src[((y-1)*w+(x-1))*4+c] + kernel[1]*src[((y-1)*w+x)*4+c] + kernel[2]*src[((y-1)*w+(x+1))*4+c] +
+            kernel[3]*src[(y*w+(x-1))*4+c]     + kernel[4]*src[(y*w+x)*4+c]       + kernel[5]*src[(y*w+(x+1))*4+c] +
+            kernel[6]*src[((y+1)*w+(x-1))*4+c] + kernel[7]*src[((y+1)*w+x)*4+c]   + kernel[8]*src[((y+1)*w+(x+1))*4+c]
+          ));
+        }
+      }
+    }
+  }
+
+  ctx.putImageData(imgd, 0, 0);
+}
+
+function hslToRgb(h, s, l) {
+  if(s===0) return [l,l,l];
+  const q = l<0.5 ? l*(1+s) : l+s-l*s;
+  const p = 2*l-q;
+  return [hue2rgb(p,q,h+1/3), hue2rgb(p,q,h), hue2rgb(p,q,h-1/3)];
+}
+function hue2rgb(p,q,t){
+  if(t<0) t+=1; if(t>1) t-=1;
+  if(t<1/6) return p+(q-p)*6*t;
+  if(t<1/2) return q;
+  if(t<2/3) return p+(q-p)*(2/3-t)*6;
+  return p;
+}
+
+// ══════════════════════════════════════
+//  UPLOAD
+// ══════════════════════════════════════
+async function uploadPhoto(blob) {
+  const overlay = document.getElementById('uploadOverlay');
+  const msg = document.getElementById('uploadMsg');
+  overlay.classList.remove('hidden');
+  msg.textContent = 'Subiendo a Cloudinary...';
+  let url = null;
+  try {
+    const fd = new FormData();
+    fd.append('file', blob, 'product.jpg');
+    fd.append('upload_preset', CLOUD_PRESET);
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {method:'POST',body:fd});
+    if(res.ok) {
+      const json = await res.json();
+      url = json.secure_url;
+    }
+  } catch(e) { /* fallback */ }
+
+  if(!url) {
+    // Fallback: base64 en Firestore
+    msg.textContent = 'Cloudinary falló, guardando localmente...';
+    try {
+      const reader = new FileReader();
+      url = await new Promise((res,rej) => {
+        reader.onload = e => res(e.target.result);
+        reader.onerror = rej;
+        reader.readAsDataURL(blob);
+      });
+    } catch(e) {
+      overlay.classList.add('hidden');
+      showToast('Error al subir la foto', true);
+      return;
+    }
+  }
+
+  // Guardar en Firestore
+  msg.textContent = 'Guardando en Firestore...';
+  try {
+    await fs.updateDoc(fs.doc(db,'products',_activeProdId), {
+      img: url, updatedAt: fs.serverTimestamp()
+    });
+    if(DB.products[_activeProdId]) DB.products[_activeProdId].img = url;
+    overlay.classList.add('hidden');
+    showToast('✅ Foto guardada');
+    renderList();
+  } catch(e) {
+    overlay.classList.add('hidden');
+    showToast('Error guardando en base de datos: '+e.message, true);
+  }
+  _activeProdId = null;
+}
+
+</script>
+</body>
+</html>
