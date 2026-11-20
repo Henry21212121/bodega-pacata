@@ -133,7 +133,7 @@ input,select,textarea{cursor:text;}
 /* COMPACT TABLE VIEW */
 .prod-tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 .prod-tbl{width:100%;border-collapse:collapse;font-size:.82rem;}
-.prod-tbl th{background:var(--vbg);color:var(--v);font-weight:800;font-size:.72rem;padding:7px 8px;text-align:left;white-space:nowrap;position:sticky;top:116px;z-index:10;box-shadow:0 2px 4px rgba(0,0,0,.08);}
+.prod-tbl th{background:var(--vbg);color:var(--v);font-weight:800;font-size:.72rem;padding:7px 8px;text-align:left;white-space:nowrap;position:sticky;top:var(--pt-th-top,96px);z-index:10;box-shadow:0 2px 4px rgba(0,0,0,.08);}
 .prod-tbl td{padding:5px 7px;border-bottom:1px solid #f0f0f0;vertical-align:middle;}
 .prod-tbl tr:hover td{background:#f9fffe;}
 .prod-tbl tr.pt-modified td{background:#fffde7;}
@@ -5197,6 +5197,17 @@ function _ptSaveCols(cols) {
   try { localStorage.setItem('pt_cols', JSON.stringify(cols)); } catch(e) {}
 }
 
+function _ptUpdateStickyTop() {
+  // Mide los elementos sticky que están SOBRE la tabla y ajusta --pt-th-top
+  requestAnimationFrame(() => {
+    const header = document.querySelector('.adm-header');
+    const tabs   = document.querySelector('.adm-tabs');
+    const hH = header ? header.offsetHeight : 58;
+    const tH = tabs   ? tabs.offsetHeight   : 38;
+    document.documentElement.style.setProperty('--pt-th-top', (hH + tH) + 'px');
+  });
+}
+
 function _syncPtViewBtn() {
   const btn = document.getElementById('btnToggleView');
   const cfgWrap = document.getElementById('colCfgWrap');
@@ -5394,6 +5405,8 @@ function renderAdmProdsTabla() {
     </table>
   </div>`;
 
+  // Ajustar posición sticky del encabezado según altura real del header+tabs
+  _ptUpdateStickyTop();
   // Update save-all button visibility
   _ptUpdateSaveAllBtn();
 }
