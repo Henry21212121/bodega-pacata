@@ -427,6 +427,9 @@ body.dark #consumoFamiliarBox,body.dark [style*="#fff3e0"]{filter:none;}
           <button class="sell-btn" id="fiarBtn" onclick="openFiarCheckout()" disabled style="flex:1;background:var(--ro);font-size:.82rem">
             📋 FIAR
           </button>
+          <button class="sell-btn" id="prestarBtn" onclick="openPrestamoModal()" disabled style="flex:1;background:#7b1fa2;font-size:.78rem">
+            📦 PRESTAR
+          </button>
         </div>
       </div>
     </div>
@@ -671,6 +674,17 @@ body.dark #consumoFamiliarBox,body.dark [style*="#fff3e0"]{filter:none;}
         </thead>
         <tbody id="fiadoTableBody"></tbody>
       </table>
+    </div>
+
+    <!-- ── PRÉSTAMOS PENDIENTES ── -->
+    <div style="margin-top:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div class="section-title" style="margin:0;color:#7b1fa2">📦 Préstamos pendientes</div>
+        <span id="prestamosCount" style="background:#7b1fa2;color:#fff;border-radius:50px;padding:1px 9px;font-size:.72rem;font-weight:800">0</span>
+      </div>
+      <div id="prestamosListPanel">
+        <div style="font-size:.8rem;color:var(--gr);text-align:center;padding:14px 0">Sin préstamos pendientes ✓</div>
+      </div>
     </div>
   </div>
 </div>
@@ -1034,6 +1048,45 @@ body.dark #consumoFamiliarBox,body.dark [style*="#fff3e0"]{filter:none;}
     <div class="btn-row">
       <button class="btn btn-sec" onclick="closeModal('fiarModal')">Cancelar</button>
       <button class="btn btn-ro" onclick="confirmarFiar()" style="background:var(--ro);color:#fff">📋 Registrar fiado</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: PRÉSTAMO -->
+<div class="modal-ov" id="prestamoModal"><button onclick="closeModal('prestamoModal')" style="position:absolute;top:10px;right:12px;background:rgba(0,0,0,.15);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;flex-shrink:0" title="Cerrar">✕</button>
+  <div class="modal-box">
+    <div class="modal-title">📦 Registrar préstamo</div>
+    <div id="prestamoCartSummary" style="background:var(--vbg);border-radius:10px;padding:10px;margin-bottom:12px;font-size:.82rem"></div>
+
+    <!-- Buscar persona existente -->
+    <div class="fld">
+      <label>Buscar persona por nombre</label>
+      <input type="text" id="prestamoBuscar" placeholder="Nombre..." oninput="buscarPrestatario()" autocomplete="off">
+    </div>
+    <div id="prestamoSugerencias" style="display:none;max-height:140px;overflow-y:auto;border:1.5px solid var(--vbg);border-radius:10px;margin-top:4px;background:#fff"></div>
+
+    <!-- Persona seleccionada -->
+    <div id="prestamoPersonaSelec" style="display:none;background:var(--vbg);border-radius:10px;padding:10px;margin-bottom:8px">
+      <div style="font-size:.82rem;font-weight:800;color:var(--v)" id="prestamoPersonaNombre"></div>
+      <div style="font-size:.72rem;color:var(--gr)" id="prestamoPersonaInfo"></div>
+      <button onclick="clearPrestamoPersona()" style="background:none;border:none;color:var(--gr);font-size:.72rem;cursor:pointer;margin-top:4px">✕ Cambiar</button>
+    </div>
+
+    <!-- Crear nueva persona -->
+    <div id="prestamoNuevoForm" style="border:1.5px dashed var(--vbg);border-radius:10px;padding:10px;margin-bottom:10px">
+      <div style="font-size:.75rem;font-weight:800;color:var(--gr);margin-bottom:8px">— o ingresar nombre —</div>
+      <div class="fld"><label>Nombre *</label><input type="text" id="prestamoNuevoNombre" placeholder="¿A quién se lo prestás?"></div>
+      <div class="fld"><label>Celular (opcional)</label><input type="tel" id="prestamoNuevoCel" placeholder="70012345"></div>
+    </div>
+
+    <div class="fld">
+      <label>Nota (opcional)</label>
+      <input type="text" id="prestamoNota" placeholder="Ej: para mañana, para la fiesta...">
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-sec" onclick="closeModal('prestamoModal')">Cancelar</button>
+      <button class="btn" onclick="confirmarPrestamo()" style="background:#7b1fa2;color:#fff">📦 Registrar préstamo</button>
     </div>
   </div>
 </div>
@@ -1821,6 +1874,7 @@ async function loadAll() {
 
   loadConfigData();
   loadCoquetteProds();
+  loadPrestamos();
 }
 
 // ════════════════════════════════════
@@ -2150,6 +2204,8 @@ function renderCart() {
     cartTotalEl.textContent="Bs. 0.00";
     const fiarBtnEmpty = document.getElementById("fiarBtn");
     if(fiarBtnEmpty) fiarBtnEmpty.disabled=true;
+    const prestarBtnEmpty = document.getElementById("prestarBtn");
+    if(prestarBtnEmpty) prestarBtnEmpty.disabled=true;
     return;
   }
 
@@ -2172,6 +2228,8 @@ function renderCart() {
   sellBtnItems.textContent = totalQty+" item"+(totalQty!==1?"s":"");
   const fiarBtn = document.getElementById("fiarBtn");
   if(fiarBtn) fiarBtn.disabled = false;
+  const prestarBtn = document.getElementById("prestarBtn");
+  if(prestarBtn) prestarBtn.disabled = false;
 }
 
 // ════════════════════════════════════
@@ -4839,6 +4897,190 @@ function showToast(msg,error=false){
     if(tabBar) tabBar.style.marginRight = w + 'px';
   }
 })();
+
+// ════════════════════════════════════════════════════
+// MÓDULO DE PRÉSTAMOS
+// ════════════════════════════════════════════════════
+
+let _prestamoPersonaSeleccionada = null; // {id?, nombre, celular?}
+let _prestamoBusy = false;
+
+// ── Abrir modal de préstamo ──────────────────────────
+function openPrestamoModal() {
+  const items = Object.entries(cart);
+  if(!items.length) { showToast('El carrito está vacío', true); return; }
+
+  // Resumen del carrito
+  const summary = document.getElementById('prestamoCartSummary');
+  const lines = items.map(([,e]) =>
+    `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--vbg)">
+      <span>${e.qty}× ${e.prod.nombre}</span>
+    </div>`).join('');
+  summary.innerHTML = lines + `<div style="font-weight:800;color:#7b1fa2;margin-top:6px">Artículos a prestar: ${items.reduce((s,[,e])=>s+e.qty,0)}</div>`;
+
+  // Limpiar formulario
+  document.getElementById('prestamoBuscar').value = '';
+  document.getElementById('prestamoSugerencias').style.display = 'none';
+  document.getElementById('prestamoPersonaSelec').style.display = 'none';
+  document.getElementById('prestamoNuevoNombre').value = '';
+  document.getElementById('prestamoNuevoCel').value = '';
+  document.getElementById('prestamoNota').value = '';
+  _prestamoPersonaSeleccionada = null;
+
+  openModal('prestamoModal');
+}
+
+// ── Buscar prestatario (reutiliza fiados/deudores) ──
+function buscarPrestatario() {
+  const q = document.getElementById('prestamoBuscar').value.trim().toLowerCase();
+  const sug = document.getElementById('prestamoSugerencias');
+  if(!q) { sug.style.display = 'none'; return; }
+
+  // Buscar entre deudores fiados existentes (variable global 'fiados')
+  const fiadosArr = window.fiados || (typeof fiados !== 'undefined' ? fiados : []);
+  // Deduplicar por nombre
+  const seen = new Set();
+  const deudores = [];
+  fiadosArr.forEach(f => {
+    const k = (f.nombre||'').toLowerCase().trim();
+    if(k && !seen.has(k)) { seen.add(k); deudores.push({id:f.id, nombre:f.nombre, celular:f.celular||'', saldo:Math.max(0,(f.monto||0)-(f.pagado||0))}); }
+  });
+  const matches = deudores.filter(d => d.nombre.toLowerCase().includes(q)).slice(0,6);
+
+  if(!matches.length) { sug.style.display = 'none'; return; }
+  sug.style.display = '';
+  sug.innerHTML = matches.map(d => `
+    <div onclick="seleccionarPrestatario('${d.id}','${(d.nombre||'').replace(/'/g,"\\'")}','${(d.celular||'').replace(/'/g,"\\'")}','${(d.saldo||0)}')"
+      style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--vbg);font-size:.82rem;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-weight:700">${d.nombre}</span>
+      ${d.saldo>0?`<span style="color:var(--ro);font-size:.72rem;font-weight:800">Fiado: Bs.${Number(d.saldo).toFixed(2)}</span>`:''}
+    </div>`).join('');
+}
+
+function seleccionarPrestatario(id, nombre, celular, saldo) {
+  _prestamoPersonaSeleccionada = { id, nombre, celular };
+  document.getElementById('prestamoPersonaNombre').textContent = nombre;
+  document.getElementById('prestamoPersonaInfo').textContent =
+    (celular ? `📱 ${celular}` : '') + (Number(saldo)>0 ? `  |  Fiado pendiente: Bs.${Number(saldo).toFixed(2)}` : '');
+  document.getElementById('prestamoPersonaSelec').style.display = '';
+  document.getElementById('prestamoSugerencias').style.display = 'none';
+  document.getElementById('prestamoBuscar').value = '';
+}
+
+function clearPrestamoPersona() {
+  _prestamoPersonaSeleccionada = null;
+  document.getElementById('prestamoPersonaSelec').style.display = 'none';
+}
+
+// ── Confirmar y guardar préstamo ─────────────────────
+async function confirmarPrestamo() {
+  if(_prestamoBusy) { showToast('⏳ Espera...', true); return; }
+  _prestamoBusy = true;
+
+  let nombrePersona, celular = '';
+
+  if(_prestamoPersonaSeleccionada) {
+    nombrePersona = _prestamoPersonaSeleccionada.nombre;
+    celular = _prestamoPersonaSeleccionada.celular || '';
+  } else {
+    nombrePersona = document.getElementById('prestamoNuevoNombre').value.trim();
+    celular = document.getElementById('prestamoNuevoCel').value.trim();
+  }
+
+  if(!nombrePersona) {
+    showToast('Ingresá el nombre de la persona', true);
+    _prestamoBusy = false; return;
+  }
+
+  const nota = document.getElementById('prestamoNota').value.trim();
+  const items = Object.entries(cart).map(([,e]) => ({
+    nombre: e.prod.nombre,
+    cantidad: e.qty,
+    prodId: e.prod.id || ''
+  }));
+
+  try {
+    const data = {
+      nombre: nombrePersona,
+      celular,
+      items,
+      nota,
+      deudorId: _prestamoPersonaSeleccionada?.id || null,
+      fechaPrestamo: fs.serverTimestamp(),
+      estado: 'pendiente'
+    };
+    await fs.addDoc(fs.collection(db, 'prestamos'), data);
+    closeModal('prestamoModal');
+    showToast(`📦 Préstamo registrado para ${nombrePersona}`);
+    // No limpiar carrito — el préstamo no descuenta stock ni cierra la venta
+  } catch(e) {
+    showToast('Error al registrar: ' + e.message, true);
+  } finally {
+    _prestamoBusy = false;
+  }
+}
+
+// ── Cargar y mostrar préstamos pendientes ────────────
+function loadPrestamos() {
+  if(!window._db || !window._fs) return;
+  fs.onSnapshot(
+    fs.query(fs.collection(db,'prestamos'), fs.where('estado','==','pendiente'), fs.orderBy('fechaPrestamo','desc')),
+    snap => {
+      window._dbPrestamos = snap.docs.map(d=>({...d.data(),id:d.id}));
+      renderPrestamos();
+    },
+    err => console.warn('prestamos snapshot:', err)
+  );
+}
+
+function renderPrestamos() {
+  const list = document.getElementById('prestamosListPanel');
+  const badge = document.getElementById('prestamosCount');
+  const prestamos = window._dbPrestamos || [];
+  if(badge) badge.textContent = prestamos.length;
+
+  if(!list) return;
+  if(!prestamos.length) {
+    list.innerHTML = `<div style="font-size:.8rem;color:var(--gr);text-align:center;padding:14px 0">Sin préstamos pendientes ✓</div>`;
+    return;
+  }
+
+  list.innerHTML = prestamos.map(p => {
+    const itemsTxt = (p.items||[]).map(i=>`${i.cantidad}× ${i.nombre}`).join(', ');
+    const fecha = p.fechaPrestamo?.toDate ? p.fechaPrestamo.toDate().toLocaleDateString('es-BO',{day:'2-digit',month:'short'}) : '—';
+    return `<div style="background:var(--vbg);border-left:4px solid #7b1fa2;border-radius:10px;padding:10px 12px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:800;font-size:.85rem;color:#7b1fa2">📦 ${p.nombre}</div>
+          <div style="font-size:.78rem;color:var(--tx);margin-top:3px">${itemsTxt}</div>
+          ${p.nota?`<div style="font-size:.72rem;color:var(--gr);margin-top:2px;font-style:italic">${p.nota}</div>`:''}
+          <div style="font-size:.7rem;color:var(--gr);margin-top:3px">📅 ${fecha}</div>
+        </div>
+        <button onclick="devolverPrestamo('${p.id}')"
+          style="background:#2d7a45;color:#fff;border:none;border-radius:8px;padding:6px 11px;font-size:.75rem;font-weight:800;cursor:pointer;white-space:nowrap;flex-shrink:0">
+          ✅ Devolvió
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function devolverPrestamo(id) {
+  try {
+    await fs.updateDoc(fs.doc(db,'prestamos',id), { estado: 'devuelto', fechaDevolucion: fs.serverTimestamp() });
+    showToast('✅ Préstamo cerrado');
+  } catch(e) {
+    showToast('Error: ' + e.message, true);
+  }
+}
+
+// Exponer al scope global
+window.openPrestamoModal = openPrestamoModal;
+window.buscarPrestatario = buscarPrestatario;
+window.seleccionarPrestatario = seleccionarPrestatario;
+window.clearPrestamoPersona = clearPrestamoPersona;
+window.confirmarPrestamo = confirmarPrestamo;
+window.devolverPrestamo = devolverPrestamo;
 </script>
 </body>
 </html>
