@@ -5164,7 +5164,7 @@ const PT_COL_LABELS = {
   stock: 'Stock',
   stockMin: 'Stock mín.',
   desc: 'Descripción',
-  costo: 'Costo (Bs.)'
+  costo: 'Adquisición'
 };
 // Campos que deben tener datos para la alerta de re-habilitación
 const PT_COL_FIELD = {
@@ -5310,7 +5310,7 @@ function renderAdmProdsTabla() {
 
   // Build header
   let headers = `<th>Foto</th><th>Nombre</th><th>Categoría</th><th>Precio (Bs.)</th>`;
-  if(cols.costo) headers += `<th>${PT_COL_LABELS.costo}</th>`;
+  if(cols.costo) headers += `<th>Cant. adq.</th><th>Precio lote</th><th>Costo unit.</th>`;
   if(cols.stock) headers += `<th>${PT_COL_LABELS.stock}</th>`;
   if(cols.stockMin) headers += `<th>${PT_COL_LABELS.stockMin}</th>`;
   if(cols.expiry) headers += `<th>${PT_COL_LABELS.expiry}</th>`;
@@ -5334,7 +5334,14 @@ function renderAdmProdsTabla() {
         </select>
       </td>
       <td><input class="pt-inp${isDirty&&mod.precio!==undefined?' dirty':''}" type="number" step="0.01" min="0" data-pid="${p.id}" data-field="precio" value="${v('precio')??''}" oninput="_ptOnInput('${p.id}','precio',this.value)" style="min-width:72px"></td>`;
-    if(cols.costo) cells += `<td><input class="pt-inp${isDirty&&mod.costoUnit!==undefined?' dirty':''}" type="number" step="0.01" min="0" data-pid="${p.id}" data-field="costoUnit" value="${v('costoUnit')??''}" oninput="_ptOnInput('${p.id}','costoUnit',this.value)" style="min-width:72px"></td>`;
+    if(cols.costo) {
+      const cantAdqV = mod.cantAdq !== undefined ? mod.cantAdq : (p.cantAdq||'');
+      const costoLoteV = mod.costoLote !== undefined ? mod.costoLote : (p.costoLote||'');
+      const cuCalc = (parseFloat(cantAdqV)||0) > 0 ? ((parseFloat(costoLoteV)||0)/(parseFloat(cantAdqV)||1)).toFixed(4) : (v('costoUnit')||0).toFixed(4);
+      cells += `<td><input class="pt-inp${isDirty&&mod.cantAdq!==undefined?' dirty':''}" type="number" step="1" min="0" data-pid="${p.id}" data-field="cantAdq" value="${cantAdqV}" oninput="_ptOnInputAdq('${p.id}',this)" style="min-width:60px" placeholder="Cant."></td>`;
+      cells += `<td><input class="pt-inp${isDirty&&mod.costoLote!==undefined?' dirty':''}" type="number" step="0.01" min="0" data-pid="${p.id}" data-field="costoLote" value="${costoLoteV}" oninput="_ptOnInputAdq('${p.id}',this)" style="min-width:72px" placeholder="Lote Bs."></td>`;
+      cells += `<td><span id="ptcu_${p.id}" style="font-size:.82rem;font-weight:800;color:var(--v);padding:3px 7px;display:block">Bs.${parseFloat(cuCalc).toFixed(2)}</span></td>`;
+    }
     if(cols.stock) cells += `<td><input class="pt-inp${isDirty&&mod.stock!==undefined?' dirty':''}" type="number" min="0" data-pid="${p.id}" data-field="stock" value="${v('stock')??0}" oninput="_ptOnInput('${p.id}','stock',this.value)" style="min-width:60px"></td>`;
     if(cols.stockMin) cells += `<td><input class="pt-inp${isDirty&&mod.stockMin!==undefined?' dirty':''}" type="number" min="0" data-pid="${p.id}" data-field="stockMin" value="${v('stockMin')??0}" oninput="_ptOnInput('${p.id}','stockMin',this.value)" style="min-width:60px"></td>`;
     if(cols.expiry) cells += `<td><input class="pt-inp${isDirty&&mod.expiry!==undefined?' dirty':''}" type="date" data-pid="${p.id}" data-field="expiry" value="${v('expiry')||''}" oninput="_ptOnInput('${p.id}','expiry',this.value)" style="min-width:120px"></td>`;
@@ -5377,7 +5384,7 @@ function _ptNewProductRow(cols) {
     <td><input class="pt-inp" id="ptnew_nombre" placeholder="Nombre del producto" style="min-width:120px"></td>
     <td><select class="pt-inp" id="ptnew_cat">${catOpts}</select></td>
     <td><input class="pt-inp" type="number" step="0.01" min="0" id="ptnew_precio" placeholder="0.00" style="min-width:72px"></td>`;
-  if(cols.costo) cells += `<td><input class="pt-inp" type="number" step="0.01" min="0" id="ptnew_costoUnit" placeholder="0.00" style="min-width:72px"></td>`;
+  if(cols.costo) cells += `<td><input class="pt-inp" type="number" step="1" min="0" id="ptnew_cantAdq" placeholder="Cant." style="min-width:60px" oninput="_ptNewAdqCalc()"></td><td><input class="pt-inp" type="number" step="0.01" min="0" id="ptnew_costoLote" placeholder="Lote Bs." style="min-width:72px" oninput="_ptNewAdqCalc()"></td><td><span id="ptnew_cuCalc" style="font-size:.82rem;font-weight:800;color:var(--v);padding:3px 7px;display:block">Bs.0.00</span></td>`;
   if(cols.stock) cells += `<td><input class="pt-inp" type="number" min="0" id="ptnew_stock" placeholder="0" style="min-width:60px"></td>`;
   if(cols.stockMin) cells += `<td><input class="pt-inp" type="number" min="0" id="ptnew_stockMin" placeholder="0" style="min-width:60px"></td>`;
   if(cols.expiry) cells += `<td><input class="pt-inp" type="date" id="ptnew_expiry" style="min-width:120px"></td>`;
@@ -5466,12 +5473,50 @@ async function saveAllModified() {
   renderAdmProdsTabla();
 }
 
+function _ptOnInputAdq(pid, inp) {
+  const field = inp.dataset.field; // 'cantAdq' o 'costoLote'
+  const value = parseFloat(inp.value)||0;
+  // Track change
+  if(!_ptModified[pid]) _ptModified[pid] = {};
+  const p = DB.products[pid];
+  const orig = p?.[field];
+  if(value === (orig||0)) { delete _ptModified[pid][field]; }
+  else { _ptModified[pid][field] = value; }
+  // Recalculate costoUnit
+  const cantAdq  = _ptModified[pid]?.cantAdq  !== undefined ? _ptModified[pid].cantAdq  : (p?.cantAdq||0);
+  const costoLote = _ptModified[pid]?.costoLote !== undefined ? _ptModified[pid].costoLote : (p?.costoLote||0);
+  const cu = cantAdq > 0 ? parseFloat((costoLote/cantAdq).toFixed(4)) : (p?.costoUnit||0);
+  _ptModified[pid].costoUnit = cu;
+  if(cu === (p?.costoUnit||0)) delete _ptModified[pid].costoUnit;
+  if(!Object.keys(_ptModified[pid]).length) delete _ptModified[pid];
+  // Update display
+  const cuEl = document.getElementById('ptcu_'+pid);
+  if(cuEl) cuEl.textContent = 'Bs.'+cu.toFixed(2);
+  const row = document.getElementById('ptrow_'+pid);
+  const saveBtn = document.getElementById('ptsave_'+pid);
+  const isDirty = !!_ptModified[pid] && Object.keys(_ptModified[pid]).length > 0;
+  if(row) row.className = isDirty ? 'pt-modified' : '';
+  if(saveBtn) saveBtn.className = isDirty ? 'pt-save active' : 'pt-save';
+  inp.classList.toggle('dirty', isDirty);
+  _ptUpdateSaveAllBtn();
+}
+
+function _ptNewAdqCalc() {
+  const cant  = parseFloat(document.getElementById('ptnew_cantAdq')?.value)||0;
+  const lote  = parseFloat(document.getElementById('ptnew_costoLote')?.value)||0;
+  const cu    = cant > 0 ? (lote/cant) : 0;
+  const el    = document.getElementById('ptnew_cuCalc');
+  if(el) el.textContent = 'Bs.'+cu.toFixed(2);
+}
+
 async function ptSaveNewRow() {
   const nombre = document.getElementById('ptnew_nombre')?.value.trim();
   if(!nombre) { showToast('⚠️ El nombre es obligatorio', true); return; }
   const cat = document.getElementById('ptnew_cat')?.value||'';
   const precio = parseFloat(document.getElementById('ptnew_precio')?.value)||0;
-  const costoUnit = parseFloat(document.getElementById('ptnew_costoUnit')?.value)||0;
+  const cantAdq  = parseFloat(document.getElementById('ptnew_cantAdq')?.value)||0;
+  const costoLote = parseFloat(document.getElementById('ptnew_costoLote')?.value)||0;
+  const costoUnit = cantAdq > 0 ? parseFloat((costoLote/cantAdq).toFixed(4)) : 0;
   const stock = parseInt(document.getElementById('ptnew_stock')?.value)||0;
   const stockMin = parseInt(document.getElementById('ptnew_stockMin')?.value)||0;
   const expiry = document.getElementById('ptnew_expiry')?.value||'';
@@ -5479,7 +5524,7 @@ async function ptSaveNewRow() {
   const desc = document.getElementById('ptnew_desc')?.value.trim()||'';
   const id = 'P-'+Date.now().toString(36).toUpperCase().slice(-5);
   const data = { id, nombre, cat, precio, costoUnit, stock, stockMin, expiry, estado, desc,
-    unidad:'unidad', promos:[], promoActive:false, cantAdq:0, costoLote:0,
+    unidad:'unidad', promos:[], promoActive:false, cantAdq, costoLote,
     createdAt: fs.serverTimestamp(), updatedAt: fs.serverTimestamp() };
   try {
     await fs.setDoc(fs.doc(db,'products',id), data);
