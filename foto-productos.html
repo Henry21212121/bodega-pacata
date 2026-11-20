@@ -271,7 +271,7 @@ function updatePinDots() {
 }
 
 function checkPin() {
-  const correct = DB.config?.pinAdmin || DB.config?.pin || '1234';
+  const correct = '1234';
   if(_pinInput === correct) {
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('appMain').style.display = '';
