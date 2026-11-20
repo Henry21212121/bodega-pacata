@@ -247,6 +247,63 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
 .toast.error{background:var(--ro);}
 
 @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+
+/* ===== MODO OSCURO ===== */
+body.dark{
+  --v:#4caf6e;--vl:#6dd48d;--vbg:#1e3828;--or:#f7a040;--ro:#ef5350;
+  --tx:#e8f5ee;--gr:#9ab3a2;--gcl:#0f1f14;--wh:#1a2a1e;
+  --sh:0 2px 16px rgba(0,0,0,.45);
+  color-scheme:dark;
+}
+body.dark body{background:var(--gcl);}
+/* Fondo general y tarjetas */
+body.dark .tab-bar{background:#1a2a1e;border-bottom-color:#2a3f2e;}
+body.dark .modal-overlay{background:rgba(0,0,0,.72);}
+body.dark .modal-box{background:#1e3020;}
+body.dark .checkout-screen{background:#0f1f14;}
+body.dark .voice-panel{background:#1e3020;border-color:#2a4030;}
+/* Inputs y selects */
+body.dark .fld input,body.dark .fld select,body.dark .fld textarea,
+body.dark input[type=text],body.dark input[type=number],body.dark select{
+  background:#1e3020;color:var(--tx);border-color:#3a5a42;
+}
+body.dark .fld input:focus,body.dark .fld select:focus{border-color:var(--v);}
+/* Botones secundarios */
+body.dark .btn-sec,body.dark .cancel-sale-btn{background:#2a3f2e;color:var(--tx);}
+body.dark .pay-method-btn{background:#1e3020;border-color:#3a5a42;color:var(--tx);}
+body.dark .pay-method-btn.selected{background:#1e3828;border-color:var(--v);color:var(--v);}
+/* Carrito y sugerencias */
+body.dark .cart-item{background:#1e3828;}
+body.dark .ci-btn{background:#1e3020;border-color:var(--v);}
+body.dark .suggestion-item{border-bottom-color:#2a4030;}
+body.dark .suggestion-item:hover{background:#1e3828;}
+/* Promo */
+body.dark .promo-box{background:#2a3010;border-color:#5a5000;}
+/* Checkout */
+body.dark .checkout-items{background:#1e3020;}
+body.dark .checkout-item{border-bottom-color:#2a5035;}
+body.dark .vuelto-box{background:#2a2810;border-color:#5a5000;}
+body.dark .vuelto-row input{background:#1e3020;border-color:#5a5000;color:var(--tx);}
+/* Tickets */
+body.dark .ticket-header{border-bottom-color:#3a5a42;}
+/* Tarjetas stat */
+body.dark .stat-card{background:#1e3020;}
+/* Badges */
+body.dark .badge-low{background:#e65100;}
+/* Tabs de día */
+body.dark .day-view-tab{background:#2a3f2e;color:var(--tx);}
+/* Botones de reparación / warnings */
+body.dark #btnRepararVentas,body.dark #btnRepararFiados{background:#3a3010;color:#ffd54f;border-color:#6a5500;}
+/* Campos calculadora libras / unidades / combo */
+body.dark #cqLibrasFields,body.dark #cqComboFields{background:#2a2810;}
+body.dark #cqUnidadesFields{background:#1a2f1a;}
+body.dark #pfPesoFields{background:#2a2810;}
+body.dark #cqPrecioUnit{background:#2a3f2e;color:#9ab3a2;}
+/* Consumo familiar */
+body.dark #consumoFamiliarBox,body.dark [style*="#fff3e0"]{filter:none;}
+/* Modo oscuro toggle btn */
+.dark-toggle{background:rgba(255,255,255,.18);border:none;color:#fff;border-radius:50%;width:32px;height:32px;font-size:1.05rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s;flex-shrink:0;}
+.dark-toggle:hover{background:rgba(255,255,255,.32);}
 </style>
 </head>
 <body>
@@ -287,7 +344,10 @@ header{background:linear-gradient(90deg,#1a4d2a,#2d7a45);color:#fff;padding:0 14
         <div class="h-sub" id="hDate"></div>
       </div>
     </div>
-    <button class="logout-btn" onclick="logout()">Salir</button>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <button class="dark-toggle" id="btnDarkToggle" onclick="toggleDarkMode()" title="Modo oscuro">🌙</button>
+      <button class="logout-btn" onclick="logout()">Salir</button>
+    </div>
   </div>
   <!-- Banner modo calculadora -->
   <div id="modoCalcBanner" class="modo-calc-banner" style="display:none">
@@ -1798,6 +1858,32 @@ function checkPin() {
     setTimeout(()=>dots.style.animation="shake .3s",10);
   }
 }
+/* ===== DARK MODE ===== */
+function toggleDarkMode(){
+  const isDark = document.body.classList.toggle('dark');
+  try{ localStorage.setItem('bodega_dark', isDark ? '1' : '0'); }catch(e){}
+  document.getElementById('btnDarkToggle').textContent = isDark ? '☀️' : '🌙';
+}
+(function initDarkMode(){
+  try{
+    if(localStorage.getItem('bodega_dark')==='1'){
+      document.body.classList.add('dark');
+      // El botón puede no existir aún (DOMContentLoaded lo corrige)
+      const btn = document.getElementById('btnDarkToggle');
+      if(btn) btn.textContent='☀️';
+    }
+  }catch(e){}
+})();
+document.addEventListener('DOMContentLoaded',()=>{
+  try{
+    if(localStorage.getItem('bodega_dark')==='1'){
+      document.body.classList.add('dark');
+      const btn=document.getElementById('btnDarkToggle');
+      if(btn) btn.textContent='☀️';
+    }
+  }catch(e){}
+});
+/* ===================== */
 function logout() { pinInput=""; updatePinDots(); document.getElementById("loginScreen").classList.remove("hidden"); }
 
 // ════════════════════════════════════
