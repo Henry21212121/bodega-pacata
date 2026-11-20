@@ -1458,9 +1458,16 @@ function calcFiarSaldo() {
   }
 }
 
+let _confirmarFiarBusy = false;
+let _fiarConfirmDupTimer = null;
 async function confirmarFiar() {
+  if(_confirmarFiarBusy) { showToast('⏳ Espera, registrando fiado...', true); return; }
+  _confirmarFiarBusy = true;
+  if(_fiarConfirmDupTimer) clearTimeout(_fiarConfirmDupTimer);
+  _fiarConfirmDupTimer = setTimeout(() => { _confirmarFiarBusy = false; }, 15000);
+  try {
   const total = cartTotal();
-  if(!total) { showToast('El carrito está vacío', true); return; }
+  if(!total) { showToast('El carrito está vacío', true); _confirmarFiarBusy = false; return; }
   const aCuenta = parseFloat(document.getElementById('fiarACuenta').value)||0;
   const saldo = total - aCuenta;
   const items = Object.values(cart);
@@ -1567,6 +1574,8 @@ async function confirmarFiar() {
   closeModal('fiarModal');
   cart = {}; renderCart();
   showToast(`📋 Fiado de Bs.${total.toFixed(2)} registrado para ${nombre}`);
+  } catch(e) { showToast('Error al registrar fiado: '+e.message, true); }
+  finally { _confirmarFiarBusy = false; if(_fiarConfirmDupTimer) clearTimeout(_fiarConfirmDupTimer); }
 }
 
 // ════════════════════════════════════
