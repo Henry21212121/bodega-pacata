@@ -131,9 +131,9 @@ input,select,textarea{cursor:text;}
 .prod-acts{display:flex;gap:4px;flex-wrap:wrap;}
 
 /* COMPACT TABLE VIEW */
-.prod-tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.prod-tbl-wrap{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 200px);-webkit-overflow-scrolling:touch;}
 .prod-tbl{width:100%;border-collapse:collapse;font-size:.82rem;}
-.prod-tbl th{background:var(--vbg);color:var(--v);font-weight:800;font-size:.72rem;padding:7px 8px;text-align:left;white-space:nowrap;position:sticky;top:var(--pt-th-top,96px);z-index:10;box-shadow:0 2px 4px rgba(0,0,0,.08);}
+.prod-tbl th{background:var(--vbg);color:var(--v);font-weight:800;font-size:.72rem;padding:7px 8px;text-align:left;white-space:nowrap;position:sticky;top:0;z-index:10;box-shadow:0 2px 4px rgba(0,0,0,.08);}
 .prod-tbl td{padding:5px 7px;border-bottom:1px solid #f0f0f0;vertical-align:middle;}
 .prod-tbl tr:hover td{background:#f9fffe;}
 .prod-tbl tr.pt-modified td{background:#fffde7;}
@@ -5198,15 +5198,27 @@ function _ptSaveCols(cols) {
 }
 
 function _ptUpdateStickyTop() {
-  // Mide los elementos sticky que están SOBRE la tabla y ajusta --pt-th-top
-  requestAnimationFrame(() => {
-    const header = document.querySelector('.adm-header');
-    const tabs   = document.querySelector('.adm-tabs');
-    const hH = header ? header.offsetHeight : 58;
-    const tH = tabs   ? tabs.offsetHeight   : 38;
-    document.documentElement.style.setProperty('--pt-th-top', (hH + tH) + 'px');
-  });
+  // Mide en tiempo real el bottom de los elementos sticky sobre la tabla
+  // Usa getBoundingClientRect para capturar la posición visual real
+  const tabs = document.querySelector('.adm-tabs');
+  if(!tabs) return;
+  const top = Math.round(tabs.getBoundingClientRect().bottom);
+  document.documentElement.style.setProperty('--pt-th-top', top + 'px');
 }
+
+// Actualizar al hacer scroll para que el sticky siga siendo preciso
+(function _initPtStickyScroll() {
+  let _ptScrollRaf = null;
+  document.addEventListener('scroll', () => {
+    if(document.querySelector('.prod-tbl')) {
+      if(_ptScrollRaf) return;
+      _ptScrollRaf = requestAnimationFrame(() => {
+        _ptUpdateStickyTop();
+        _ptScrollRaf = null;
+      });
+    }
+  }, { passive: true });
+})();
 
 function _syncPtViewBtn() {
   const btn = document.getElementById('btnToggleView');
