@@ -133,7 +133,7 @@ input,select,textarea{cursor:text;}
 /* COMPACT TABLE VIEW */
 .prod-tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 .prod-tbl{width:100%;border-collapse:collapse;font-size:.82rem;}
-.prod-tbl th{background:var(--vbg);color:var(--v);font-weight:800;font-size:.72rem;padding:7px 8px;text-align:left;white-space:nowrap;position:sticky;top:0;z-index:1;}
+.prod-tbl th{background:var(--vbg);color:var(--v);font-weight:800;font-size:.72rem;padding:7px 8px;text-align:left;white-space:nowrap;position:sticky;top:116px;z-index:10;box-shadow:0 2px 4px rgba(0,0,0,.08);}
 .prod-tbl td{padding:5px 7px;border-bottom:1px solid #f0f0f0;vertical-align:middle;}
 .prod-tbl tr:hover td{background:#f9fffe;}
 .prod-tbl tr.pt-modified td{background:#fffde7;}
@@ -1324,6 +1324,8 @@ async function enterAdmin() {
   buildDaysCheckboxes();
   loadConfig();
   initTabArrows();
+  // Restaurar estado de vista tabla/tarjetas
+  _syncPtViewBtn();
 }
 
 function logout() {
@@ -5179,7 +5181,7 @@ const PT_COL_FIELD = {
   costo: 'costoUnit'
 };
 
-let _ptViewMode = 'cards'; // 'cards' | 'table'
+let _ptViewMode = (()=>{ try{ return localStorage.getItem('pt_view')||'cards'; }catch(e){ return 'cards'; } })(); // 'cards' | 'table'
 let _ptModified = {}; // {prodId: {field:value, ...}}
 
 function _ptLoadCols() {
@@ -5195,8 +5197,27 @@ function _ptSaveCols(cols) {
   try { localStorage.setItem('pt_cols', JSON.stringify(cols)); } catch(e) {}
 }
 
+function _syncPtViewBtn() {
+  const btn = document.getElementById('btnToggleView');
+  const cfgWrap = document.getElementById('colCfgWrap');
+  const saveAllBtn = document.getElementById('btnSaveAll');
+  if(!btn) return;
+  if(_ptViewMode === 'table') {
+    btn.textContent = '🃏 Tarjetas';
+    if(cfgWrap) cfgWrap.style.display = '';
+    if(saveAllBtn) saveAllBtn.style.display = '';
+    const cols = _ptLoadCols();
+    PT_COL_KEYS.forEach(k => { const cb = document.getElementById('col_'+k); if(cb) cb.checked = cols[k]; });
+  } else {
+    btn.textContent = '📋 Tabla';
+    if(cfgWrap) cfgWrap.style.display = 'none';
+    if(saveAllBtn) saveAllBtn.style.display = 'none';
+  }
+}
+
 function toggleProdView() {
   _ptViewMode = _ptViewMode === 'cards' ? 'table' : 'cards';
+  try{ localStorage.setItem('pt_view', _ptViewMode); }catch(e){}
   const btn = document.getElementById('btnToggleView');
   const cfgWrap = document.getElementById('colCfgWrap');
   const saveAllBtn = document.getElementById('btnSaveAll');
