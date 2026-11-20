@@ -62,8 +62,12 @@ input,select,textarea{cursor:text;}
 
 /* TABS */
 .adm-tabs{background:#fff;border-bottom:2px solid var(--vbg);position:sticky;top:58px;z-index:90;box-shadow:0 2px 6px rgba(0,0,0,.06);}
-.adm-tabs-inner{max-width:1100px;margin:auto;display:flex;overflow-x:auto;scrollbar-width:none;padding:0 8px;}
+.adm-tabs-wrap{max-width:1100px;margin:auto;display:flex;align-items:stretch;position:relative;}
+.adm-tabs-inner{flex:1;display:flex;overflow-x:auto;scrollbar-width:none;padding:0 4px;}
 .adm-tabs-inner::-webkit-scrollbar{display:none;}
+.adm-tab-arrow{flex-shrink:0;width:28px;background:#fff;border:none;cursor:pointer;color:var(--v);font-size:1.1rem;font-weight:900;display:flex;align-items:center;justify-content:center;opacity:.7;transition:opacity .15s;padding:0;}
+.adm-tab-arrow:hover{opacity:1;background:var(--vbg);}
+.adm-tab-arrow.hidden{visibility:hidden;}
 .atab{border:none;background:none;padding:12px 16px;font-size:.82rem;font-weight:700;color:var(--gr);border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s;}
 .atab:hover{color:var(--v);}
 .atab.active{color:var(--v);border-bottom-color:var(--v);}
@@ -125,6 +129,35 @@ input,select,textarea{cursor:text;}
 .prod-nm{font-size:.78rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .prod-meta{font-size:.65rem;color:var(--gr);}
 .prod-acts{display:flex;gap:4px;flex-wrap:wrap;}
+
+/* COMPACT TABLE VIEW */
+.prod-tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.prod-tbl{width:100%;border-collapse:collapse;font-size:.82rem;}
+.prod-tbl th{background:var(--vbg);color:var(--v);font-weight:800;font-size:.72rem;padding:7px 8px;text-align:left;white-space:nowrap;position:sticky;top:0;z-index:1;}
+.prod-tbl td{padding:5px 7px;border-bottom:1px solid #f0f0f0;vertical-align:middle;}
+.prod-tbl tr:hover td{background:#f9fffe;}
+.prod-tbl tr.pt-modified td{background:#fffde7;}
+.pt-thumb{width:34px;height:34px;border-radius:6px;overflow:hidden;background:var(--vbg);display:flex;align-items:center;justify-content:center;font-size:1.1rem;cursor:pointer;border:1.5px dashed #d0e8d8;flex-shrink:0;}
+.pt-thumb img{width:100%;height:100%;object-fit:cover;}
+.pt-inp{font-size:1rem;font-weight:800;border:1.5px solid #d0e8d8;border-radius:6px;padding:3px 7px;width:100%;min-width:70px;outline:none;transition:border-color .15s;background:#fff;}
+.pt-inp:focus{border-color:var(--v);}
+.pt-inp.dirty{border-color:var(--or)!important;background:#fffde7;}
+.pt-save{background:var(--v);color:#fff;border:none;border-radius:6px;padding:4px 9px;font-size:.75rem;font-weight:800;cursor:pointer;white-space:nowrap;opacity:.35;transition:opacity .15s;}
+.pt-save.active{opacity:1;}
+.pt-save.active:hover{background:var(--vl);}
+.pt-actions{display:flex;gap:4px;align-items:center;}
+/* Column config popup */
+.col-cfg-wrap{position:relative;display:inline-block;}
+.col-cfg-popup{position:absolute;right:0;top:calc(100% + 4px);background:#fff;border:1.5px solid #d0e8d8;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.12);padding:10px 14px;z-index:100;min-width:220px;display:none;}
+.col-cfg-popup.open{display:block;}
+.col-cfg-popup label{display:flex;align-items:center;gap:7px;padding:4px 0;font-size:.82rem;cursor:pointer;border-bottom:1px solid #f5f5f5;}
+.col-cfg-popup label:last-child{border-bottom:none;}
+.col-cfg-popup input[type=checkbox]{width:16px;height:16px;accent-color:var(--v);cursor:pointer;}
+/* Missing-data banner */
+.pt-missing-banner{background:#fff3cd;border:1px solid #fde19a;border-radius:8px;padding:8px 12px;font-size:.8rem;margin-bottom:8px;display:flex;align-items:center;gap:8px;}
+.pt-missing-banner a{color:var(--or);font-weight:700;cursor:pointer;text-decoration:underline;}
+/* New-row highlight */
+.prod-tbl tr.pt-new-row td{background:#e8f5e9;}
 
 /* PROMO TIER */
 .tier-row{display:grid;grid-template-columns:80px 1fr 1fr 30px;gap:6px;align-items:center;margin-bottom:5px;}
@@ -223,19 +256,23 @@ input[type=file]{display:none;}
   </header>
 
   <div class="adm-tabs">
-    <div class="adm-tabs-inner">
+    <div class="adm-tabs-wrap">
+    <button class="adm-tab-arrow hidden" id="tabArrowL" onclick="scrollTabs(-1)" title="Anterior">‹</button>
+    <div class="adm-tabs-inner" id="admTabsInner" onscroll="updateTabArrows()">
       <button class="atab active" onclick="showTab('dashboard',this)">📊 Dashboard</button>
-      <button class="atab" onclick="showTab('pedidos',this)">📦 Pedidos</button>
-      <button class="atab" onclick="showTab('repartidores',this)">🚲 Repartidores</button>
+      <button class="atab" onclick="showTab('pedidos',this)" style="display:none">📦 Pedidos</button>
+      <button class="atab" onclick="showTab('repartidores',this)" style="display:none">🚲 Repartidores</button>
       <button class="atab" onclick="showTab('productos',this)">🛍️ Productos</button>
-      <button class="atab" onclick="showTab('clientes',this)">👥 Clientes</button>
+      <button class="atab" onclick="showTab('clientes',this)" style="display:none">👥 Clientes</button>
       <button class="atab" onclick="showTab('reportes',this)">📈 Reportes</button>
-      <button class="atab" onclick="showTab('ofertas',this)">🎉 Ofertas</button>
-      <button class="atab" onclick="showTab('mensajes',this)">📢 Mensajes</button>
-      <button class="atab" onclick="showTab('intro',this)">🎬 Intro</button>
-      <button class="atab" onclick="showTab('historial',this)">📋 Historial</button>
+      <button class="atab" onclick="showTab('ofertas',this)" style="display:none">🎉 Ofertas</button>
+      <button class="atab" onclick="showTab('mensajes',this)" style="display:none">📢 Mensajes</button>
+      <button class="atab" onclick="showTab('intro',this)" style="display:none">🎬 Intro</button>
+      <button class="atab" onclick="showTab('historial',this)" style="display:none">📋 Historial</button>
       <button class="atab" onclick="showTab('papelera',this)">🗑️ Papelera</button>
       <button class="atab" onclick="showTab('config',this)">⚙️ Config</button>
+    </div>
+    <button class="adm-tab-arrow hidden" id="tabArrowR" onclick="scrollTabs(1)" title="Siguiente">›</button>
     </div>
   </div>
 
@@ -366,7 +403,23 @@ input[type=file]{display:none;}
           <button class="btn btn-sec btn-sm" onclick="openNewCat()" title="Agregar categoría">🗂️ + Categoría</button>
           <button class="btn btn-or btn-sm" onclick="bulkGenDescriptions()" id="bulkDescBtn" title="Genera descripciones con IA para todos los productos que no tienen una">✨ Descripciones masivas</button>
           <button class="btn btn-ro btn-sm" onclick="confirmarResetStock()">🗑️ Resetear stock</button>
+          <button class="btn btn-sec btn-sm" id="btnToggleView" onclick="toggleProdView()" title="Alternar entre vista tarjetas y tabla compacta">📋 Tabla</button>
+          <div class="col-cfg-wrap" id="colCfgWrap" style="display:none">
+            <button class="btn btn-sec btn-sm" onclick="toggleColConfig()" title="Configurar columnas visibles">⚙️ Columnas</button>
+            <div class="col-cfg-popup" id="colCfgPopup">
+              <div style="font-size:.72rem;font-weight:800;color:var(--gr);margin-bottom:6px">Columnas visibles</div>
+              <label><input type="checkbox" id="col_precioQty" onchange="onColToggle('precioQty',this)"> Precios por cantidad</label>
+              <label><input type="checkbox" id="col_estado" onchange="onColToggle('estado',this)"> Estado (oculto/visible)</label>
+              <label><input type="checkbox" id="col_expiry" onchange="onColToggle('expiry',this)"> Fecha vencimiento</label>
+              <label><input type="checkbox" id="col_stock" onchange="onColToggle('stock',this)"> Stock actual</label>
+              <label><input type="checkbox" id="col_stockMin" onchange="onColToggle('stockMin',this)"> Stock mínimo</label>
+              <label><input type="checkbox" id="col_desc" onchange="onColToggle('desc',this)"> Descripción</label>
+              <label><input type="checkbox" id="col_costo" onchange="onColToggle('costo',this)"> Costo de adquisición</label>
+            </div>
+          </div>
+          <button class="btn btn-v btn-sm" id="btnSaveAll" onclick="saveAllModified()" style="display:none">💾 Guardar todos los modificados</button>
         </div>
+        <div id="ptMissingBanner" style="display:none"></div>
         <div id="bulkDescProgress" style="display:none;background:#fff8ec;border:1px solid #fde19a;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:.82rem"></div>
         <div class="filter-pills" id="catFilterPills"></div>
         <div id="prodList"><div class="adm-loading">Cargando...</div></div>
@@ -1266,6 +1319,7 @@ async function enterAdmin() {
   renderDashboard();
   buildDaysCheckboxes();
   loadConfig();
+  initTabArrows();
 }
 
 function logout() {
@@ -1919,6 +1973,7 @@ function getPromoIssues(p) {
 }
 
 function renderAdmProds() {
+  if(typeof _ptViewMode !== 'undefined' && _ptViewMode === 'table') { renderAdmProdsTabla(); return; }
   const q      = (document.getElementById("prodSearch")?.value||"").toLowerCase().trim();
   const sortBy = document.getElementById("prodSortBy")?.value || "nombre";
 
@@ -5075,6 +5130,364 @@ window.deleteAdmCqProd = deleteAdmCqProd;
 window.setReportSource = setReportSource;
 window.toggleRangoFechas = toggleRangoFechas;
 window.renderCoquetteAdminList = renderCoquetteAdminList;
+
+// ── Flechas de navegación de tabs ──────────────────────────────
+function scrollTabs(dir) {
+  const el = document.getElementById('admTabsInner');
+  if(!el) return;
+  el.scrollBy({left: dir * 160, behavior:'smooth'});
+  setTimeout(updateTabArrows, 200);
+}
+function updateTabArrows() {
+  const el = document.getElementById('admTabsInner');
+  if(!el) return;
+  const L = document.getElementById('tabArrowL');
+  const R = document.getElementById('tabArrowR');
+  if(L) L.classList.toggle('hidden', el.scrollLeft <= 4);
+  if(R) R.classList.toggle('hidden', el.scrollLeft + el.clientWidth >= el.scrollWidth - 4);
+}
+function initTabArrows() {
+  setTimeout(updateTabArrows, 300);
+  window.addEventListener('resize', updateTabArrows);
+}
+
+// ═══════════════════════════════════════════════════════
+//  TABLA COMPACTA DE PRODUCTOS
+// ═══════════════════════════════════════════════════════
+
+// Columnas opcionales — persistidas en localStorage
+const PT_COL_KEYS = ['precioQty','estado','expiry','stock','stockMin','desc','costo'];
+const PT_COL_LABELS = {
+  precioQty: 'Precios x Cant.',
+  estado: 'Estado',
+  expiry: 'Vencimiento',
+  stock: 'Stock',
+  stockMin: 'Stock mín.',
+  desc: 'Descripción',
+  costo: 'Costo (Bs.)'
+};
+// Campos que deben tener datos para la alerta de re-habilitación
+const PT_COL_FIELD = {
+  expiry: 'expiry',
+  stock: 'stock',
+  stockMin: 'stockMin',
+  desc: 'desc',
+  costo: 'costoUnit'
+};
+
+let _ptViewMode = 'cards'; // 'cards' | 'table'
+let _ptModified = {}; // {prodId: {field:value, ...}}
+
+function _ptLoadCols() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('pt_cols')||'{}');
+    const result = {};
+    PT_COL_KEYS.forEach(k => { result[k] = saved[k] !== undefined ? saved[k] : false; });
+    return result;
+  } catch(e) { return Object.fromEntries(PT_COL_KEYS.map(k=>[k,false])); }
+}
+
+function _ptSaveCols(cols) {
+  try { localStorage.setItem('pt_cols', JSON.stringify(cols)); } catch(e) {}
+}
+
+function toggleProdView() {
+  _ptViewMode = _ptViewMode === 'cards' ? 'table' : 'cards';
+  const btn = document.getElementById('btnToggleView');
+  const cfgWrap = document.getElementById('colCfgWrap');
+  const saveAllBtn = document.getElementById('btnSaveAll');
+  if(_ptViewMode === 'table') {
+    btn.textContent = '🃏 Tarjetas';
+    cfgWrap.style.display = '';
+    saveAllBtn.style.display = '';
+    // Sync checkboxes to saved state
+    const cols = _ptLoadCols();
+    PT_COL_KEYS.forEach(k => {
+      const cb = document.getElementById('col_'+k);
+      if(cb) cb.checked = cols[k];
+    });
+    renderAdmProdsTabla();
+  } else {
+    btn.textContent = '📋 Tabla';
+    cfgWrap.style.display = 'none';
+    saveAllBtn.style.display = 'none';
+    document.getElementById('ptMissingBanner').style.display = 'none';
+    renderAdmProds();
+  }
+}
+
+function toggleColConfig() {
+  const popup = document.getElementById('colCfgPopup');
+  if(popup) popup.classList.toggle('open');
+  // Close on outside click
+  if(popup && popup.classList.contains('open')) {
+    setTimeout(() => {
+      function outsideClick(e) {
+        if(!document.getElementById('colCfgWrap').contains(e.target)) {
+          popup.classList.remove('open');
+          document.removeEventListener('click', outsideClick);
+        }
+      }
+      document.addEventListener('click', outsideClick);
+    }, 50);
+  }
+}
+
+function onColToggle(colKey, cb) {
+  const cols = _ptLoadCols();
+  const wasOff = !cols[colKey];
+  cols[colKey] = cb.checked;
+  _ptSaveCols(cols);
+
+  // Alert if re-enabling a column where products have missing data
+  if(wasOff && cb.checked && PT_COL_FIELD[colKey]) {
+    const field = PT_COL_FIELD[colKey];
+    const allProds = Object.values(DB.products||{});
+    const missing = allProds.filter(p => {
+      if(field === 'costoUnit') return !p.costoUnit || p.costoUnit <= 0;
+      if(field === 'expiry') return !p.expiry || p.expiry === '';
+      if(field === 'desc') return !p.desc || p.desc === '';
+      if(field === 'stock') return p.stock === undefined || p.stock === null;
+      if(field === 'stockMin') return !p.stockMin || p.stockMin <= 0;
+      return false;
+    });
+    if(missing.length > 0) {
+      const banner = document.getElementById('ptMissingBanner');
+      if(banner) {
+        banner.style.display = 'flex';
+        banner.innerHTML = `<span>⚠️</span> <span><b>${missing.length} productos</b> no tienen <b>${PT_COL_LABELS[colKey]}</b>. <a onclick="filterMissingCol('${colKey}')">Ver productos con dato faltante</a></span>`;
+      }
+    }
+  }
+  if(_ptViewMode === 'table') renderAdmProdsTabla();
+}
+
+function filterMissingCol(colKey) {
+  const field = PT_COL_FIELD[colKey];
+  if(!field) return;
+  // Set sort to show missing first
+  const sortMap = {
+    expiry: 'con_vencimiento',
+    desc: 'sin_desc',
+    costo: 'sin_costo',
+    stock: 'sin_stock'
+  };
+  const sortEl = document.getElementById('prodSortBy');
+  if(sortEl && sortMap[colKey]) sortEl.value = sortMap[colKey];
+  document.getElementById('ptMissingBanner').style.display = 'none';
+  if(_ptViewMode === 'table') renderAdmProdsTabla();
+}
+
+function renderAdmProdsTabla() {
+  if(_ptViewMode !== 'table') return;
+  const q      = (document.getElementById("prodSearch")?.value||"").toLowerCase().trim();
+  const sortBy = document.getElementById("prodSortBy")?.value || "nombre";
+
+  if(currentProdCat === "COQUETTE") { renderAdmProds(); return; }
+
+  let prods = Object.values(DB.products||{});
+  if(currentProdCat !== "all") prods = prods.filter(p => p.cat === currentProdCat);
+  if(q) prods = prods.filter(p => matchBusqueda(p.nombre, q) || matchBusqueda(p.cat||"", q));
+
+  // Apply same sorting as cards view
+  if(sortBy==="sin_foto")          prods = [...prods.filter(p=>!p.img),...prods.filter(p=>!!p.img)];
+  else if(sortBy==="con_vencimiento") prods = prods.filter(p=>p.expiry&&p.expiry!=="");
+  else if(sortBy==="sin_stock")    prods = [...prods.filter(p=>p.stock===0),...prods.filter(p=>p.stock!==0)];
+  else if(sortBy==="bajo_stock")   prods = [...prods.filter(p=>p.stock>0&&p.stockMin>0&&p.stock<=p.stockMin),...prods.filter(p=>!(p.stock>0&&p.stockMin>0&&p.stock<=p.stockMin))];
+  else if(sortBy==="sin_desc")     prods = [...prods.filter(p=>!p.desc),...prods.filter(p=>!!p.desc)];
+  else if(sortBy==="sin_costo")    prods = prods.filter(p=>!p.costoUnit||p.costoUnit<=0);
+  else if(sortBy==="promo_mal")    prods = prods.filter(p=>getPromoIssues(p).length>0);
+  else if(sortBy==="updated")      prods = prods.sort((a,b)=>(b.updatedAt?.seconds||0)-(a.updatedAt?.seconds||0));
+  else if(sortBy==="stock_asc")    prods = prods.sort((a,b)=>(a.stock||0)-(b.stock||0));
+  else if(sortBy==="margen_asc")   prods = prods.sort((a,b)=>{ const ma=a.costoUnit>0?(a.precio-a.costoUnit)/a.precio:1; const mb=b.costoUnit>0?(b.precio-b.costoUnit)/b.precio:1; return ma-mb; });
+  else if(sortBy==="precio_desc")  prods = prods.sort((a,b)=>(b.precio||0)-(a.precio||0));
+  else if(sortBy==="nombre_desc")  prods = prods.sort((a,b)=>b.nombre.localeCompare(a.nombre));
+  else                              prods = prods.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+
+  const cols = _ptLoadCols();
+  const list = document.getElementById("prodList");
+  if(!list) return;
+
+  // Build header
+  let headers = `<th>Foto</th><th>Nombre</th><th>Categoría</th><th>Precio (Bs.)</th>`;
+  if(cols.costo) headers += `<th>${PT_COL_LABELS.costo}</th>`;
+  if(cols.stock) headers += `<th>${PT_COL_LABELS.stock}</th>`;
+  if(cols.stockMin) headers += `<th>${PT_COL_LABELS.stockMin}</th>`;
+  if(cols.expiry) headers += `<th>${PT_COL_LABELS.expiry}</th>`;
+  if(cols.estado) headers += `<th>${PT_COL_LABELS.estado}</th>`;
+  if(cols.desc) headers += `<th style="min-width:140px">${PT_COL_LABELS.desc}</th>`;
+  if(cols.precioQty) headers += `<th style="min-width:120px">${PT_COL_LABELS.precioQty}</th>`;
+  headers += `<th>Acciones</th>`;
+
+  // Build rows
+  const rows = prods.map(p => {
+    const mod = _ptModified[p.id] || {};
+    const isDirty = Object.keys(mod).length > 0;
+    const v = k => mod[k] !== undefined ? mod[k] : p[k];
+    const imgEl = p.img ? `<img src="${p.img}">` : (DB.categories[p.cat]?.emoji||"📦");
+    let cells = `
+      <td><div class="pt-thumb" onclick="quickImg('${p.id}')">${imgEl}</div></td>
+      <td><input class="pt-inp${isDirty&&mod.nombre!==undefined?' dirty':''}" data-pid="${p.id}" data-field="nombre" value="${_esc(v('nombre'))}" oninput="_ptOnInput('${p.id}','nombre',this.value)" style="min-width:120px"></td>
+      <td>
+        <select class="pt-inp${isDirty&&mod.cat!==undefined?' dirty':''}" data-pid="${p.id}" data-field="cat" onchange="_ptOnInput('${p.id}','cat',this.value)" style="min-width:90px">
+          ${Object.keys(DB.categories||{}).map(c=>`<option value="${_esc(c)}"${v('cat')===c?' selected':''}>${_esc(c)}</option>`).join('')}
+        </select>
+      </td>
+      <td><input class="pt-inp${isDirty&&mod.precio!==undefined?' dirty':''}" type="number" step="0.01" min="0" data-pid="${p.id}" data-field="precio" value="${v('precio')??''}" oninput="_ptOnInput('${p.id}','precio',this.value)" style="min-width:72px"></td>`;
+    if(cols.costo) cells += `<td><input class="pt-inp${isDirty&&mod.costoUnit!==undefined?' dirty':''}" type="number" step="0.01" min="0" data-pid="${p.id}" data-field="costoUnit" value="${v('costoUnit')??''}" oninput="_ptOnInput('${p.id}','costoUnit',this.value)" style="min-width:72px"></td>`;
+    if(cols.stock) cells += `<td><input class="pt-inp${isDirty&&mod.stock!==undefined?' dirty':''}" type="number" min="0" data-pid="${p.id}" data-field="stock" value="${v('stock')??0}" oninput="_ptOnInput('${p.id}','stock',this.value)" style="min-width:60px"></td>`;
+    if(cols.stockMin) cells += `<td><input class="pt-inp${isDirty&&mod.stockMin!==undefined?' dirty':''}" type="number" min="0" data-pid="${p.id}" data-field="stockMin" value="${v('stockMin')??0}" oninput="_ptOnInput('${p.id}','stockMin',this.value)" style="min-width:60px"></td>`;
+    if(cols.expiry) cells += `<td><input class="pt-inp${isDirty&&mod.expiry!==undefined?' dirty':''}" type="date" data-pid="${p.id}" data-field="expiry" value="${v('expiry')||''}" oninput="_ptOnInput('${p.id}','expiry',this.value)" style="min-width:120px"></td>`;
+    if(cols.estado) cells += `<td><select class="pt-inp${isDirty&&mod.estado!==undefined?' dirty':''}" data-pid="${p.id}" data-field="estado" onchange="_ptOnInput('${p.id}','estado',this.value)"><option value="activo"${v('estado')!=='oculto'?' selected':''}>✅ Activo</option><option value="oculto"${v('estado')==='oculto'?' selected':''}>🙈 Oculto</option></select></td>`;
+    if(cols.desc) cells += `<td><input class="pt-inp${isDirty&&mod.desc!==undefined?' dirty':''}" data-pid="${p.id}" data-field="desc" value="${_esc(v('desc')||'')}" oninput="_ptOnInput('${p.id}','desc',this.value)" style="min-width:140px"></td>`;
+    if(cols.precioQty) {
+      const promos = (p.promos||[]).map(t=>`${t.q}x→Bs.${t.p}`).join(', ');
+      cells += `<td><span style="font-size:.72rem;color:var(--gr)">${promos||'—'}</span></td>`;
+    }
+    cells += `<td><div class="pt-actions">
+      <button class="pt-save${isDirty?' active':''}" id="ptsave_${p.id}" onclick="ptSaveRow('${p.id}')">💾</button>
+      <button class="btn btn-sec btn-sm" title="Editar completo" onclick="openProdEditor('${p.id}')">✏️</button>
+      <button class="btn btn-ro btn-sm" onclick="askDelete('${p.id}')">🗑️</button>
+    </div></td>`;
+    return `<tr class="${isDirty?'pt-modified':''}" id="ptrow_${p.id}">${cells}</tr>`;
+  }).join('');
+
+  // New product row
+  const newRowCells = _ptNewProductRow(cols);
+
+  list.innerHTML = `<div class="prod-tbl-wrap">
+    <table class="prod-tbl">
+      <thead><tr>${headers}</tr></thead>
+      <tbody id="ptTbody">${rows}${newRowCells}</tbody>
+    </table>
+  </div>`;
+
+  // Update save-all button visibility
+  _ptUpdateSaveAllBtn();
+}
+
+function _esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function _ptNewProductRow(cols) {
+  const catOpts = Object.keys(DB.categories||{}).map(c=>`<option value="${_esc(c)}">${_esc(c)}</option>`).join('');
+  let cells = `
+    <td><div class="pt-thumb" style="cursor:default">➕</div></td>
+    <td><input class="pt-inp" id="ptnew_nombre" placeholder="Nombre del producto" style="min-width:120px"></td>
+    <td><select class="pt-inp" id="ptnew_cat">${catOpts}</select></td>
+    <td><input class="pt-inp" type="number" step="0.01" min="0" id="ptnew_precio" placeholder="0.00" style="min-width:72px"></td>`;
+  if(cols.costo) cells += `<td><input class="pt-inp" type="number" step="0.01" min="0" id="ptnew_costoUnit" placeholder="0.00" style="min-width:72px"></td>`;
+  if(cols.stock) cells += `<td><input class="pt-inp" type="number" min="0" id="ptnew_stock" placeholder="0" style="min-width:60px"></td>`;
+  if(cols.stockMin) cells += `<td><input class="pt-inp" type="number" min="0" id="ptnew_stockMin" placeholder="0" style="min-width:60px"></td>`;
+  if(cols.expiry) cells += `<td><input class="pt-inp" type="date" id="ptnew_expiry" style="min-width:120px"></td>`;
+  if(cols.estado) cells += `<td><select class="pt-inp" id="ptnew_estado"><option value="activo">✅ Activo</option><option value="oculto">🙈 Oculto</option></select></td>`;
+  if(cols.desc) cells += `<td><input class="pt-inp" id="ptnew_desc" placeholder="Descripción..." style="min-width:140px"></td>`;
+  if(cols.precioQty) cells += `<td></td>`;
+  cells += `<td><button class="btn btn-v btn-sm" onclick="ptSaveNewRow()">💾 Agregar</button></td>`;
+  return `<tr class="pt-new-row" id="ptrow_new">${cells}</tr>`;
+}
+
+function _ptOnInput(pid, field, value) {
+  const p = DB.products[pid];
+  if(!p) return;
+  if(!_ptModified[pid]) _ptModified[pid] = {};
+  // If value equals original, remove from modified
+  const orig = p[field];
+  let typed = value;
+  if(field === 'precio' || field === 'costoUnit') typed = parseFloat(value)||0;
+  else if(field === 'stock' || field === 'stockMin') typed = parseInt(value)||0;
+  if(String(typed) === String(orig) || (typed === 0 && !orig)) {
+    delete _ptModified[pid][field];
+    if(!Object.keys(_ptModified[pid]).length) delete _ptModified[pid];
+  } else {
+    _ptModified[pid][field] = typed;
+  }
+  // Update row dirty state visually
+  const row = document.getElementById('ptrow_'+pid);
+  const saveBtn = document.getElementById('ptsave_'+pid);
+  const isDirty = !!_ptModified[pid] && Object.keys(_ptModified[pid]).length > 0;
+  if(row) row.className = isDirty ? 'pt-modified' : '';
+  if(saveBtn) { saveBtn.className = isDirty ? 'pt-save active' : 'pt-save'; }
+  // Mark input dirty
+  const inp = document.querySelector(`[data-pid="${pid}"][data-field="${field}"]`);
+  if(inp) inp.classList.toggle('dirty', isDirty && _ptModified[pid]?.[field] !== undefined);
+  _ptUpdateSaveAllBtn();
+}
+
+function _ptUpdateSaveAllBtn() {
+  const btn = document.getElementById('btnSaveAll');
+  if(!btn) return;
+  const count = Object.keys(_ptModified).length;
+  btn.style.display = _ptViewMode === 'table' ? '' : 'none';
+  btn.textContent = count > 0 ? `💾 Guardar todos los modificados (${count})` : '💾 Guardar todos los modificados';
+  btn.style.opacity = count > 0 ? '1' : '.4';
+  btn.style.pointerEvents = count > 0 ? '' : 'none';
+}
+
+async function ptSaveRow(pid) {
+  const p = DB.products[pid];
+  if(!p) return;
+  const mod = _ptModified[pid];
+  if(!mod || !Object.keys(mod).length) return;
+  const btn = document.getElementById('ptsave_'+pid);
+  if(btn) { btn.textContent='⏳'; btn.classList.remove('active'); }
+  try {
+    const update = {...mod, updatedAt: fs.serverTimestamp()};
+    await fs.updateDoc(fs.doc(db,'products',pid), update);
+    // Apply to local DB
+    Object.assign(p, mod);
+    delete _ptModified[pid];
+    showToast('✅ '+p.nombre+' guardado');
+    renderAdmProdsTabla();
+  } catch(e) {
+    showToast('Error: '+e.message, true);
+    if(btn) { btn.textContent='💾'; btn.classList.add('active'); }
+  }
+}
+
+async function saveAllModified() {
+  const ids = Object.keys(_ptModified);
+  if(!ids.length) return;
+  let saved = 0, errors = 0;
+  for(const pid of ids) {
+    const p = DB.products[pid];
+    if(!p) continue;
+    const mod = _ptModified[pid];
+    if(!mod || !Object.keys(mod).length) continue;
+    try {
+      await fs.updateDoc(fs.doc(db,'products',pid), {...mod, updatedAt: fs.serverTimestamp()});
+      Object.assign(p, mod);
+      delete _ptModified[pid];
+      saved++;
+    } catch(e) { errors++; }
+  }
+  showToast(errors ? `⚠️ ${saved} guardados, ${errors} errores` : `✅ ${saved} productos guardados`);
+  renderAdmProdsTabla();
+}
+
+async function ptSaveNewRow() {
+  const nombre = document.getElementById('ptnew_nombre')?.value.trim();
+  if(!nombre) { showToast('⚠️ El nombre es obligatorio', true); return; }
+  const cat = document.getElementById('ptnew_cat')?.value||'';
+  const precio = parseFloat(document.getElementById('ptnew_precio')?.value)||0;
+  const costoUnit = parseFloat(document.getElementById('ptnew_costoUnit')?.value)||0;
+  const stock = parseInt(document.getElementById('ptnew_stock')?.value)||0;
+  const stockMin = parseInt(document.getElementById('ptnew_stockMin')?.value)||0;
+  const expiry = document.getElementById('ptnew_expiry')?.value||'';
+  const estado = document.getElementById('ptnew_estado')?.value||'activo';
+  const desc = document.getElementById('ptnew_desc')?.value.trim()||'';
+  const id = 'P-'+Date.now().toString(36).toUpperCase().slice(-5);
+  const data = { id, nombre, cat, precio, costoUnit, stock, stockMin, expiry, estado, desc,
+    unidad:'unidad', promos:[], promoActive:false, cantAdq:0, costoLote:0,
+    createdAt: fs.serverTimestamp(), updatedAt: fs.serverTimestamp() };
+  try {
+    await fs.setDoc(fs.doc(db,'products',id), data);
+    showToast('✅ Producto agregado: '+nombre);
+    renderAdmProdsTabla();
+  } catch(e) { showToast('Error: '+e.message, true); }
+}
+
 </script>
 
 <!-- MODAL: ASIGNAR REPARTIDOR -->
