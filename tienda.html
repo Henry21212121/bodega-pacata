@@ -3874,8 +3874,13 @@ function renderFiados() {
     btnRep.textContent = `🔧 Reparar ${fiadosMalos.length} fiado${fiadosMalos.length!==1?'s':''} con deuda incorrecta`;
   }
   if(!fiados.length){
-    el.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--gr);font-size:.82rem">Sin fiados pendientes 🎉</td></tr>`;
-    return;
+    const prestamosHuerfanos = (window._dbPrestamos||[]);
+    if(!prestamosHuerfanos.length) {
+      el.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--gr);font-size:.82rem">Sin fiados pendientes 🎉</td></tr>`;
+      return;
+    }
+    // Hay préstamos solos aunque no haya fiados — no hacer return, seguir al bloque de prestamosSolos
+    el.innerHTML = '';
   }
   // Agrupar por nombre
   const grupos = {};
