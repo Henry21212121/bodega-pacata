@@ -639,8 +639,6 @@ body.dark #consumoFamiliarBox,body.dark [style*="#fff3e0"]{filter:none;}
       <div class="section-title" style="margin:0">📋 Fiados pendientes</div>
       <div style="display:flex;gap:6px">
         <button class="btn btn-sec" id="btnToggleSeleccion" onclick="toggleModoSeleccion()" style="padding:7px 10px;font-size:.78rem;display:none">☑️ Seleccionar</button>
-        <button class="btn btn-or" onclick="openAddFiado()" style="padding:7px 13px;font-size:.78rem">+ Nuevo fiado</button>
-        <button onclick="openPrestamoModal()" style="background:#7b1fa2;color:#fff;border:none;border-radius:10px;padding:7px 11px;font-size:.78rem;font-weight:800;cursor:pointer">📦 Préstamo</button>
       </div>
     </div>
     <!-- Barra de selección (visible solo en modo selección) -->
@@ -1744,7 +1742,7 @@ let DB = { products:{}, config:{}, tempProds:[] };
 let pinInput = "";
 let cart = {};        // id -> {prod, qty, tipo}
 let modoCalculadora = localStorage.getItem('modoCalc') === 'true';
-let controlStock = true;   // se lee de DB.config.controlStock al cargar
+let controlStock = localStorage.getItem('controlStock') !== 'false';  // respaldo inmediato; Firestore lo sobreescribe al cargar
 
 // ════════════════════════════════════
 // CONEXIÓN / MODO OFFLINE
@@ -1775,6 +1773,7 @@ window.addEventListener('offline', () => { showToast('📴 Sin conexión — se 
 
 async function toggleControlStock() {
   controlStock = !controlStock;
+  localStorage.setItem('controlStock', controlStock);  // persiste localmente de inmediato
   actualizarUIControlStock();
   renderProductos();
   try {
@@ -1856,6 +1855,7 @@ async function waitForDB() {
       DB.config = snap.data();
       // controlStock: undefined o true → activado; false → desactivado
       controlStock = DB.config.controlStock !== false;
+      localStorage.setItem('controlStock', controlStock);  // sincronizar localStorage con Firestore
       actualizarUIControlStock();
     }
   } catch(e) {}
