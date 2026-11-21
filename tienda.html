@@ -5260,9 +5260,11 @@ async function confirmarPrestamo() {
 function loadPrestamos() {
   if(!window._db || !window._fs) return;
   fs.onSnapshot(
-    fs.query(fs.collection(db,'prestamos'), fs.where('estado','==','pendiente'), fs.orderBy('fechaPrestamo','desc')),
+    fs.query(fs.collection(db,'prestamos'), fs.where('estado','==','pendiente')),
     snap => {
-      window._dbPrestamos = snap.docs.map(d=>({...d.data(),id:d.id}));
+      window._dbPrestamos = snap.docs
+        .map(d=>({...d.data(),id:d.id}))
+        .sort((a,b)=>(b.fechaPrestamo?.seconds||0)-(a.fechaPrestamo?.seconds||0));
       renderPrestamos();
     },
     err => console.warn('prestamos snapshot:', err)
