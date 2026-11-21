@@ -36,10 +36,12 @@
   .hdr-btn:active{background:rgba(255,255,255,.3);}
 
   /* ── SEARCH BAR ── */
-  .search-bar{padding:10px 14px;background:var(--card);border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;}
-  .search-bar input{flex:1;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:.88rem;outline:none;background:#fff;}
+  .search-bar{padding:8px 14px;background:var(--card);border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+  .search-bar input{flex:1;min-width:120px;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:.88rem;outline:none;background:#fff;}
   .search-bar input:focus{border-color:var(--v);}
-  .filter-toggle{background:var(--vbg);border:1.5px solid var(--border);border-radius:8px;padding:7px 12px;font-size:.8rem;font-weight:700;cursor:pointer;color:var(--v);white-space:nowrap;}
+  .search-bar-row2{display:flex;gap:6px;width:100%;}
+  .search-bar select{flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:.82rem;outline:none;background:#fff;color:var(--tx);cursor:pointer;}
+  .filter-toggle{flex-shrink:0;background:var(--vbg);border:1.5px solid var(--border);border-radius:8px;padding:7px 12px;font-size:.8rem;font-weight:700;cursor:pointer;color:var(--v);white-space:nowrap;}
   .filter-toggle.active{background:var(--v);color:#fff;border-color:var(--v);}
 
   /* ── STATS BAR ── */
@@ -71,11 +73,11 @@
   .crop-btn{background:rgba(255,255,255,.12);border:none;color:#fff;border-radius:8px;padding:7px 13px;font-size:.8rem;font-weight:700;cursor:pointer;}
   .crop-btn.primary{background:var(--v);}
   .crop-btn:active{opacity:.7;}
-  /* Crop area */
-  .crop-area-wrap{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;touch-action:none;}
+  /* Crop area — altura limitada para que los paneles siempre sean visibles */
+  .crop-area-wrap{flex:0 0 auto;height:min(55vw,55vh,340px);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;touch-action:none;}
   #cropCanvas{cursor:grab;touch-action:none;max-width:100%;max-height:100%;}
   /* Sliders */
-  .adjust-panel{background:#1a1a1a;padding:10px 14px 16px;display:flex;flex-direction:column;gap:7px;}
+  .adjust-panel{background:#1a1a1a;padding:10px 14px 16px;display:flex;flex-direction:column;gap:7px;overflow-y:auto;max-height:calc(100vh - min(55vw,55vh,340px) - 100px);}
   .adj-row{display:flex;align-items:center;gap:8px;}
   .adj-lbl{color:#ccc;font-size:.72rem;font-weight:700;width:70px;flex-shrink:0;}
   .adj-val{color:#fff;font-size:.72rem;font-weight:800;width:32px;text-align:right;flex-shrink:0;}
@@ -85,7 +87,7 @@
   .crop-tab{flex:1;padding:9px 4px;font-size:.72rem;font-weight:700;color:#888;border:none;background:transparent;cursor:pointer;transition:color .15s;}
   .crop-tab.active{color:var(--vl);}
   /* Fondo panel */
-  .bg-panel{background:#1a1a1a;padding:12px 14px 16px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;}
+  .bg-panel{background:#1a1a1a;padding:12px 14px 16px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;max-height:calc(100vh - min(55vw,55vh,340px) - 100px);}
   .bg-toggle{display:flex;align-items:center;gap:10px;cursor:pointer;}
   .bg-toggle input[type=checkbox]{width:20px;height:20px;accent-color:var(--vl);cursor:pointer;}
   .bg-toggle span{color:#ccc;font-size:.82rem;font-weight:700;}
@@ -147,11 +149,13 @@
   </div>
 
   <div class="search-bar">
-    <input id="searchInput" type="text" placeholder="🔍 Buscar producto..." oninput="renderList()">
-    <select id="catFilter" onchange="renderList()" style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:.82rem;outline:none;background:#fff;color:var(--tx);cursor:pointer;max-width:130px">
-      <option value="">Todas las cats.</option>
-    </select>
-    <button class="filter-toggle" id="btnSinFoto" onclick="toggleSinFotoFilter()">Sin foto</button>
+    <input id="searchInput" type="text" placeholder="🔍 Buscar producto..." oninput="renderListDebounced()" onsearch="renderList()">
+    <div class="search-bar-row2">
+      <select id="catFilter" onchange="renderList()">
+        <option value="">Todas las cats.</option>
+      </select>
+      <button class="filter-toggle" id="btnSinFoto" onclick="toggleSinFotoFilter()">📷 Sin foto</button>
+    </div>
   </div>
   <div class="stats-bar" id="statsBar">Cargando...</div>
   <div class="prod-list" id="prodList"><div style="text-align:center;padding:30px;color:var(--gr)">Cargando productos...</div></div>
@@ -377,6 +381,12 @@ function toggleSinFotoFilter() {
 }
 window.toggleSinFotoFilter = toggleSinFotoFilter;
 
+let _renderTimer = null;
+function renderListDebounced() {
+  if(_renderTimer) clearTimeout(_renderTimer);
+  _renderTimer = setTimeout(renderList, 120);
+}
+
 function renderList() {
   const q   = (document.getElementById('searchInput')?.value||'').toLowerCase().trim();
   const cat = document.getElementById('catFilter')?.value||'';
@@ -540,7 +550,7 @@ function drawCrop() {
   if(!_srcBitmap) return;
   const wrap = document.getElementById('cropAreaWrap');
   const canvas = document.getElementById('cropCanvas');
-  const size = Math.min(wrap.clientWidth, wrap.clientHeight, 400);
+  const size = Math.min(wrap.clientWidth || 300, wrap.clientHeight || 300, 400);
   canvas.width = size; canvas.height = size;
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0,0,size,size);
