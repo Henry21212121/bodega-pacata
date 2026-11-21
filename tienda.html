@@ -720,6 +720,22 @@ body.dark #consumoFamiliarBox,body.dark [style*="#fff3e0"]{filter:none;}
 <div class="tab-content" id="tab-configuracion">
   <div class="inner">
 
+    <!-- CONTROL DE STOCK -->
+    <div style="background:#fff;border-radius:var(--rd);padding:14px;box-shadow:var(--sh);margin-top:10px;margin-bottom:12px;border:2px solid #1565c0">
+      <div class="section-title" style="margin-bottom:8px;color:#1565c0">📦 Control de stock</div>
+      <p style="font-size:.82rem;color:#666;margin:0 0 12px">Cuando está <b>desactivado</b>, ningún producto aparece como "Agotado" y no hay límite al agregar al carrito. El stock sigue mostrándose en admin pero no bloquea ventas.</p>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div>
+          <div style="font-weight:800;font-size:.9rem" id="controlStockLabel">Activado</div>
+          <div style="font-size:.75rem;color:#aaa" id="controlStockSub">Los productos agotados no se pueden vender</div>
+        </div>
+        <button id="btnControlStock" onclick="toggleControlStock()"
+          style="padding:10px 20px;border:none;border-radius:10px;font-weight:800;font-size:.9rem;cursor:pointer;background:#1565c0;color:#fff;min-width:120px;transition:all .2s">
+          Desactivar
+        </button>
+      </div>
+    </div>
+
     <!-- MODO CALCULADORA -->
     <div style="background:#fff;border-radius:var(--rd);padding:14px;box-shadow:var(--sh);margin-top:10px;margin-bottom:12px;border:2px solid #ff6d00">
       <div class="section-title" style="margin-bottom:8px;color:#e65100">🧮 Modo Calculadora</div>
@@ -1728,6 +1744,7 @@ let DB = { products:{}, config:{}, tempProds:[] };
 let pinInput = "";
 let cart = {};        // id -> {prod, qty, tipo}
 let modoCalculadora = localStorage.getItem('modoCalc') === 'true';
+let controlStock = true;   // se lee de DB.config.controlStock al cargar
 
 // ════════════════════════════════════
 // CONEXIÓN / MODO OFFLINE
@@ -1755,6 +1772,35 @@ function actualizarBannerConexion() {
 }
 window.addEventListener('online', () => { showToast('🌐 Internet recuperado, sincronizando...'); actualizarBannerConexion(); });
 window.addEventListener('offline', () => { showToast('📴 Sin conexión — se sigue trabajando localmente', true); actualizarBannerConexion(); });
+
+async function toggleControlStock() {
+  controlStock = !controlStock;
+  actualizarUIControlStock();
+  renderProductos();
+  try {
+    await fs.updateDoc(fs.doc(db,'config','main'), { controlStock });
+    DB.config.controlStock = controlStock;
+    showToast(controlStock ? '📦 Control de stock activado' : '📦 Control de stock desactivado');
+  } catch(e) {
+    showToast('Error guardando configuración', true);
+  }
+}
+window.toggleControlStock = toggleControlStock;
+
+function actualizarUIControlStock() {
+  const btn   = document.getElementById('btnControlStock');
+  const label = document.getElementById('controlStockLabel');
+  const sub   = document.getElementById('controlStockSub');
+  if(controlStock) {
+    if(btn)   { btn.textContent='Desactivar'; btn.style.background='#1565c0'; btn.style.color='#fff'; }
+    if(label) { label.textContent='✅ Activado'; label.style.color='#1565c0'; }
+    if(sub)   sub.textContent='Los productos agotados no se pueden vender';
+  } else {
+    if(btn)   { btn.textContent='Activar'; btn.style.background='#eee'; btn.style.color='#555'; }
+    if(label) { label.textContent='⚠️ Desactivado'; label.style.color='#f57c00'; }
+    if(sub)   sub.textContent='Ningún producto aparece como agotado';
+  }
+}
 
 function toggleModoCalc() {
   modoCalculadora = !modoCalculadora;
@@ -1787,7 +1833,7 @@ function actualizarUIModCalc() {
 }
 
 // Aplicar al cargar
-document.addEventListener('DOMContentLoaded', () => actualizarUIModCalc());
+document.addEventListener('DOMContentLoaded', () => { actualizarUIModCalc(); actualizarUIControlStock(); });
 let currentProdTab = "catalogo";
 let payMethod = "efectivo";
 let editTempId = null;
@@ -1806,7 +1852,12 @@ async function waitForDB() {
   // Load config FIRST — PIN depends on this
   try {
     const snap = await fs.getDoc(fs.doc(db, "config", "main"));
-    if(snap.exists()) DB.config = snap.data();
+    if(snap.exists()) {
+      DB.config = snap.data();
+      // controlStock: undefined o true → activado; false → desactivado
+      controlStock = DB.config.controlStock !== false;
+      actualizarUIControlStock();
+    }
   } catch(e) {}
 
   // Mark as ready and update UI
@@ -2104,9 +2155,9 @@ function makeCqCard(p) {
 }
 
 function makeProdCard(p, tipo) {
-  const agotado = p.stock === 0;
+  const agotado = controlStock && p.stock === 0;
   const isTmp = tipo === "temporal";
-  const low = p.stockMin > 0 && p.stock <= p.stockMin && p.stock > 0;
+  const low = controlStock && p.stockMin > 0 && p.stock <= p.stockMin && p.stock > 0;
   // Tienda física: nunca mostrar promos por cantidad (eso es solo del e-commerce)
   const conPromo = false;
   const inCart = cart[tipo + "_" + p.id];
@@ -2138,7 +2189,7 @@ function makeProdCard(p, tipo) {
   }
 
   // Cart control — same as virtual store
-  const atMax = !modoCalculadora && inCart && inCart.qty >= p.stock && p.stock > 0;
+  const atMax = !modoCalculadora && controlStock && inCart && inCart.qty >= p.stock && p.stock > 0;
   let ctrlHtml = "";
   if(agotado && !modoCalculadora) {
     ctrlHtml = `<button class="abtn" disabled>Sin stock</button>`;
@@ -2151,7 +2202,7 @@ function makeProdCard(p, tipo) {
   } else {
     ctrlHtml = `<button class="abtn" onclick="addToCart('${p.id}','${tipo}')">+ Agregar</button>`;
   }
-  const stockInfo = (!modoCalculadora && p.stock != null && p.stock !== "")
+  const stockInfo = (!modoCalculadora && controlStock && p.stock != null && p.stock !== "")
     ? `<div style="font-size:.65rem;color:var(--gr);text-align:center;margin-top:3px;font-weight:700">${p.stock > 0 ? `📦 ${p.stock} disponible${p.stock!==1?'s':''}` : ''}</div>`
     : '';
 
@@ -2178,11 +2229,11 @@ function makeProdCard(p, tipo) {
 function addToCart(id, tipo) {
   const prod = tipo==="temporal" ? DB.tempProds.find(p=>p.id===id) : DB.products[id];
   if(!prod) return;
-  if(!modoCalculadora && tipo==="catalogo" && prod.stock===0) { showToast("Sin stock",true); return; }
+  if(!modoCalculadora && controlStock && tipo==="catalogo" && prod.stock===0) { showToast("Sin stock",true); return; }
   const key = tipo+"_"+id;
-  const stockMax = (!modoCalculadora && prod.stock != null && prod.stock > 0) ? prod.stock : Infinity;
+  const stockMax = (!modoCalculadora && controlStock && prod.stock != null && prod.stock > 0) ? prod.stock : Infinity;
   const actual = cart[key]?.qty || 0;
-  if(!modoCalculadora && actual >= stockMax) {
+  if(!modoCalculadora && controlStock && actual >= stockMax) {
     showToast("⚠️ Máximo disponible: "+stockMax, true); return;
   }
   if(cart[key]) { cart[key].qty++; }
@@ -2195,10 +2246,10 @@ function addToCart(id, tipo) {
 function changeCartQty(key, delta) {
   if(!cart[key]) return;
   const entry = cart[key];
-  const stockMax = (!modoCalculadora && entry.prod.stock != null && entry.prod.stock > 0) ? entry.prod.stock : Infinity;
+  const stockMax = (!modoCalculadora && controlStock && entry.prod.stock != null && entry.prod.stock > 0) ? entry.prod.stock : Infinity;
   const nuevaQty = entry.qty + delta;
   if(nuevaQty <= 0) { delete cart[key]; renderCart(); return; }
-  if(!modoCalculadora && delta > 0 && nuevaQty > stockMax) {
+  if(!modoCalculadora && controlStock && delta > 0 && nuevaQty > stockMax) {
     showToast("⚠️ Máximo disponible: "+stockMax, true); return;
   }
   cart[key].qty = nuevaQty;
@@ -2426,14 +2477,16 @@ async function confirmSale() {
       showToast("🧮 Total: Bs."+total.toFixed(2)+" (modo calculadora — no guardado)");
     } else {
       await fs.addDoc(fs.collection(db,"sales_physical"), sale);
-      // Decrement stock
-      for(const [,entry] of items) {
-        if(entry.tipo==="catalogo" && DB.products[entry.prod.id]?.stock>0) {
-          await fs.updateDoc(fs.doc(db,"products",entry.prod.id), {stock:fs.increment(-Math.ceil(entry.qty))});
-        }
-        if(entry.tipo==="temporal" && entry.prod.stock!=null) {
-          const ns = Math.max(0,(entry.prod.stock||0)-entry.qty);
-          await fs.updateDoc(fs.doc(db,"tempProducts",entry.prod.id), {stock:ns});
+      // Decrement stock — solo si control de stock está activo
+      if(controlStock) {
+        for(const [,entry] of items) {
+          if(entry.tipo==="catalogo" && DB.products[entry.prod.id]?.stock>0) {
+            await fs.updateDoc(fs.doc(db,"products",entry.prod.id), {stock:fs.increment(-Math.ceil(entry.qty))});
+          }
+          if(entry.tipo==="temporal" && entry.prod.stock!=null) {
+            const ns = Math.max(0,(entry.prod.stock||0)-entry.qty);
+            await fs.updateDoc(fs.doc(db,"tempProducts",entry.prod.id), {stock:ns});
+          }
         }
       }
       // Guardar préstamo si se anotó uno
@@ -4931,14 +4984,16 @@ async function confirmConsumoPropio() {
     await fs.addDoc(fs.collection(db,"consumo_propio"), {
       items: consumoItems, total, createdAt: fs.serverTimestamp()
     });
-    // Descontar stock real (sale del inventario igual que una venta)
-    for(const [,e] of items) {
-      if(e.tipo==="catalogo" && DB.products[e.prod.id]?.stock>0) {
-        await fs.updateDoc(fs.doc(db,"products",e.prod.id), {stock:fs.increment(-Math.ceil(e.qty))});
-      }
-      if(e.tipo==="temporal" && e.prod.stock!=null) {
-        const ns = Math.max(0,(e.prod.stock||0)-e.qty);
-        await fs.updateDoc(fs.doc(db,"tempProducts",e.prod.id), {stock:ns});
+    // Descontar stock real — solo si control de stock está activo
+    if(controlStock) {
+      for(const [,e] of items) {
+        if(e.tipo==="catalogo" && DB.products[e.prod.id]?.stock>0) {
+          await fs.updateDoc(fs.doc(db,"products",e.prod.id), {stock:fs.increment(-Math.ceil(e.qty))});
+        }
+        if(e.tipo==="temporal" && e.prod.stock!=null) {
+          const ns = Math.max(0,(e.prod.stock||0)-e.qty);
+          await fs.updateDoc(fs.doc(db,"tempProducts",e.prod.id), {stock:ns});
+        }
       }
     }
     consumoCart = {};
