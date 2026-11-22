@@ -639,6 +639,7 @@ body.dark #consumoFamiliarBox,body.dark [style*="#fff3e0"]{filter:none;}
       <div class="section-title" style="margin:0">📋 Fiados pendientes</div>
       <div style="display:flex;gap:6px">
         <button class="btn btn-sec" id="btnToggleSeleccion" onclick="toggleModoSeleccion()" style="padding:7px 10px;font-size:.78rem;display:none">☑️ Seleccionar</button>
+        <button class="btn btn-or" onclick="openAddFiado()" style="padding:7px 13px;font-size:.78rem">+ Nuevo fiado</button>
       </div>
     </div>
     <!-- Barra de selección (visible solo en modo selección) -->
@@ -1853,9 +1854,12 @@ async function waitForDB() {
     const snap = await fs.getDoc(fs.doc(db, "config", "main"));
     if(snap.exists()) {
       DB.config = snap.data();
-      // controlStock: undefined o true → activado; false → desactivado
-      controlStock = DB.config.controlStock !== false;
-      localStorage.setItem('controlStock', controlStock);  // sincronizar localStorage con Firestore
+      // controlStock: si Firestore tiene el campo explícito, usarlo; si no, respetar localStorage
+      if(DB.config.hasOwnProperty('controlStock')) {
+        controlStock = DB.config.controlStock !== false;
+        localStorage.setItem('controlStock', controlStock);
+      }
+      // Si no existe en Firestore, controlStock ya tiene el valor de localStorage (inicializado arriba)
       actualizarUIControlStock();
     }
   } catch(e) {}
